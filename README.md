@@ -123,6 +123,8 @@ JWT_SECRET=your_secret_key_here
 ```
 
 ---
+## Credit 
+KrishnaManohar101 (for initial codebase)
 
 ## License
 MIT
