@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+**/dist/
+build/
+**/build/
+
+# Environment & secrets
+env
+**/.env
+**/.env.*
+
+# Temp files from compiler backend
+temp/
+**/temp/*.ino
+**/temp/*.hex
+
+# Logs
+*.log
+**/out.txt
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
