@@ -1,6 +1,6 @@
 # push-arduino-simulator.ps1
 # Usage: .\push-arduino-simulator.ps1 "your commit message"
-# Commits and pushes everything in the simulator folder to Arduino-simulator on GitHub.
+# Commits and pushes the full simulator to Arduino-simulator on GitHub.
 
 param(
     [Parameter(Mandatory=$true)]
@@ -8,15 +8,36 @@ param(
 )
 
 $root = "c:\Users\Danish\Documents\simulator"
-
-Write-Host "Committing to Arduino-simulator..." -ForegroundColor Cyan
+$subs = @(
+    "OpenHW-studio-frontend-danish",
+    "openhw-studio-backend-danish",
+    "openhw-studio-emulator-danish"
+)
 
 Set-Location $root
+Write-Host "Committing to Arduino-simulator..." -ForegroundColor Cyan
 
-# Stage all changes (node_modules and .git sub-folders are excluded via .gitignore)
-git add .
-git commit -m $Message
-git push origin main
+# Temporarily hide sub-repo .git folders so root git tracks files (not submodules)
+foreach ($sub in $subs) {
+    $gitPath = Join-Path $root "$sub\.git"
+    if (Test-Path $gitPath) {
+        Rename-Item $gitPath ".git_bak"
+    }
+}
 
-Write-Host ""
-Write-Host "Done! Pushed to https://github.com/danish9661/Arduino-simulator" -ForegroundColor Green
+try {
+    git add .
+    git commit -m $Message
+    git push origin main
+    Write-Host ""
+    Write-Host "Done! Pushed to https://github.com/danish9661/Arduino-simulator" -ForegroundColor Green
+} finally {
+    # Always restore sub-repo .git folders, even if push fails
+    foreach ($sub in $subs) {
+        $bakPath = Join-Path $root "$sub\.git_bak"
+        if (Test-Path $bakPath) {
+            Rename-Item $bakPath ".git"
+        }
+    }
+    Write-Host "Sub-repo git folders restored." -ForegroundColor DarkGray
+}
