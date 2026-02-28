@@ -2,6 +2,9 @@
 node_modules/
 **/node_modules/
 
+# Sub-repo git folders (renamed temporarily during sync)
+**/.git_bak/
+
 # Build outputs
 dist/
 **/dist/

@@ -1,0 +1,16 @@
+{
+    "name": "openhw-studio-monorepo",
+    "private": true,
+    "version": "1.0.0",
+    "workspaces": [
+        "OpenHW-studio-frontend-danish",
+        "openhw-studio-emulator-danish",
+        "openhw-studio-backend-danish"
+    ],
+    "scripts": {
+        "start:frontend": "npm run dev -w OpenHW-studio-frontend-danish",
+        "start:emulator": "npm start -w @openhw/emulator",
+        "start:backend": "npm run dev -w openhw-studio-backend-danish",
+        "start:all": "start cmd /k npm run start:backend ^& start cmd /k npm run start:frontend"
+    }
+}

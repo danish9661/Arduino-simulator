@@ -1,0 +1,36 @@
+ type    .\start_all.bat 
+
+Open a terminal and navigate to the backend folder:
+bash
+cd openhw-studio-backend-danish
+Install dependencies:
+bash
+npm install
+Start the server (runs on http://localhost:5000):
+bash
+npm run dev
+2. The Universal Emulator Backend
+This is the high-speed WebSocket server that runs the simulated CPU.
+
+Open a new terminal and navigate to the emulator folder:
+bash
+cd openhw-studio-emulator-danish
+Install dependencies:
+bash
+npm install
+Start the server (runs on ws://localhost:8085):
+bash
+node src/server.js
+3. The React Frontend
+This is the visual user interface for the application.
+
+Open a new terminal and navigate to the frontend folder:
+bash
+cd OpenHW-studio-frontend-danish
+Install dependencies:
+bash
+npm install
+Start the Vite development server:
+bash
+npm run dev
+The terminal will give you a local URL (usually http://localhost:5173) which you can open in your browser to start using the simulator.
