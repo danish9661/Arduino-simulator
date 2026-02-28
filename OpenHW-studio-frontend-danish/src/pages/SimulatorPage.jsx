@@ -53,18 +53,67 @@ Object.values(COMPONENT_REGISTRY).forEach(module => {
 let nextId = 1
 let nextWireId = 1
 
-// ─── MULTI-SEGMENT ORTHOGONAL PATH ──────────────────────────────────────────
+// ─── ROUNDED ORTHOGONAL PATH ───────────────────────────────────────────────
 function multiRoutePath(p1, p2, waypoints = []) {
   if (!p1 || !p2) return '';
   const pts = [p1, ...waypoints, p2];
-  let d = '';
+  let orthPts = [];
+
+  // 1. Generate purely orthogonal points
   for (let i = 0; i < pts.length - 1; i++) {
     const a = pts[i];
     const b = pts[i + 1];
+    if (i === 0) orthPts.push(a);
+
+    // Midpoint dog-leg logic (same as before but extracting the coordinates)
     const midX = (a.x + b.x) / 2;
-    if (i === 0) d += `M ${a.x} ${a.y} `;
-    d += `L ${midX} ${a.y} L ${midX} ${b.y} L ${b.x} ${b.y} `;
+    orthPts.push({ x: midX, y: a.y });
+    orthPts.push({ x: midX, y: b.y });
+    orthPts.push(b);
   }
+
+  // Deduplicate consecutive identical points
+  orthPts = orthPts.filter((pt, i, arr) => {
+    if (i === 0) return true;
+    return pt.x !== arr[i - 1].x || pt.y !== arr[i - 1].y;
+  });
+
+  if (orthPts.length < 2) return '';
+
+  const r = 10; // Corner radius (adjust as desired for curvature)
+  let d = `M ${orthPts[0].x} ${orthPts[0].y}`;
+
+  // 2. Add arcs at corners
+  for (let i = 1; i < orthPts.length - 1; i++) {
+    const prev = orthPts[i - 1];
+    const curr = orthPts[i];
+    const next = orthPts[i + 1];
+
+    // Distance to neighbors
+    const distPrev = Math.hypot(curr.x - prev.x, curr.y - prev.y);
+    const distNext = Math.hypot(next.x - curr.x, next.y - curr.y);
+
+    // Limit radius if segment is too short
+    const cornerR = Math.min(r, distPrev / 2, distNext / 2);
+
+    // Calculate start and end points of the curve along the segments
+    const pStartPoint = {
+      x: curr.x + (prev.x - curr.x) * (cornerR / distPrev) || curr.x,
+      y: curr.y + (prev.y - curr.y) * (cornerR / distPrev) || curr.y,
+    };
+    const pEndPoint = {
+      x: curr.x + (next.x - curr.x) * (cornerR / distNext) || curr.x,
+      y: curr.y + (next.y - curr.y) * (cornerR / distNext) || curr.y,
+    };
+
+    // Draw line to the start of the curve, then the quadratic curve to the end
+    d += ` L ${pStartPoint.x} ${pStartPoint.y}`;
+    d += ` Q ${curr.x} ${curr.y} ${pEndPoint.x} ${pEndPoint.y}`;
+  }
+
+  // Draw final line to the last point
+  const last = orthPts[orthPts.length - 1];
+  d += ` L ${last.x} ${last.y}`;
   return d;
 }
 
@@ -302,9 +351,10 @@ export default function SimulatorPage() {
   // ── Move and Select component ──────────────────────────────────────────────
   const onCompMouseDown = useCallback((e, id) => {
     e.stopPropagation()
+    if (isRunning) return; // Restrict movement while running
     const comp = components.find(c => c.id === id)
     movingComp.current = { id, sx: e.clientX, sy: e.clientY, cx: comp.x, cy: comp.y, moved: false, originalComps: JSON.parse(JSON.stringify(components)) }
-  }, [components])
+  }, [components, isRunning])
 
   const onCompClick = useCallback((e, id) => {
     e.stopPropagation()
@@ -341,6 +391,7 @@ export default function SimulatorPage() {
   // ── Pin click — start or complete wire ─────────────────────────────────────
   const onPinClick = useCallback((e, compId, pinId, pinLabel) => {
     e.stopPropagation()
+    if (isRunning) return; // Restrict wiring while running
 
     const pos = getPinPos(compId, pinId)
     if (!pos) return
@@ -363,27 +414,53 @@ export default function SimulatorPage() {
         toLabel: pinLabel,
         color: wireColor(wireStart.pinLabel),
         waypoints: wireStart.waypoints || [],
+        isBelow: false // Add z-index configuration
       }
       setWires(prev => [...prev, newWire])
       setWireStart(null)
     }
-  }, [wireStart, getPinPos, saveHistory])
+  }, [wireStart, getPinPos, saveHistory, isRunning])
 
   const updateWireColor = (id, color) => {
     setWires(prev => prev.map(w => w.id === id ? { ...w, color } : w));
   };
 
+  const toggleWireLayer = (id) => {
+    saveHistory();
+    setWires(prev => prev.map(w => w.id === id ? { ...w, isBelow: !w.isBelow } : w));
+  };
+
+  const updateComponentAttr = (id, key, value) => {
+    saveHistory();
+    setComponents(prev => prev.map(c => {
+      if (c.id === id) {
+        let newW = c.w;
+        let newH = c.h;
+        if (c.type === 'wokwi-neopixel-matrix') {
+          const rows = key === 'rows' ? (parseInt(value) || 1) : (parseInt(c.attrs?.rows) || 1);
+          const cols = key === 'cols' ? (parseInt(value) || 1) : (parseInt(c.attrs?.cols) || 1);
+          newW = Math.max(30, cols * 30);
+          newH = Math.max(30, rows * 30);
+        }
+        return { ...c, w: newW, h: newH, attrs: { ...c.attrs, [key]: value } };
+      }
+      return c;
+    }));
+  };
+
   // Cancel wire on Escape / delete selected
   useEffect(() => {
     const onKey = (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+
       if (e.key === 'Escape') { setWireStart(null); setSelected(null); }
       if ((e.key === 'Delete' || e.key === 'Backspace') && selected && !isRunning) {
         saveHistory();
-        if (selected.startsWith('w')) {
+        if (selected.match(/^w\d+$/)) {
           setWires(prev => prev.filter(w => w.id !== selected))
         } else {
           setComponents(prev => prev.filter(c => c.id !== selected))
-          setWires(prev => prev.filter(w => !w.from.startsWith(selected) && !w.to.startsWith(selected)))
+          setWires(prev => prev.filter(w => !w.from.startsWith(selected + ':') && !w.to.startsWith(selected + ':')))
         }
         setSelected(null)
       }
@@ -533,11 +610,11 @@ export default function SimulatorPage() {
           <Btn color={selected ? "var(--red)" : undefined} disabled={!selected || isRunning} onClick={() => {
             if (!selected || isRunning) return;
             saveHistory();
-            if (selected.startsWith('w')) {
+            if (selected.match(/^w\d+$/)) {
               setWires(prev => prev.filter(w => w.id !== selected));
             } else {
               setComponents(prev => prev.filter(c => c.id !== selected))
-              setWires(prev => prev.filter(w => !w.from.startsWith(selected) && !w.to.startsWith(selected)))
+              setWires(prev => prev.filter(w => !w.from.startsWith(selected + ':') && !w.to.startsWith(selected + ':')))
             }
             setSelected(null)
           }}>🗑 Delete</Btn>
@@ -627,81 +704,51 @@ export default function SimulatorPage() {
             }
           }}
         >
-          {/* SVG layer for wires */}
+          {/* BOTTOM SVG layer for wires (Below Components) */}
           <svg
-            ref={svgRef}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}
           >
-            <defs>
-              <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
-                <path d="M 0 0 L 6 3 L 0 6 z" fill="var(--accent)" opacity="0.6" />
-              </marker>
-            </defs>
-
-            {/* Placed wires */}
-            {wires.map(w => {
+            {wires.filter(w => w.isBelow === true).map(w => {
               const fromParts = w.from.split(':')
               const toParts = w.to.split(':')
               const p1 = getPinPos(fromParts[0], fromParts[1])
               const p2 = getPinPos(toParts[0], toParts[1])
               if (!p1 || !p2) return null
               const isSelectedWire = selected === w.id;
-              // Approximate midpoint for context menu
-              const pts = [p1, ...(w.waypoints || []), p2];
-              const midIdx = Math.floor(pts.length / 2);
-              const midPt = pts[midIdx];
 
               return (
                 <g key={w.id} style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setSelected(w.id); }}>
-                  {/* Shadow for click hitbox */}
-                  <path
-                    d={multiRoutePath(p1, p2, w.waypoints)}
-                    stroke="transparent" strokeWidth={16} fill="none"
-                    style={{ pointerEvents: 'stroke' }}
-                  />
-                  <path
-                    d={multiRoutePath(p1, p2, w.waypoints)}
-                    stroke={isSelectedWire ? 'var(--orange)' : w.color}
-                    strokeWidth={isSelectedWire ? 3.5 : 2.5}
-                    fill="none"
-                    strokeDasharray={isSelectedWire ? "6 4" : "none"}
-                    strokeLinecap="round"
-                    opacity={0.9}
-                  />
-                  {/* Dots at waypoints & ends */}
-                  <circle cx={p1.x} cy={p1.y} r={isSelectedWire ? 5 : 4} fill={isSelectedWire ? 'var(--orange)' : w.color} />
-                  {(w.waypoints || []).map((pt, i) => (
-                    <circle key={i} cx={pt.x} cy={pt.y} r={isSelectedWire ? 4 : 3} fill={isSelectedWire ? 'var(--orange)' : w.color} opacity={0.6} />
-                  ))}
-                  <circle cx={p2.x} cy={p2.y} r={isSelectedWire ? 5 : 4} fill={isSelectedWire ? 'var(--orange)' : w.color} />
+                  <path d={multiRoutePath(p1, p2, w.waypoints)} stroke="transparent" strokeWidth={16} fill="none" style={{ pointerEvents: 'stroke' }} />
+                  <path d={multiRoutePath(p1, p2, w.waypoints)} stroke={isSelectedWire ? 'var(--orange)' : w.color} strokeWidth={isSelectedWire ? 3.5 : 2.5} fill="none" strokeDasharray={isSelectedWire ? "6 4" : "none"} strokeLinecap="round" opacity={0.6} />
+                  <circle cx={p1.x} cy={p1.y} r={isSelectedWire ? 5 : 4} fill={isSelectedWire ? 'var(--orange)' : w.color} opacity={0.6} />
+                  {(w.waypoints || []).map((pt, i) => <circle key={i} cx={pt.x} cy={pt.y} r={isSelectedWire ? 4 : 3} fill={isSelectedWire ? 'var(--orange)' : w.color} opacity={0.4} />)}
+                  <circle cx={p2.x} cy={p2.y} r={isSelectedWire ? 5 : 4} fill={isSelectedWire ? 'var(--orange)' : w.color} opacity={0.6} />
+                </g>
+              )
+            })}
+          </svg>
 
-                  {/* Small Context Menu for Selected Wire */}
-                  {isSelectedWire && !isRunning && (
-                    <foreignObject x={midPt.x - 45} y={midPt.y - 50} width="90" height="42" style={{ overflow: 'visible', pointerEvents: 'none' }}>
-                      <div style={{
-                        position: 'relative',
-                        background: 'var(--bg2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '6px 10px', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', cursor: 'default',
-                        pointerEvents: 'all'
-                      }}
-                        onPointerDown={e => e.stopPropagation()}
-                        onClick={e => e.stopPropagation()}>
-                        <input
-                          type="color" value={w.color}
-                          onChange={e => updateWireColor(w.id, e.target.value)}
-                          style={{ width: 22, height: 22, padding: 0, border: 'none', cursor: 'pointer', background: 'transparent', borderRadius: 4 }}
-                          title="Change Color"
-                        />
-                        <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
-                        <button style={{ background: 'var(--red)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 13, padding: '4px 8px', borderRadius: 6, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }} onPointerDown={() => deleteWire(w.id)} onClick={() => deleteWire(w.id)} title="Delete Wire">
-                          ✕
-                        </button>
-                        {/* Downward pointing triangle arrow */}
-                        <div style={{ position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid var(--border)' }} />
-                        <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--bg2)' }} />
-                      </div>
-                    </foreignObject>
-                  )}
+          {/* TOP SVG layer for wires (Above Components) & Context Menu */}
+          <svg
+            ref={svgRef}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }}
+          >
+            {/* Placed wires (Top layer) */}
+            {wires.filter(w => w.isBelow !== true).map(w => {
+              const fromParts = w.from.split(':')
+              const toParts = w.to.split(':')
+              const p1 = getPinPos(fromParts[0], fromParts[1])
+              const p2 = getPinPos(toParts[0], toParts[1])
+              if (!p1 || !p2) return null
+              const isSelectedWire = selected === w.id;
+
+              return (
+                <g key={w.id} style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setSelected(w.id); }}>
+                  <path d={multiRoutePath(p1, p2, w.waypoints)} stroke="transparent" strokeWidth={16} fill="none" style={{ pointerEvents: 'stroke' }} />
+                  <path d={multiRoutePath(p1, p2, w.waypoints)} stroke={isSelectedWire ? 'var(--orange)' : w.color} strokeWidth={isSelectedWire ? 3.5 : 2.5} fill="none" strokeDasharray={isSelectedWire ? "6 4" : "none"} strokeLinecap="round" opacity={0.9} />
+                  <circle cx={p1.x} cy={p1.y} r={isSelectedWire ? 5 : 4} fill={isSelectedWire ? 'var(--orange)' : w.color} />
+                  {(w.waypoints || []).map((pt, i) => <circle key={i} cx={pt.x} cy={pt.y} r={isSelectedWire ? 4 : 3} fill={isSelectedWire ? 'var(--orange)' : w.color} opacity={0.6} />)}
+                  <circle cx={p2.x} cy={p2.y} r={isSelectedWire ? 5 : 4} fill={isSelectedWire ? 'var(--orange)' : w.color} />
                 </g>
               )
             })}
@@ -719,6 +766,47 @@ export default function SimulatorPage() {
               />
             )}
           </svg>
+
+          {/* HTML Overlay for Wire Context Menus (Bypasses SVG foreignObject event bugs) */}
+          {(() => {
+            const w = wires.find(w => w.id === selected);
+            if (!w || isRunning) return null;
+
+            const fromParts = w.from.split(':')
+            const toParts = w.to.split(':')
+            const p1 = getPinPos(fromParts[0], fromParts[1])
+            const p2 = getPinPos(toParts[0], toParts[1])
+            if (!p1 || !p2) return null
+            const pts = [p1, ...(w.waypoints || []), p2];
+            const midPt = pts[Math.floor(pts.length / 2)];
+
+            return (
+              <div key={`menu-${w.id}`} style={{
+                position: 'absolute',
+                left: midPt.x - 65,
+                top: midPt.y - 50,
+                zIndex: 50,
+                background: 'var(--bg2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8,
+                padding: '6px 10px', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', cursor: 'default'
+              }}
+                onPointerDown={e => e.stopPropagation()}
+                onClick={e => e.stopPropagation()}>
+                <input type="color" value={w.color} onChange={e => updateWireColor(w.id, e.target.value)} style={{ width: 22, height: 22, padding: 0, border: 'none', cursor: 'pointer', background: 'transparent', borderRadius: 4 }} title="Change Color" />
+                <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
+                <button
+                  style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', fontSize: 16, padding: '2px 6px', borderRadius: 6, display: 'flex', alignItems: 'center' }}
+                  onClick={(e) => { e.stopPropagation(); toggleWireLayer(w.id); }}
+                  onPointerDown={(e) => { e.stopPropagation(); }}
+                  title={w.isBelow ? "Bring to Front" : "Send to Back"}
+                >
+                  {w.isBelow ? '↑' : '↓'}
+                </button>
+                <button style={{ background: 'var(--red)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 13, padding: '4px 8px', borderRadius: 6, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }} onPointerDown={(e) => { e.stopPropagation(); deleteWire(w.id); }} onClick={(e) => { e.stopPropagation(); deleteWire(w.id); }} title="Delete Wire">✕</button>
+                <div style={{ position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid var(--border)' }} />
+                <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--bg2)' }} />
+              </div>
+            )
+          })()}
 
           {/* Empty state */}
           {components.length === 0 && (
@@ -795,8 +883,15 @@ export default function SimulatorPage() {
 
                 {/* Pins */}
                 {pins.map(pin => {
-                  const isHovered = hoveredPin === `${comp.id}:${pin.id}`
-                  const isWireStartPin = wireStart?.compId === comp.id && wireStart?.pinId === pin.id
+                  const pinStrRef = `${comp.id}:${pin.id}`;
+                  const isHovered = hoveredPin === pinStrRef;
+                  const isWireStartPin = wireStart?.compId === comp.id && wireStart?.pinId === pin.id;
+
+                  // Check if a wire is connected to this pin
+                  const connectedWire = wires.find(w => w.from === pinStrRef || w.to === pinStrRef);
+                  const pinColor = connectedWire ? connectedWire.color : (isWireStartPin || isHovered ? '#f1c40f' : 'rgba(255,255,255,0.2)');
+                  const pinBorder = connectedWire ? connectedWire.color : (isHovered || isWireStartPin ? '#fff' : 'rgba(255,255,255,0.8)');
+
                   return (
                     <div
                       key={pin.id}
@@ -805,8 +900,8 @@ export default function SimulatorPage() {
                         position: 'absolute',
                         left: pin.x, top: pin.y,
                         width: 5, height: 5,
-                        background: isWireStartPin ? '#f1c40f' : isHovered ? '#f1c40f' : 'rgba(255,255,255,0.2)',
-                        border: `1px solid ${isHovered || isWireStartPin ? '#fff' : 'rgba(255,255,255,0.8)'}`,
+                        background: pinColor,
+                        border: `1px solid ${pinBorder}`,
                         borderRadius: '0%', /* matching task3.html */
                         cursor: 'crosshair',
                         zIndex: isHovered ? 30 : 20, /* matching task3.html hover and port z-index */
@@ -814,7 +909,7 @@ export default function SimulatorPage() {
                         transition: '0.2s', /* matching task3.html transition */
                         pointerEvents: 'all', /* Fix hit detection */
                       }}
-                      onMouseEnter={() => setHoveredPin(`${comp.id}:${pin.id}`)}
+                      onMouseEnter={() => setHoveredPin(pinStrRef)}
                       onMouseLeave={() => setHoveredPin(null)}
                       onClick={e => onPinClick(e, comp.id, pin.id, pin.description || pin.id)}
                     >
@@ -846,6 +941,58 @@ export default function SimulatorPage() {
                 }}>
                   {comp.label}
                 </div>
+
+                {/* Component Context Menu */}
+                {isSelected && !isRunning && (
+                  <div style={{
+                    position: 'absolute', top: -50, left: '50%', transform: 'translateX(-50%)',
+                    background: 'var(--bg2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '6px 10px', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', cursor: 'default',
+                    pointerEvents: 'all', whiteSpace: 'nowrap', zIndex: 100
+                  }}
+                    onMouseDown={e => e.stopPropagation()}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {comp.type === 'wokwi-led' && (
+                      <>
+                        <span style={{ fontSize: 12, color: 'var(--text2)' }}>Color:</span>
+                        <select value={comp.attrs.color || 'red'} onChange={e => updateComponentAttr(comp.id, 'color', e.target.value)} style={{ background: 'var(--bg)', color: 'white', border: '1px solid var(--border)', borderRadius: 4, padding: 2, outline: 'none' }}>
+                          <option value="red">Red</option>
+                          <option value="green">Green</option>
+                          <option value="blue">Blue</option>
+                          <option value="yellow">Yellow</option>
+                          <option value="orange">Orange</option>
+                          <option value="white">White</option>
+                        </select>
+                      </>
+                    )}
+                    {comp.type === 'wokwi-resistor' && (
+                      <>
+                        <span style={{ fontSize: 12, color: 'var(--text2)' }}>Res (Ω):</span>
+                        <input type="text" value={comp.attrs.value ?? '1000'} onChange={e => updateComponentAttr(comp.id, 'value', e.target.value)} style={{ width: 60, background: 'var(--bg)', color: 'white', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 4px', outline: 'none' }} />
+                      </>
+                    )}
+                    {comp.type === 'wokwi-power-supply' && (
+                      <>
+                        <span style={{ fontSize: 12, color: 'var(--text2)' }}>Voltage:</span>
+                        <input type="number" step="0.1" value={comp.attrs.voltage ?? '5.0'} onChange={e => updateComponentAttr(comp.id, 'voltage', e.target.value)} style={{ width: 50, background: 'var(--bg)', color: 'white', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 4px', outline: 'none' }} />
+                        <span style={{ fontSize: 12, color: 'var(--text2)' }}>V</span>
+                      </>
+                    )}
+                    {comp.type === 'wokwi-neopixel-matrix' && (
+                      <>
+                        <span style={{ fontSize: 12, color: 'var(--text2)' }}>Cols:</span>
+                        <input type="number" min="1" max="16" value={comp.attrs.cols ?? '8'} onChange={e => updateComponentAttr(comp.id, 'cols', e.target.value)} style={{ width: 40, background: 'var(--bg)', color: 'white', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 4px', outline: 'none' }} />
+                        <span style={{ fontSize: 12, color: 'var(--text2)' }}>Rows:</span>
+                        <input type="number" min="1" max="16" value={comp.attrs.rows ?? '8'} onChange={e => updateComponentAttr(comp.id, 'rows', e.target.value)} style={{ width: 40, background: 'var(--bg)', color: 'white', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 4px', outline: 'none' }} />
+                      </>
+                    )}
+
+
+                    <div style={{ position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid var(--border)' }} />
+                    <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--bg2)' }} />
+                  </div>
+                )}
               </div>
             )
           })}
@@ -1058,8 +1205,8 @@ export default function SimulatorPage() {
             </div>
           )}
         </aside>
-      </div>
-    </div>
+      </div >
+    </div >
   )
 }
 
