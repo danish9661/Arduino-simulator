@@ -48,7 +48,7 @@ Express.js REST API. Accepts C++ code, invokes `arduino-cli` to compile it, and 
 - **Key libs:** Express, Mongoose, jsonwebtoken, bcryptjs, cors
 
 ### ⚙️ Emulator — `openhw-studio-emulator-danish/`
-High-speed WebSocket server. Runs a virtual ATmega328P (Arduino Uno chip) at a simulated 16 MHz, intercepts hardware register writes to track pin states, decodes WS2812B NeoPixel signals, and streams JSON state at ~60 FPS.
+High-speed WebSocket server. Runs a virtual ATmega328P (Arduino Uno chip) at a simulated 16 MHz, utilizing `avr8js` **AVRIOPort** infrastructure natively for 100% accurate Hardware Interrupts (EXTI/PCINT) and Internal Pull-up Resistor simulation. Decodes WS2812B NeoPixel signals, routes I2C (TWI) and SPI peripheral buses, and streams JSON state at ~60 FPS.
 
 - **Port:** `ws://localhost:8085`
 - **Key libs:** ws, avr8js, intel-hex
@@ -71,6 +71,15 @@ High-speed WebSocket server. Runs a virtual ATmega328P (Arduino Uno chip) at a s
 | Potentiometer | Analog input |
 | Slide Potentiometer | Analog input |
 | NeoPixel Matrix (WS2812B) | Addressable RGB LED |
+
+---
+
+## Powerful Integrated Tools
+
+- **Serial Monitor**: Talk directly to the virtual UART port natively in the browser. 
+- **Analog Plotter / Logic Analyzer**: Trace real-time multi-pin voltage signals using a highly-optimized, zero-dependency HTML5 `<canvas>` rendering engine.
+- **Physical Controls**: Click the physical Reset button on the Arduino Uno graphic to reboot the active web-worker sketch loop.
+- **Advanced Bus Routing**: I2C and SPI peripheral mapping allows standard Arduino libraries to work immediately natively.
 
 ---
 

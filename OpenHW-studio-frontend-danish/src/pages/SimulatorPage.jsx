@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../context/AuthContext.jsx'
 import { compileCode } from '../services/simulatorService.js'
+import html2canvas from 'html2canvas'
 
 import { wokwiLed as ledIndex, wokwiArduinoUno as unoIndex, wokwiResistor as resistorIndex, wokwiPushbutton as pushbuttonIndex, wokwiPowerSupply as powerSupplyIndex, wokwiNeopixelMatrix as neopixelIndex, wokwiBuzzer as buzzerIndex, wokwiMotor as motorIndex, wokwiServo as servoIndex, wokwiMotorDriver as motorDriverIndex, wokwiSlidePotentiometer as slidePotIndex, wokwiPotentiometer as potIndex } from '@openhw/emulator/src/components/index.ts';
 
@@ -159,6 +160,20 @@ export default function SimulatorPage() {
   const [pinStates, setPinStates] = useState({})
   const [neopixelData, setNeopixelData] = useState({})
   const [oopStates, setOopStates] = useState({});
+  const [serialHistory, setSerialHistory] = useState([]);
+  const [serialInput, setSerialInput] = useState('');
+  const [serialPaused, setSerialPaused] = useState(false);
+  const serialOutputRef = useRef(null);
+
+  // Plotter State
+  const [plotData, setPlotData] = useState([]);
+  const [selectedPlotPins, setSelectedPlotPins] = useState(['13', 'A0']);
+  const plotterCanvasRef = useRef(null);
+  const [plotterPaused, setPlotterPaused] = useState(false);
+
+  // PNG Export State
+  const [isExporting, setIsExporting] = useState(false);
+
   const workerRef = useRef(null)
   const neopixelRefs = useRef({})
 
@@ -281,6 +296,99 @@ export default function SimulatorPage() {
     new Set(validationErrors.flatMap(e => e.compIds)),
     [validationErrors]
   )
+
+  // ── Serial auto-scroll ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!serialPaused && serialOutputRef.current) {
+      serialOutputRef.current.scrollTop = serialOutputRef.current.scrollHeight;
+    }
+  }, [serialHistory, serialPaused]);
+
+  // ── Plotter Rendering Loop ───────────────────────────────────────────────────
+  useEffect(() => {
+    const canvas = plotterCanvasRef.current;
+    if (!canvas || codeTab !== 'plotter' || plotData.length === 0 || selectedPlotPins.length === 0) return;
+    if (plotterPaused) return; // Freeze canvas when paused
+
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    ctx.clearRect(0, 0, width, height);
+
+    const trackHeight = height / selectedPlotPins.length;
+    const Y_LABEL_W = 30;
+
+    selectedPlotPins.forEach((pinStr, trackIdx) => {
+      const trackBaseY = trackHeight * (trackIdx + 1) - 10;
+      const trackTopY = trackHeight * trackIdx + 10;
+      const isAnalog = pinStr.startsWith('A');
+      const color = isAnalog ? '#3498db' : '#2ecc71';
+
+      // Track separator
+      if (trackIdx < selectedPlotPins.length - 1) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, trackHeight * (trackIdx + 1));
+        ctx.lineTo(width, trackHeight * (trackIdx + 1));
+        ctx.stroke();
+      }
+
+      // Baseline (LOW / 0V) dashed guide
+      ctx.setLineDash([4, 6]);
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(Y_LABEL_W, trackBaseY);
+      ctx.lineTo(width, trackBaseY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Y-axis labels
+      ctx.font = '9px JetBrains Mono';
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.textAlign = 'right';
+      ctx.fillText(isAnalog ? '5V' : 'HIGH', Y_LABEL_W - 2, trackTopY + 9);
+      ctx.fillText(isAnalog ? '0V' : 'LOW', Y_LABEL_W - 2, trackBaseY);
+      ctx.textAlign = 'left';
+
+      // Pin label
+      ctx.fillStyle = color;
+      ctx.font = 'bold 10px JetBrains Mono';
+      ctx.fillText(`Pin ${pinStr}`, Y_LABEL_W + 4, trackTopY + 10);
+
+      // Signal trace
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+
+      const maxPts = width - Y_LABEL_W;
+      const pts = plotData.slice(-maxPts);
+      const xStep = maxPts / Math.max(pts.length, 1);
+
+      pts.forEach((pt, i) => {
+        const x = Y_LABEL_W + (maxPts - ((pts.length - 1 - i) * xStep));
+        let val = 0;
+        if (isAnalog) {
+          const ch = parseInt(pinStr.substring(1));
+          val = Math.max(0, Math.min(1, (pt.analog[ch] || 0) / 5.0));
+        } else {
+          val = pt.pins[pinStr] ? 1 : 0;
+        }
+        const y = trackBaseY - (val * (trackBaseY - trackTopY));
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    });
+
+    // X-axis label
+    ctx.font = '9px JetBrains Mono';
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.textAlign = 'left';
+    ctx.fillText('← time', Y_LABEL_W + 4, height - 4);
+  }, [plotData, codeTab, selectedPlotPins, plotterPaused]);
 
   // ── Get absolute pin position on canvas ────────────────────────────────────
   const getPinPos = useCallback((compId, pinId) => {
@@ -497,6 +605,13 @@ export default function SimulatorPage() {
         const msg = event.data;
         if (msg.type === 'state' && msg.pins) {
           setPinStates(msg.pins);
+          // Push to plotData history
+          setPlotData(prev => {
+            const newPt = { time: Date.now(), pins: msg.pins, analog: msg.analog || [] };
+            const next = [...prev, newPt];
+            if (next.length > 800) return next.slice(next.length - 800);
+            return next;
+          });
         }
         if (msg.type === 'state' && msg.neopixels) {
           setNeopixelData(msg.neopixels);
@@ -508,6 +623,14 @@ export default function SimulatorPage() {
               next[c.id] = c.state;
             });
             return next;
+          });
+        }
+        if (msg.type === 'serial') {
+          const now = new Date();
+          const ts = now.toTimeString().slice(0, 8) + '.' + String(now.getMilliseconds()).padStart(3, '0');
+          setSerialHistory(prev => {
+            if (prev.length > 2000) prev = prev.slice(prev.length - 1800);
+            return [...prev, { dir: 'rx', text: msg.data, ts }];
           });
         }
       };
@@ -550,6 +673,265 @@ export default function SimulatorPage() {
     setPinStates({});
     setNeopixelData({});
     setOopStates({});
+    setSerialHistory([]);
+    setPlotData([]);
+    setSerialPaused(false);
+    setPlotterPaused(false);
+  };
+
+  const handleReset = () => {
+    if (workerRef.current && isRunning) {
+      workerRef.current.postMessage({ type: 'RESET' });
+      const now = new Date();
+      const ts = now.toTimeString().slice(0, 8) + '.' + String(now.getMilliseconds()).padStart(3, '0');
+      setSerialHistory(prev => [...prev, { dir: 'sys', text: '--- BOARD RESET ---', ts }]);
+    }
+  };
+
+  const sendSerialInput = () => {
+    const txt = serialInput.trim();
+    if (!txt || !workerRef.current || !isRunning) return;
+    workerRef.current.postMessage({ type: 'SERIAL_INPUT', data: txt + '\n' });
+    const now = new Date();
+    const ts = now.toTimeString().slice(0, 8) + '.' + String(now.getMilliseconds()).padStart(3, '0');
+    setSerialHistory(prev => [...prev, { dir: 'tx', text: txt, ts }]);
+    setSerialInput('');
+  };
+
+  // ── PNG Export ────────────────────────────────────────────────────────────
+  const downloadPng = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      // 1. Capture the circuit canvas element
+      const circuitCanvas = await html2canvas(canvasRef.current, {
+        backgroundColor: '#070b14',
+        scale: 1.5,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+      });
+
+      const CW = circuitCanvas.width;   // circuit width
+      const CH = circuitCanvas.height;  // circuit height
+      const CODE_W = 340;               // code panel width
+      const HEADER_H = 48;              // header bar height
+      const FOOTER_H = 140;             // metadata footer height
+      const TOTAL_W = CW + CODE_W;
+      const TOTAL_H = HEADER_H + Math.max(CH, 400) + FOOTER_H;
+
+      // 2. Create composite canvas
+      const out = document.createElement('canvas');
+      out.width = TOTAL_W;
+      out.height = TOTAL_H;
+      const ctx = out.getContext('2d');
+
+      // ── Background
+      ctx.fillStyle = '#07080f';
+      ctx.fillRect(0, 0, TOTAL_W, TOTAL_H);
+
+      // ── Header bar
+      const grad = ctx.createLinearGradient(0, 0, TOTAL_W, 0);
+      grad.addColorStop(0, '#0d1525');
+      grad.addColorStop(1, '#111827');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, TOTAL_W, HEADER_H);
+
+      // Header bottom border
+      ctx.fillStyle = '#1e2d47';
+      ctx.fillRect(0, HEADER_H - 1, TOTAL_W, 1);
+
+      // Logo text
+      ctx.fillStyle = '#00d4ff';
+      ctx.font = 'bold 16px "Space Grotesk", sans-serif';
+      ctx.fillText('⚡ OpenHW-Studio', 20, HEADER_H / 2 + 6);
+
+      // Board chip (right side of header)
+      const boardLabel = board === 'arduino_uno' ? 'Arduino Uno' : board === 'pico' ? 'Raspberry Pi Pico' : 'ESP32';
+      ctx.font = '13px "Space Grotesk", sans-serif';
+      ctx.fillStyle = '#8fa3be';
+      const boardText = `Board: ${boardLabel}`;
+      const boardTW = ctx.measureText(boardText).width;
+      ctx.fillText(boardText, TOTAL_W - boardTW - 20, HEADER_H / 2 + 5);
+
+      // Component count chip
+      const infoText = `${components.length} components · ${wires.length} wires`;
+      const infoTW = ctx.measureText(infoText).width;
+      ctx.fillText(infoText, TOTAL_W - boardTW - infoTW - 36, HEADER_H / 2 + 5);
+
+      // ── Circuit image (left column)
+      ctx.drawImage(circuitCanvas, 0, HEADER_H);
+
+      // ── Code panel (right column)
+      const codeX = CW;
+      const codeY = HEADER_H;
+      const codeH = TOTAL_H - HEADER_H - FOOTER_H;
+
+      ctx.fillStyle = '#0a0f1a';
+      ctx.fillRect(codeX, codeY, CODE_W, codeH);
+
+      // Code panel left border
+      ctx.fillStyle = '#1e2d47';
+      ctx.fillRect(codeX, codeY, 1, codeH);
+
+      // Code panel header
+      ctx.fillStyle = '#0d1525';
+      ctx.fillRect(codeX + 1, codeY, CODE_W - 1, 28);
+      ctx.fillStyle = '#1e2d47';
+      ctx.fillRect(codeX + 1, codeY + 28, CODE_W - 1, 1);
+      ctx.fillStyle = '#00d4ff';
+      ctx.font = 'bold 11px "JetBrains Mono", monospace';
+      ctx.fillText('{ } Code', codeX + 12, codeY + 18);
+
+      // Code lines
+      ctx.font = '10px "JetBrains Mono", monospace';
+      const LINE_H = 14;
+      const MAX_LINES = Math.floor((codeH - 40) / LINE_H);
+      const codeLines = code.split('\n');
+      const keywords = /\b(void|int|float|bool|char|long|unsigned|return|if|else|for|while|do|switch|case|break|continue|new|delete|true|false|null|nullptr|include|define|const|static|struct|class|public|private|protected)\b/g;
+      const callFn = /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g;
+      codeLines.slice(0, MAX_LINES).forEach((line, i) => {
+        const y = codeY + 40 + i * LINE_H;
+        // Line number
+        ctx.fillStyle = '#3a4a5c';
+        ctx.fillText(String(i + 1).padStart(3, ' '), codeX + 6, y);
+        // Code text (simplified coloring - green for keywords, blue for calls, white for rest)
+        const truncated = line.length > 36 ? line.slice(0, 35) + '…' : line;
+        ctx.fillStyle = '#c8d8ea';
+        ctx.fillText(truncated, codeX + 32, y);
+      });
+      if (codeLines.length > MAX_LINES) {
+        ctx.fillStyle = '#4d6380';
+        ctx.fillText(`… ${codeLines.length - MAX_LINES} more lines`, codeX + 32, codeY + 40 + MAX_LINES * LINE_H);
+      }
+
+      // ── Metadata footer
+      const footerY = TOTAL_H - FOOTER_H;
+
+      // Footer separator
+      ctx.fillStyle = '#1e2d47';
+      ctx.fillRect(0, footerY, TOTAL_W, 1);
+
+      ctx.fillStyle = '#0d1220';
+      ctx.fillRect(0, footerY + 1, TOTAL_W, FOOTER_H - 1);
+
+      // Build the metadata object matching the spec
+      const metadata = {
+        board,
+        components: components.map(c => ({ id: c.id, type: c.type, label: c.label, x: c.x, y: c.y, attrs: c.attrs })),
+        connections: wires.map(w => ({ id: w.id, from: w.from, to: w.to, color: w.color })),
+        code: code.length > 500 ? code.slice(0, 497) + '...' : code,
+        exported: new Date().toISOString(),
+      };
+      const jsonStr = JSON.stringify(metadata, null, 0);
+
+      // Footer label
+      ctx.fillStyle = '#00d4ff';
+      ctx.font = 'bold 10px "JetBrains Mono", monospace';
+      ctx.fillText('{ } Metadata', 16, footerY + 18);
+
+      // JSON block
+      ctx.font = '9.5px "JetBrains Mono", monospace';
+      const footerLines = [
+        `board: "${metadata.board}"`,
+        `components: [${metadata.components.length} items]`,
+        `connections: [${metadata.connections.length} wires]`,
+        `code: ${metadata.components.length} sketch lines`,
+        `exported: "${metadata.exported}"`,
+      ];
+      footerLines.forEach((ln, i) => {
+        ctx.fillStyle = i % 2 === 0 ? '#8fa3be' : '#6b82a0';
+        ctx.fillText(ln, 16, footerY + 34 + i * 16);
+      });
+
+      // Branding
+      ctx.fillStyle = '#2a3a52';
+      ctx.font = '9px "Space Grotesk", sans-serif';
+      ctx.fillText('Generated by OpenHW-Studio · openhw.studio', TOTAL_W - 264, TOTAL_H - 10);
+
+      // 3. Encode FULL metadata (no truncation) for machine-readable round-trip
+      const fullMetadata = {
+        board,
+        components: components.map(c => ({ id: c.id, type: c.type, label: c.label, x: c.x, y: c.y, w: c.w, h: c.h, attrs: c.attrs })),
+        connections: wires.map(w => ({ id: w.id, from: w.from, to: w.to, color: w.color, waypoints: w.waypoints || [], isBelow: w.isBelow || false, fromLabel: w.fromLabel || '', toLabel: w.toLabel || '' })),
+        code,
+        exported: new Date().toISOString(),
+      };
+      const MARKER = '\x00OPENHW_META\x00';
+      const jsonPayload = MARKER + JSON.stringify(fullMetadata);
+
+      // 4. Append metadata bytes after PNG IEND → still renders fine in all image viewers
+      const dateStr = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-').replace(':', '-');
+      const filename = `circuit_${board}_${dateStr}.png`;
+      out.toBlob(async (blob) => {
+        const pngBuf = await blob.arrayBuffer();
+        const pngBytes = new Uint8Array(pngBuf);
+        const metaBytes = new TextEncoder().encode(jsonPayload);
+        const combined = new Uint8Array(pngBytes.length + metaBytes.length);
+        combined.set(pngBytes);
+        combined.set(metaBytes, pngBytes.length);
+        const finalBlob = new Blob([combined], { type: 'image/png' });
+        const url = URL.createObjectURL(finalBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      }, 'image/png');
+    } catch (err) {
+      console.error('[PNG Export] Error:', err);
+      alert('PNG export failed: ' + err.message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // ── PNG Import ────────────────────────────────────────────────────────────
+  const importFileRef = useRef(null);
+
+  const importPng = (file) => {
+    if (!file || !file.name.toLowerCase().endsWith('.png')) {
+      alert('Please select a valid OpenHW-Studio PNG file.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const bytes = new Uint8Array(e.target.result);
+        // Scan the tail (last 512KB) for the marker to avoid decoding the full PNG image data
+        const TAIL_SIZE = Math.min(bytes.length, 524288);
+        const tail = new TextDecoder('utf-8', { fatal: false }).decode(bytes.slice(bytes.length - TAIL_SIZE));
+        const MARKER = '\x00OPENHW_META\x00';
+        const markerIdx = tail.indexOf(MARKER);
+        if (markerIdx === -1) {
+          alert('This PNG does not contain OpenHW-Studio circuit data.\nOnly PNGs exported from this simulator can be imported.');
+          return;
+        }
+        const jsonStr = tail.slice(markerIdx + MARKER.length);
+        const meta = JSON.parse(jsonStr);
+
+        // Confirm before overwriting current circuit
+        const hasExisting = components.length > 0 || wires.length > 0;
+        if (hasExisting && !window.confirm(`Import will replace your current circuit (${components.length} components, ${wires.length} wires). Continue?`)) {
+          return;
+        }
+
+        // Restore state
+        saveHistory();
+        if (meta.board) setBoard(meta.board);
+        if (meta.code) setCode(meta.code);
+        if (Array.isArray(meta.components)) setComponents(meta.components);
+        if (Array.isArray(meta.connections)) setWires(meta.connections);
+        setSelected(null);
+        setWireStart(null);
+      } catch (err) {
+        console.error('[PNG Import] Parse error:', err);
+        alert('Failed to parse circuit data from PNG: ' + err.message);
+      }
+      // Reset the file input so the same file can be re-imported
+      if (importFileRef.current) importFileRef.current.value = '';
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   const getComponentStateAttrs = (comp) => {
@@ -574,6 +956,13 @@ export default function SimulatorPage() {
     // Pass interactions to the Web Worker
     attrs.onInteract = (event) => {
       console.log(`[SimulatorPage] UI Component ${comp.id} interacted: ${event}. isRunning: ${isRunning}`);
+
+      // Handle physical Arduino board reset button presses
+      if (comp.type === 'wokwi-arduino-uno' && event === 'RESET') {
+        if (isRunning) handleReset();
+        return;
+      }
+
       if (workerRef.current && isRunning) {
         workerRef.current.postMessage({
           type: 'INTERACT',
@@ -626,6 +1015,20 @@ export default function SimulatorPage() {
           </Btn>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Hidden file input for PNG import */}
+          <input
+            ref={importFileRef}
+            type="file"
+            accept=".png,image/png"
+            style={{ display: 'none' }}
+            onChange={e => { if (e.target.files?.[0]) importPng(e.target.files[0]); }}
+          />
+          <Btn color="var(--orange)" onClick={() => importFileRef.current?.click()} title="Import a previously exported OpenHW-Studio PNG to restore the circuit">
+            📂 Import PNG
+          </Btn>
+          <Btn color="var(--purple)" onClick={downloadPng} disabled={isExporting} title="Download circuit as PNG with embedded metadata">
+            {isExporting ? '⏳ Exporting...' : '⬇ Export PNG'}
+          </Btn>
           {isAuthenticated
             ? <><span style={S.userChip}>👤 {user?.name?.split(' ')[0]}</span><Btn>☁ Save</Btn></>
             : <Btn color="var(--accent)" onClick={() => navigate('/login')}>Sign In to Save</Btn>
@@ -1094,13 +1497,13 @@ export default function SimulatorPage() {
               {/* Code editor */}
               <div style={S.codePanel}>
                 <div style={S.codeTabs}>
-                  {['code', 'libraries', 'serial'].map(t => (
+                  {['code', 'libraries', 'serial', 'plotter'].map(t => (
                     <button
                       key={t}
                       style={{ ...S.codeTab, ...(codeTab === t ? S.codeTabActive : {}) }}
                       onClick={() => setCodeTab(t)}
                     >
-                      {t === 'code' ? '{ } Code' : t === 'libraries' ? '📚 Libraries' : '📟 Serial'}
+                      {t === 'code' ? '{ } Code' : t === 'libraries' ? '📚 Libraries' : t === 'serial' ? '📟 Serial' : '📈 Plotter'}
                     </button>
                   ))}
                 </div>
@@ -1189,15 +1592,177 @@ export default function SimulatorPage() {
                   </div>
                 )}
                 {codeTab === 'serial' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                    <div style={S.serialOutput}>
-                      <span style={{ color: 'var(--green)', display: 'block', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>
-                        [Serial Monitor Ready]
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, background: '#070b14', overflow: 'hidden' }}>
+                    {/* Serial Toolbar */}
+                    <div style={S.serialToolbar}>
+                      <span style={{
+                        display: 'flex', alignItems: 'center', gap: 5, fontSize: 11,
+                        color: serialPaused ? 'var(--text3)' : 'var(--green)'
+                      }}>
+                        <span style={{
+                          width: 7, height: 7, borderRadius: '50%',
+                          background: serialPaused ? 'var(--text3)' : 'var(--green)',
+                          boxShadow: serialPaused ? 'none' : '0 0 6px var(--green)',
+                          animation: (!serialPaused && isRunning) ? 'pulse 1.2s infinite' : 'none',
+                          flexShrink: 0
+                        }} />
+                        {serialPaused ? 'Paused' : isRunning ? 'Live' : 'Idle'}
                       </span>
+                      <div style={{ flex: 1 }} />
+                      <span style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'JetBrains Mono, monospace' }}>
+                        {serialHistory.length} lines
+                      </span>
+                      <button
+                        style={S.serialCtrlBtn}
+                        onClick={() => setSerialPaused(p => !p)}
+                        title={serialPaused ? 'Resume auto-scroll' : 'Pause auto-scroll'}
+                      >
+                        {serialPaused ? '▶ Resume' : '⏸ Pause'}
+                      </button>
+                      <button
+                        style={{ ...S.serialCtrlBtn, color: 'var(--red)', borderColor: 'rgba(255,68,68,0.3)' }}
+                        onClick={() => setSerialHistory([])}
+                        title="Clear all output"
+                      >
+                        🗑 Clear
+                      </button>
                     </div>
-                    <div style={{ display: 'flex', gap: 6, padding: 8, borderTop: '1px solid var(--border)' }}>
-                      <input style={S.serialInput} placeholder="Send message..." />
-                      <Btn color="var(--accent)">Send</Btn>
+
+                    {/* Output Area */}
+                    <div ref={serialOutputRef} style={S.serialOutput}>
+                      {serialHistory.length === 0 ? (
+                        <div style={{ color: 'var(--text3)', fontSize: 12, padding: '20px 0', textAlign: 'center' }}>
+                          {isRunning ? 'Waiting for serial output...' : 'Run the simulator to see serial output.'}
+                        </div>
+                      ) : (
+                        serialHistory.map((entry, i) => {
+                          const badgeColor = entry.dir === 'rx' ? '#2ecc71' : entry.dir === 'tx' ? '#3498db' : '#888';
+                          const badgeBg = entry.dir === 'rx' ? 'rgba(46,204,113,0.12)' : entry.dir === 'tx' ? 'rgba(52,152,219,0.12)' : 'rgba(128,128,128,0.12)';
+                          return (
+                            <div key={i} style={S.serialLine}>
+                              <span style={S.serialTs}>{entry.ts || ''}</span>
+                              <span style={{ ...S.serialBadge, color: badgeColor, background: badgeBg, border: `1px solid ${badgeColor}40` }}>
+                                {entry.dir?.toUpperCase() || 'RX'}
+                              </span>
+                              <span style={{ flex: 1, color: entry.dir === 'tx' ? '#3498db' : entry.dir === 'sys' ? '#888' : 'var(--green)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                                {entry.text}
+                              </span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* TX Input Row */}
+                    <div style={{ display: 'flex', gap: 6, padding: '8px 10px', borderTop: '1px solid rgba(255,255,255,0.07)', flexShrink: 0, background: '#0d1220' }}>
+                      <input
+                        style={{ ...S.serialInput, flex: 1, fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}
+                        placeholder="Send message to Arduino..."
+                        value={serialInput}
+                        onChange={e => setSerialInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') sendSerialInput(); }}
+                        disabled={!isRunning}
+                      />
+                      <button
+                        onClick={sendSerialInput}
+                        disabled={!isRunning || !serialInput.trim()}
+                        style={{
+                          background: (isRunning && serialInput.trim()) ? 'var(--accent)' : 'transparent',
+                          border: '1px solid var(--accent)', color: (isRunning && serialInput.trim()) ? '#fff' : 'var(--text3)',
+                          borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 700,
+                          cursor: (isRunning && serialInput.trim()) ? 'pointer' : 'not-allowed',
+                          fontFamily: 'inherit', transition: 'all .15s', whiteSpace: 'nowrap'
+                        }}
+                      >
+                        ↑ Send
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {codeTab === 'plotter' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, background: 'var(--bg)', overflow: 'hidden' }}>
+                    {/* Plotter Toolbar */}
+                    <div style={S.plotterToolbar}>
+                      <span style={{
+                        display: 'flex', alignItems: 'center', gap: 5, fontSize: 11,
+                        color: plotterPaused ? 'var(--text3)' : 'var(--green)'
+                      }}>
+                        <span style={{
+                          width: 7, height: 7, borderRadius: '50%',
+                          background: plotterPaused ? 'var(--text3)' : 'var(--green)',
+                          boxShadow: plotterPaused ? 'none' : '0 0 6px var(--green)',
+                        }} />
+                        {plotterPaused ? 'Paused' : isRunning ? 'Plotting live...' : 'Idle'}
+                      </span>
+                      <div style={{ flex: 1 }} />
+                      <button
+                        style={S.serialCtrlBtn}
+                        onClick={() => setPlotterPaused(p => !p)}
+                        title={plotterPaused ? 'Resume plotting' : 'Pause plotting'}
+                      >
+                        {plotterPaused ? '▶ Resume' : '⏸ Pause'}
+                      </button>
+                      <button
+                        style={{ ...S.serialCtrlBtn, color: 'var(--red)', borderColor: 'rgba(255,68,68,0.3)' }}
+                        onClick={() => setPlotData([])}
+                        title="Clear plot"
+                      >
+                        🗑 Clear
+                      </button>
+                    </div>
+
+                    {/* Pin Selector */}
+                    <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span style={{ fontSize: 11, color: 'var(--text3)', flexShrink: 0 }}>Pins:</span>
+                      {['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', 'A0', 'A1', 'A2', 'A3', 'A4', 'A5'].map(pin => {
+                        const isSel = selectedPlotPins.includes(pin);
+                        const isAna = pin.startsWith('A');
+                        return (
+                          <button
+                            key={pin}
+                            onClick={() => setSelectedPlotPins(prev => {
+                              if (prev.includes(pin)) return prev.filter(p => p !== pin);
+                              if (prev.length >= 4) return [...prev.slice(1), pin];
+                              return [...prev, pin];
+                            })}
+                            style={{
+                              background: isSel ? (isAna ? 'rgba(52,152,219,0.2)' : 'rgba(46,204,113,0.2)') : 'transparent',
+                              border: `1px solid ${isSel ? (isAna ? '#3498db' : '#2ecc71') : 'var(--border)'}`,
+                              color: isSel ? (isAna ? '#3498db' : '#2ecc71') : 'var(--text3)',
+                              borderRadius: 4, padding: '1px 5px', fontSize: 10, cursor: 'pointer'
+                            }}
+                          >{pin}</button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Legend */}
+                    {selectedPlotPins.length > 0 && (
+                      <div style={S.plotterLegend}>
+                        {selectedPlotPins.map(pin => (
+                          <span key={pin} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}>
+                            <span style={{ width: 10, height: 10, borderRadius: 2, background: pin.startsWith('A') ? '#3498db' : '#2ecc71', flexShrink: 0 }} />
+                            <span style={{ color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace' }}>Pin {pin}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Canvas */}
+                    <div style={{ flex: 1, position: 'relative' }}>
+                      {!isRunning && plotData.length === 0 ? (
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', gap: 8, fontSize: 13 }}>
+                          <span style={{ fontSize: 28 }}>📈</span>
+                          Run simulator to trace signals.
+                        </div>
+                      ) : (
+                        <canvas
+                          ref={plotterCanvasRef}
+                          width={800}
+                          height={600}
+                          style={{ position: 'absolute', width: '100%', height: '100%', background: '#070b14' }}
+                        />
+                      )}
                     </div>
                   </div>
                 )}
@@ -1205,8 +1770,8 @@ export default function SimulatorPage() {
             </div>
           )}
         </aside>
-      </div >
-    </div >
+      </div>
+    </div>
   )
 }
 
@@ -1282,6 +1847,13 @@ const S = {
   codeTabActive: { color: 'var(--accent)', borderBottomColor: 'var(--accent)' },
   codeEditor: { flex: 1, color: 'var(--text)', border: 'none', outline: 'none', resize: 'none' },
   codePlaceholder: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', gap: 8 },
-  serialOutput: { flex: 1, background: 'var(--bg)', padding: 12, overflowY: 'auto' },
-  serialInput: { flex: 1, background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '7px 10px', borderRadius: 8, fontFamily: 'inherit', fontSize: 12, outline: 'none' },
+  serialOutput: { flex: 1, overflowY: 'auto', padding: '6px 0', display: 'flex', flexDirection: 'column' },
+  serialInput: { background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '7px 10px', borderRadius: 8, fontFamily: 'inherit', fontSize: 12, outline: 'none' },
+  serialToolbar: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid rgba(255,255,255,0.07)', background: '#0d1220', flexShrink: 0 },
+  serialCtrlBtn: { background: 'transparent', border: '1px solid var(--border)', color: 'var(--text2)', borderRadius: 6, padding: '3px 8px', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
+  serialLine: { display: 'flex', alignItems: 'flex-start', gap: 8, padding: '2px 12px', fontSize: 11, fontFamily: 'JetBrains Mono, monospace', borderBottom: '1px solid rgba(255,255,255,0.03)' },
+  serialTs: { color: 'rgba(255,255,255,0.25)', fontSize: 10, minWidth: 84, flexShrink: 0, paddingTop: 1 },
+  serialBadge: { display: 'inline-block', fontSize: 9, fontWeight: 700, borderRadius: 3, padding: '1px 4px', flexShrink: 0, marginTop: 1 },
+  plotterToolbar: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid var(--border)', flexShrink: 0 },
+  plotterLegend: { display: 'flex', flexWrap: 'wrap', gap: '4px 16px', padding: '4px 10px', borderBottom: '1px solid var(--border)', flexShrink: 0 },
 }
