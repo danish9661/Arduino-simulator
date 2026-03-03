@@ -85,6 +85,8 @@ High-speed WebSocket server. Runs a virtual ATmega328P (Arduino Uno chip) at a s
 
 ## Setup & Running
 
+Because the frontend, backend, and emulator are now decoupled, you must install dependencies for each individually.
+
 ### Prerequisites
 - **Node.js 18+** and **npm 9+**
 - **MongoDB** running locally (or Atlas URI)
@@ -93,10 +95,43 @@ High-speed WebSocket server. Runs a virtual ATmega328P (Arduino Uno chip) at a s
   arduino-cli core install arduino:avr
   ```
 
-### Install all dependencies
+### Install Dependencies
+Run `npm install` inside each of the three directories:
 ```bash
+# 1. Install Frontend Dependencies
+cd OpenHW-studio-frontend-danish
 npm install
+cd ..
+
+# 2. Install Backend Dependencies
+cd openhw-studio-backend-danish
+npm install
+cd ..
+
+# 3. Install Emulator Dependencies
+cd openhw-studio-emulator-danish
+npm install
+cd ..
 ```
+
+### Local Development & NPM Linking
+During local development, you will want the frontend to immediately see changes you make to the emulator source code, without having to push those changes to GitHub first.
+
+We achieve this using **NPM Symlinks**, which tell the frontend to use the local `openhw-studio-emulator-danish` folder instead of downloading the cached version from GitHub.
+
+To set up your local development links:
+```bash
+# 1. Register the emulator as a linkable global package
+cd openhw-studio-emulator-danish
+npm link
+cd ..
+
+# 2. Tell the frontend to use the linked local emulator
+cd OpenHW-studio-frontend-danish
+npm link @openhw/emulator
+cd ..
+```
+*Note: Once deployed to Vercel/Netlify, these local symlinks will be ignored and the remote server will correctly fetch the package directly from GitHub.*
 
 ### Start all servers
 
@@ -124,7 +159,7 @@ npm run dev
 Then open **http://localhost:5173** in your browser.
 
 ### Environment Variables
-Create a file named `env` inside `openhw-studio-backend-danish/`:
+Create a file named `.env` inside `openhw-studio-backend-danish/`:
 ```env
 PORT=5000
 MONGO_URI=mongodb://localhost:27017/openhw-studio
