@@ -252,6 +252,9 @@ export class AVRRunner {
         const isArduinoGndPin = (compPin: string) =>
             compPin === 'GND' || /^gnd(_\d+)?$/i.test(compPin);
 
+        const isArduino5VPin = (compPin: string) =>
+            compPin === '5V' || compPin === 'VCC';
+
         const isArduinoPin = (wireCoord: string, targetPin: string) => {
             const [compId, compPin] = wireCoord.split(':');
             const inst = this.instances.get(compId);
@@ -319,6 +322,15 @@ export class AVRRunner {
                     toInst.setPinVoltage(toPin, 0.0);
                 } else if (toIsArduinoGnd && fromInst) {
                     fromInst.setPinVoltage(fromPin, 0.0);
+                }
+
+                const fromIsArduino5V = fromInst && fromInst.type.includes('arduino') && isArduino5VPin(fromPin);
+                const toIsArduino5V = toInst && toInst.type.includes('arduino') && isArduino5VPin(toPin);
+
+                if (fromIsArduino5V && toInst) {
+                    toInst.setPinVoltage(toPin, 5.0);
+                } else if (toIsArduino5V && fromInst) {
+                    fromInst.setPinVoltage(fromPin, 5.0);
                 }
             });
 
