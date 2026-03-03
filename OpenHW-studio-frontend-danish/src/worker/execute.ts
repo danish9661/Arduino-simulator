@@ -115,9 +115,9 @@ export class AVRRunner {
             'wokwi-buzzer': [{ id: '1' }, { id: '2' }],
             'wokwi-neopixel-matrix': [{ id: 'DIN' }, { id: 'VCC' }, { id: 'GND' }],
             'wokwi-servo': [{ id: 'GND' }, { id: 'V+' }, { id: 'PWM' }],
-            'wokwi-motor': [{ id: 'A' }, { id: 'B' }],
-            'wokwi-motor-driver': [{ id: 'IN1' }, { id: 'IN2' }, { id: 'IN3' }, { id: 'IN4' }, { id: 'GND' }, { id: 'VCC' }],
-            'wokwi-potentiometer': [{ id: 'GND' }, { id: 'SIG' }, { id: 'VCC' }],
+            'wokwi-motor': [{ id: '1' }, { id: '2' }],
+            'wokwi-motor-driver': [{ id: 'ENA' }, { id: 'ENB' }, { id: 'IN1' }, { id: 'IN2' }, { id: 'IN3' }, { id: 'IN4' }, { id: 'OUT1' }, { id: 'OUT2' }, { id: 'OUT3' }, { id: 'OUT4' }, { id: '12V' }, { id: '5V' }, { id: 'GND' }],
+            'wokwi-potentiometer': [{ id: '1' }, { id: '2' }, { id: 'SIG' }],
             'wokwi-slide-potentiometer': [{ id: 'GND' }, { id: 'SIG' }, { id: 'VCC' }],
             'wokwi-power-supply': [{ id: 'GND' }, { id: 'VCC' }],
         };
