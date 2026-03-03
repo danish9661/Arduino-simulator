@@ -23,7 +23,7 @@ Browser (React UI)
       │                        arduino-cli compiles
       │                         C++ → .hex file
       │                               │
-      └── WebSocket START + .hex ──► Emulator (port 8085)
+      └── Web Worker START + .hex ──► Emulator (port 8085)
                                             │
                                      Runs AVR CPU at 16MHz
                                      Streams pin states @ 60 FPS
