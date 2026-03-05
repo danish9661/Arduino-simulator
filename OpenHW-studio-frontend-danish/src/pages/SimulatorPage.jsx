@@ -2,10 +2,12 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../context/AuthContext.jsx'
-import { compileCode, fetchInstalledLibraries, searchLibraries, installLibrary } from '../services/simulatorService.js'
+import { compileCode, fetchInstalledLibraries, searchLibraries, installLibrary, submitCustomComponent, fetchInstalledComponentsWithFiles } from '../services/simulatorService.js'
 import html2canvas from 'html2canvas'
+import JSZip from 'jszip';
+import * as Babel from '@babel/standalone';
 
-import { wokwiLed as ledIndex, wokwiArduinoUno as unoIndex, wokwiResistor as resistorIndex, wokwiPushbutton as pushbuttonIndex, wokwiPowerSupply as powerSupplyIndex, wokwiNeopixelMatrix as neopixelIndex, wokwiBuzzer as buzzerIndex, wokwiMotor as motorIndex, wokwiServo as servoIndex, wokwiMotorDriver as motorDriverIndex, wokwiSlidePotentiometer as slidePotIndex, wokwiPotentiometer as potIndex } from '@openhw/emulator/src/components/index.ts';
+import * as EmulatorComponents from '@openhw/emulator/src/components/index.ts';
 
 // Web Editor features
 import Editor from 'react-simple-code-editor';
@@ -16,21 +18,18 @@ import 'prismjs/components/prism-cpp';
 // Import a Prism theme (or we can inject our own CSS wrapper)
 import 'prismjs/themes/prism-tomorrow.css';
 
-// Build Catalog & UI Registry from local imports
-const COMPONENT_REGISTRY = {
-  'wokwi-led': ledIndex,
-  'wokwi-arduino-uno': unoIndex,
-  'wokwi-resistor': resistorIndex,
-  'wokwi-pushbutton': pushbuttonIndex,
-  'wokwi-power-supply': powerSupplyIndex,
-  'wokwi-neopixel-matrix': neopixelIndex,
-  'wokwi-buzzer': buzzerIndex,
-  'wokwi-motor': motorIndex,
-  'wokwi-servo': servoIndex,
-  'wokwi-motor-driver': motorDriverIndex,
-  'wokwi-slide-potentiometer': slidePotIndex,
-  'wokwi-potentiometer': potIndex
-};
+// Build Catalog & UI Registry dynamically from local backend imports
+const COMPONENT_REGISTRY = {};
+
+Object.entries(EmulatorComponents).forEach(([key, module]) => {
+  // Skip the base class
+  if (key === 'BaseComponent') return;
+
+  if (module && module.manifest) {
+    const compId = module.manifest.type || module.manifest.id || key;
+    COMPONENT_REGISTRY[compId] = module;
+  }
+});
 
 const LOCAL_CATALOG = [];
 const LOCAL_PIN_DEFS = {};
@@ -50,6 +49,10 @@ Object.values(COMPONENT_REGISTRY).forEach(module => {
     LOCAL_PIN_DEFS[manifest.type] = pins;
   }
 });
+
+// Tracks component types that were dynamically injected from the backend (not built-in).
+// Used by the polling loop to detect deletions and purge them from the registry.
+const BACKEND_INJECTED_TYPES = new Set();
 
 let nextId = 1
 let nextWireId = 1
@@ -139,8 +142,11 @@ export default function SimulatorPage() {
     document.documentElement.setAttribute('data-theme', newTheme)
   }
 
+  const [, setCustomCatalogCounter] = useState(0); // Trigger palette re-render on injection
+  const [previewBanner, setPreviewBanner] = useState(null); // { id, label } — set when opened from admin "Test in Simulator"
   const [components, setComponents] = useState([])
   const [wires, setWires] = useState([])
+  const [paletteSearch, setPaletteSearch] = useState('')
   const [showGuestBanner, setShowGuestBanner] = useState(true)
   const [history, setHistory] = useState({ past: [], future: [] })
   const [selected, setSelected] = useState(null)   // comp or wire id
@@ -187,6 +193,72 @@ export default function SimulatorPage() {
   const svgRef = useRef(null)
   const dragPayload = useRef(null)
   const movingComp = useRef(null)
+  const componentZipInputRef = useRef(null);
+
+  const handleUploadZip = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+      const zip = await JSZip.loadAsync(file);
+      let manifestStr = null, uiStr = null, logicStr = null, validationStr = null, indexStr = null;
+      for (const relativePath of Object.keys(zip.files)) {
+        if (relativePath.endsWith('manifest.json')) manifestStr = await zip.files[relativePath].async('string');
+        if (relativePath.endsWith('ui.tsx') || relativePath.endsWith('ui.jsx')) uiStr = await zip.files[relativePath].async('string');
+        if (relativePath.endsWith('logic.ts') || relativePath.endsWith('logic.js')) logicStr = await zip.files[relativePath].async('string');
+        if (relativePath.endsWith('validation.ts') || relativePath.endsWith('validation.js')) validationStr = await zip.files[relativePath].async('string');
+        if (relativePath.endsWith('index.ts') || relativePath.endsWith('index.js')) indexStr = await zip.files[relativePath].async('string');
+      }
+      if (!manifestStr || !uiStr || !logicStr || !validationStr || !indexStr) {
+        alert('Error: Zip must contain manifest.json, ui.tsx, logic.ts, validation.ts, and index.ts');
+        return;
+      }
+      const manifest = JSON.parse(manifestStr);
+      await submitCustomComponent({
+        id: manifest.type, manifest, ui: uiStr, logic: logicStr, validation: validationStr, index: indexStr
+      });
+
+      // --- ZERO-TOUCH SANDBOX INJECTION ---
+      const transpileUI = Babel.transform(uiStr, { filename: 'ui.tsx', presets: ['react', 'typescript', 'env'] }).code;
+      const transpileLogic = Babel.transform(logicStr, { filename: 'logic.ts', presets: ['typescript', 'env'] }).code;
+
+      const exportsUI = {};
+      const evalUI = new Function('exports', 'require', 'React', transpileUI);
+      evalUI(exportsUI, (mod) => {
+        if (mod === 'react') return React;
+        return null;
+      }, React);
+
+      const uiComponent = exportsUI[Object.keys(exportsUI)[0]] || exportsUI.default;
+
+      if (uiComponent) {
+        const newCatItem = { ...manifest };
+        delete newCatItem.pins;
+        delete newCatItem.group;
+
+        let group = LOCAL_CATALOG.find(g => g.group === manifest.group);
+        if (!group) {
+          group = { group: manifest.group, items: [] };
+          LOCAL_CATALOG.push(group);
+        }
+        group.items = group.items.filter(i => i.type !== manifest.type);
+        group.items.push(newCatItem);
+
+        COMPONENT_REGISTRY[manifest.type] = {
+          manifest,
+          UI: uiComponent,
+          logicCode: transpileLogic
+        };
+        if (manifest.pins) {
+          LOCAL_PIN_DEFS[manifest.type] = manifest.pins;
+        }
+        setCustomCatalogCounter(c => c + 1);
+        alert(`Successfully submitted to admin AND injected ${manifest.label} into your local Sandbox Memory!`);
+      }
+    } catch (e) {
+      alert(`Error processing ZIP: ${e.message}`);
+    }
+    event.target.value = '';
+  };
 
   // ── Library Manager State ───────────────────────────────────────────────────
   const [libQuery, setLibQuery] = useState('')
@@ -207,6 +279,167 @@ export default function SimulatorPage() {
 
   useEffect(() => {
     loadLibraries();
+  }, []);
+
+  // ── Admin Preview: inject a pending component passed via sessionStorage ──────
+  // When admin clicks "Test in Simulator", AdminPage stores the component in
+  // sessionStorage and opens /simulator in a new tab. This effect picks it up,
+  // transpiles + injects it into the local registry (browser memory only),
+  // and shows a banner so the admin knows it's in preview mode.
+  useEffect(() => {
+    const previewKey = sessionStorage.getItem('pendingPreviewKey');
+    if (!previewKey) return;
+
+    const raw = sessionStorage.getItem(previewKey);
+    // Clean up immediately so a manual refresh doesn't re-inject
+    sessionStorage.removeItem(previewKey);
+    sessionStorage.removeItem('pendingPreviewKey');
+    if (!raw) return;
+
+    try {
+      const comp = JSON.parse(raw);
+      const { manifest, uiRaw, logicRaw } = comp;
+      if (!manifest || !uiRaw || !logicRaw) return;
+
+      const compType = manifest.type || comp.id;
+
+      const transpileUI = Babel.transform(uiRaw, { filename: 'ui.tsx', presets: ['react', 'typescript', 'env'] }).code;
+      const transpileLogic = Babel.transform(logicRaw, { filename: 'logic.ts', presets: ['typescript', 'env'] }).code;
+
+      const exportsUI = {};
+      const evalUI = new Function('exports', 'require', 'React', transpileUI);
+      evalUI(exportsUI, (mod) => (mod === 'react' ? React : null), React);
+
+      const uiComponent = exportsUI[Object.keys(exportsUI)[0]] || exportsUI.default;
+      if (!uiComponent) {
+        console.warn('[SimulatorPage] Preview: UI component could not be evaluated.');
+        return;
+      }
+
+      // Inject into catalog & registry
+      const newCatItem = { ...manifest };
+      delete newCatItem.pins;
+      delete newCatItem.group;
+
+      let group = LOCAL_CATALOG.find(g => g.group === manifest.group);
+      if (!group) {
+        group = { group: manifest.group, items: [] };
+        LOCAL_CATALOG.push(group);
+      }
+      group.items = group.items.filter(i => i.type !== compType);
+      group.items.push(newCatItem);
+
+      COMPONENT_REGISTRY[compType] = { manifest, UI: uiComponent, logicCode: transpileLogic };
+      if (manifest.pins) LOCAL_PIN_DEFS[compType] = manifest.pins;
+
+      setCustomCatalogCounter(c => c + 1);
+      setPreviewBanner({ id: comp.id, label: manifest.label || comp.id });
+      console.log(`[SimulatorPage] Admin preview: injected "${manifest.label}" (${compType}) into local registry.`);
+    } catch (e) {
+      console.error('[SimulatorPage] Failed to inject admin preview component:', e.message);
+    }
+  }, []);
+
+  // ── Auto-sync Approved Backend Components (polls every 12 s, no refresh needed) ──
+  // Handles both ADDITIONS (approve) and REMOVALS (delete) without any page refresh.
+  useEffect(() => {
+    const syncComponents = async () => {
+      try {
+        const installedComponents = await fetchInstalledComponentsWithFiles();
+
+        // Build a Set of currently-installed types from the backend
+        const currentInstalledTypes = new Set();
+        let injectedCount = 0;
+        let removedCount = 0;
+
+        // ── ADDITIONS: inject any newly-approved components ──────────────────
+        for (const comp of installedComponents) {
+          const { id, files } = comp;
+          if (!files) continue;
+
+          const manifestStr = files['manifest.json'];
+          const uiStr = files['ui.tsx'] || files['ui.jsx'];
+          const logicStr = files['logic.ts'] || files['logic.js'];
+          if (!manifestStr || !uiStr || !logicStr) continue;
+
+          try {
+            const manifest = JSON.parse(manifestStr);
+            const compType = manifest.type || id;
+            currentInstalledTypes.add(compType);
+
+            // Already in registry — nothing to do this cycle
+            if (COMPONENT_REGISTRY[compType]) continue;
+
+            const transpileUI = Babel.transform(uiStr, { filename: 'ui.tsx', presets: ['react', 'typescript', 'env'] }).code;
+            const transpileLogic = Babel.transform(logicStr, { filename: 'logic.ts', presets: ['typescript', 'env'] }).code;
+
+            const exportsUI = {};
+            const evalUI = new Function('exports', 'require', 'React', transpileUI);
+            evalUI(exportsUI, (mod) => {
+              if (mod === 'react') return React;
+              return null;
+            }, React);
+
+            const uiComponent = exportsUI[Object.keys(exportsUI)[0]] || exportsUI.default;
+            if (!uiComponent) continue;
+
+            // Inject into catalog
+            const newCatItem = { ...manifest };
+            delete newCatItem.pins;
+            delete newCatItem.group;
+
+            let group = LOCAL_CATALOG.find(g => g.group === manifest.group);
+            if (!group) {
+              group = { group: manifest.group, items: [] };
+              LOCAL_CATALOG.push(group);
+            }
+            group.items = group.items.filter(i => i.type !== compType);
+            group.items.push(newCatItem);
+
+            COMPONENT_REGISTRY[compType] = { manifest, UI: uiComponent, logicCode: transpileLogic };
+            if (manifest.pins) LOCAL_PIN_DEFS[compType] = manifest.pins;
+
+            BACKEND_INJECTED_TYPES.add(compType); // track so we can detect future deletions
+            injectedCount++;
+          } catch (e) {
+            console.warn(`[SimulatorPage] Failed to inject component "${id}":`, e.message);
+          }
+        }
+
+        // ── REMOVALS: purge any backend-injected type no longer installed ────
+        for (const type of BACKEND_INJECTED_TYPES) {
+          if (!currentInstalledTypes.has(type)) {
+            // Remove from registry
+            delete COMPONENT_REGISTRY[type];
+            delete LOCAL_PIN_DEFS[type];
+
+            // Remove from catalog groups
+            for (const group of LOCAL_CATALOG) {
+              group.items = group.items.filter(i => i.type !== type);
+            }
+            // Clean up empty groups
+            const idx = LOCAL_CATALOG.findIndex(g => g.items.length === 0);
+            if (idx !== -1) LOCAL_CATALOG.splice(idx, 1);
+
+            BACKEND_INJECTED_TYPES.delete(type);
+            removedCount++;
+            console.log(`[SimulatorPage] Removed deleted component "${type}" from panel.`);
+          }
+        }
+
+        if (injectedCount > 0 || removedCount > 0) {
+          setCustomCatalogCounter(c => c + 1); // triggers palette re-render
+        }
+      } catch (e) {
+        // Silently ignore — backend may be starting up or unreachable
+        console.warn('[SimulatorPage] Component sync skipped:', e.message);
+      }
+    };
+
+    // Run once immediately on mount, then poll every 12 seconds
+    syncComponents();
+    const syncInterval = setInterval(syncComponents, 12000);
+    return () => clearInterval(syncInterval); // cleanup on unmount
   }, []);
 
   const handleSearchLibraries = async (e) => {
@@ -811,12 +1044,24 @@ export default function SimulatorPage() {
           return null; // Handle Neopixels later
         }).filter(n => n);
 
+      const customLogics = [];
+      components.forEach((c) => {
+        if (COMPONENT_REGISTRY[c.type]?.logicCode) {
+          customLogics.push({
+            type: c.type,
+            code: COMPONENT_REGISTRY[c.type].logicCode,
+            pins: COMPONENT_REGISTRY[c.type].manifest.pins
+          });
+        }
+      });
+
       worker.postMessage({
         type: 'START',
         hex: result.hex,
         neopixels: neopixelWiring,
         wires: wires,
-        components: components
+        components: components,
+        customLogics: customLogics
       });
     } catch (err) {
       setIsRunning(false);
@@ -1146,6 +1391,28 @@ export default function SimulatorPage() {
   return (
     <div style={S.page}>
 
+      {/* ADMIN PREVIEW BANNER — shown when opened via "Test in Simulator" from admin dashboard */}
+      {previewBanner && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+          background: 'linear-gradient(90deg, #92400e, #b45309)',
+          color: '#fff', padding: '10px 20px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          fontFamily: 'monospace', fontSize: 13, boxShadow: '0 2px 12px rgba(0,0,0,0.4)'
+        }}>
+          <span>
+            🧪 <strong>Admin Preview Mode</strong> &nbsp;—&nbsp;
+            Component <strong style={{ color: '#fde68a' }}>{previewBanner.label}</strong>
+            &nbsp;(<code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 3 }}>{previewBanner.id}</code>)
+            &nbsp;is injected in <strong>browser memory only</strong>. It is NOT approved or installed on the backend.
+          </span>
+          <button
+            onClick={() => setPreviewBanner(null)}
+            style={{ background: 'rgba(0,0,0,0.3)', border: 'none', color: '#fff', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontSize: 13 }}
+          >✕ Dismiss</button>
+        </div>
+      )}
+
       {/* TOP BAR */}
       <header style={S.bar}>
         <button style={S.logo} onClick={() => navigate('/')}>⚡ OpenHW-Studio</button>
@@ -1227,24 +1494,44 @@ export default function SimulatorPage() {
         {/* PALETTE */}
         <aside style={S.palette}>
           <div style={S.paletteHeader}>Components</div>
-          <input style={S.paletteSearch} placeholder="🔍 Search..." />
-          {CATALOG.map(group => (
-            <div key={group.group}>
-              <div style={S.groupName}>{group.group}</div>
-              {group.items.map(item => (
-                <div
-                  key={item.type}
-                  style={S.paletteItem}
-                  draggable
-                  onDragStart={e => onPaletteDragStart(e, item)}
-                  title={`Drag to canvas to add ${item.label}`}
-                >
-                  <span style={{ fontSize: 16 }}>{item.icon}</span>
-                  <span style={{ fontSize: 13, color: 'var(--text2)' }}>{item.label}</span>
-                </div>
-              ))}
-            </div>
-          ))}
+          <input
+            style={S.paletteSearch}
+            placeholder="🔍 Search..."
+            value={paletteSearch}
+            onChange={(e) => setPaletteSearch(e.target.value)}
+          />
+          <div style={{ marginBottom: 12 }}>
+            <input type="file" ref={componentZipInputRef} onChange={handleUploadZip} accept=".zip" style={{ display: 'none' }} />
+            <button
+              onClick={() => componentZipInputRef.current.click()}
+              style={{ width: '100%', padding: '8px', borderRadius: 4, border: '1px dashed var(--border)', background: 'transparent', color: 'var(--text2)', cursor: 'pointer', fontSize: 12 }}>
+              ☁ Upload ZIP to Test
+            </button>
+          </div>
+          {CATALOG.map(group => {
+            const filteredItems = group.items.filter(item =>
+              item.label.toLowerCase().includes(paletteSearch.toLowerCase()) ||
+              item.type.toLowerCase().includes(paletteSearch.toLowerCase())
+            );
+            if (filteredItems.length === 0) return null;
+            return (
+              <div key={group.group}>
+                <div style={S.groupName}>{group.group}</div>
+                {filteredItems.map(item => (
+                  <div
+                    key={item.type}
+                    style={S.paletteItem}
+                    draggable
+                    onDragStart={e => onPaletteDragStart(e, item)}
+                    title={`Drag to canvas to add ${item.label}`}
+                  >
+                    <span style={{ fontSize: 16 }}>{item.icon}</span>
+                    <span style={{ fontSize: 13, color: 'var(--text2)' }}>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
           <div style={S.paletteTip}>
             Drag → drop to place<br />
             Click <em>Wire Mode</em> then click pins to connect<br />

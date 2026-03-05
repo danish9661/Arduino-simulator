@@ -47,7 +47,7 @@ export default function LandingPage() {
           <span className="gradient-text">Learn Electronics.</span>
         </h1>
         <p className="hero-subtitle">
-          A browser-based embedded systems simulator with gamified learning, 
+          A browser-based embedded systems simulator with gamified learning,
           classroom tools, and real hardware emulation. No hardware needed.
         </p>
         <div className="hero-actions">
