@@ -10,9 +10,9 @@ This monorepo contains three packages that work together:
 
 ```
 Arduino-simulator/
-├── OpenHW-studio-frontend-danish/   # React + Vite web app (UI)
-├── openhw-studio-backend-danish/    # Express.js REST API (compiler)
-└── openhw-studio-emulator-danish/   # Node.js WebSocket server (CPU emulator)
+├── OpenHW-studio-frontend-danish/   # React + Vite web app (Hub, User & Admin UI)
+├── openhw-studio-backend-danish/    # Express.js REST API (Compiler & Asset Registry)
+└── openhw-studio-emulator-danish/   # Node.js Emulator & Circuit Validation Engine
 ```
 
 ```
@@ -23,6 +23,8 @@ Browser (React UI)
       │                        arduino-cli compiles
       │                         C++ → .hex file
       │                               │
+      └── Circuit Validation ──► HALT if unsafe
+                                      │
       └── Web Worker START + .hex ──► Emulator (port 8085)
                                             │
                                      Runs AVR CPU at 16MHz
@@ -74,12 +76,10 @@ High-speed WebSocket server. Runs a virtual ATmega328P (Arduino Uno chip) at a s
 
 ---
 
-## Powerful Integrated Tools
-
-- **Serial Monitor**: Talk directly to the virtual UART port natively in the browser. 
-- **Analog Plotter / Logic Analyzer**: Trace real-time multi-pin voltage signals using a highly-optimized, zero-dependency HTML5 `<canvas>` rendering engine.
-- **Physical Controls**: Click the physical Reset button on the Arduino Uno graphic to reboot the active web-worker sketch loop.
-- **Advanced Bus Routing**: I2C and SPI peripheral mapping allows standard Arduino libraries to work immediately natively.
+- **Circuit Validation Engine**: Pre-simulation safety check that traces wiring graphs to detect errors (e.g., missing resistors for LEDs) before the CPU starts.
+- **Admin Dashboard**: A dedicated administrative portal to manage libraries and review community component submissions via a 3-column layout.
+- **Zero-Touch Component Sync**: Custom components submitted by users can be reviewed, tested in-browser, and approved by admins with instant synchronization.
+- **In-Browser Transpilation**: Leverage Babel Standalone to transpile and execute custom component UI (React) and Logic (TypeScript) code directly in the browser memory for instant previews.
 
 ---
 
