@@ -246,7 +246,8 @@ export default function SimulatorPage() {
         return null;
       }, React);
 
-      const uiComponent = exportsUI[Object.keys(exportsUI)[0]] || exportsUI.default;
+      const uiComponent = exportsUI[Object.keys(exportsUI).find(k => k.toLowerCase().endsWith('ui'))] || exportsUI[Object.keys(exportsUI)[0]] || exportsUI.default;
+      const contextMenu = exportsUI[Object.keys(exportsUI).find(k => k.toLowerCase().includes('contextmenu'))];
 
       if (uiComponent) {
         const newCatItem = { ...manifest };
@@ -264,6 +265,9 @@ export default function SimulatorPage() {
         COMPONENT_REGISTRY[manifest.type] = {
           manifest,
           UI: uiComponent,
+          ContextMenu: contextMenu,
+          contextMenuDuringRun: !!(exportsUI.contextMenuDuringRun || manifest.contextMenuDuringRun),
+          contextMenuOnlyDuringRun: !!(exportsUI.contextMenuOnlyDuringRun || manifest.contextMenuOnlyDuringRun),
           logicCode: transpileLogic
         };
         if (manifest.pins) {
@@ -450,7 +454,14 @@ export default function SimulatorPage() {
             group.items = group.items.filter(i => i.type !== compType);
             group.items.push(newCatItem);
 
-            COMPONENT_REGISTRY[compType] = { manifest, UI: uiComponent, logicCode: transpileLogic };
+            COMPONENT_REGISTRY[compType] = {
+              manifest,
+              UI: uiComponent,
+              ContextMenu: exportsUI[Object.keys(exportsUI).find(k => k.toLowerCase().includes('contextmenu'))],
+              contextMenuDuringRun: !!(exportsUI.contextMenuDuringRun || manifest.contextMenuDuringRun),
+              contextMenuOnlyDuringRun: !!(exportsUI.contextMenuOnlyDuringRun || manifest.contextMenuOnlyDuringRun),
+              logicCode: transpileLogic
+            };
             if (manifest.pins) LOCAL_PIN_DEFS[compType] = manifest.pins;
 
             BACKEND_INJECTED_TYPES.add(compType); // track so we can detect future deletions
@@ -1623,14 +1634,14 @@ export default function SimulatorPage() {
               flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2,
               padding: '4px 8px 8px',
             }}>
-              {CATALOG.map(group => {
+              {CATALOG.map((group, index) => {
                 const filteredItems = group.items.filter(item =>
                   item.label.toLowerCase().includes(paletteSearch.toLowerCase()) ||
                   item.type.toLowerCase().includes(paletteSearch.toLowerCase())
                 );
                 if (filteredItems.length === 0) return null;
                 return (
-                  <div key={group.group}>
+                  <div key={group.group || `group-${index}`}>
                     <div style={S.groupName}>{group.group}</div>
                     {filteredItems.map(item => (
                       <div
@@ -1646,7 +1657,7 @@ export default function SimulatorPage() {
                   </div>
                 );
               })}
-              <div style={S.paletteTip}>
+              <div key="palette-tip" style={S.paletteTip}>
                 Drag → drop to place<br />
                 Click <em>Wire Mode</em> then click pins to connect<br />
                 Del key removes selected
@@ -1780,8 +1791,9 @@ export default function SimulatorPage() {
               if (!comp) return null;
               const reg = COMPONENT_REGISTRY[comp.type];
               if (!reg?.ContextMenu) return null;
-              const showDuringRun = !!reg.contextMenuDuringRun;
+              const showDuringRun = !!reg.contextMenuDuringRun || !!reg.contextMenuOnlyDuringRun;
               if (isRunning && !showDuringRun) return null;
+              if (!isRunning && reg.contextMenuOnlyDuringRun) return null;
               return (
                 <div key={`cmenu-${comp.id}`} data-contextmenu="true" style={{
                   position: 'absolute',
@@ -1799,7 +1811,7 @@ export default function SimulatorPage() {
                   onDoubleClick={e => e.stopPropagation()}
                 >
                   {React.createElement(reg.ContextMenu, {
-                    attrs: comp.attrs,
+                    attrs: getComponentStateAttrs(comp),
                     onUpdate: (key, value) => updateComponentAttr(comp.id, key, value)
                   })}
                   <div style={{ position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid var(--border)' }} />
@@ -2099,7 +2111,7 @@ export default function SimulatorPage() {
                 {/* Result list */}
                 {results.map((item, i) => (
                   <div
-                    key={item.type}
+                    key={`${item.type}-${i}`}
                     data-quickadd="true"
                     onMouseEnter={() => setQuickAddIdx(i)}
                     onMouseDown={e => { e.preventDefault(); addComponentAt(item, quickAdd.canvasX, quickAdd.canvasY); setQuickAdd(null); }}
