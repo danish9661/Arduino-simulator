@@ -408,3 +408,10 @@ body {
   .code-panel { width: 250px; }
   .component-palette { width: 160px; }
 }
+
+/* ─── PALETTE SCROLLBAR ───────────────────────────────────────────────────── */
+.palette-scroll::-webkit-scrollbar { width: 4px; }
+.palette-scroll::-webkit-scrollbar-track { background: transparent; }
+.palette-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+.palette-scroll::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+.palette-scroll { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }

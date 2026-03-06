@@ -163,6 +163,16 @@ export default function SimulatorPage() {
   const [canvasZoom, setCanvasZoom] = useState(1)
   const [showCanvasMenu, setShowCanvasMenu] = useState(false)
   const canvasZoomRef = useRef(1)
+  const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 })
+  const canvasOffsetRef = useRef({ x: 0, y: 0 })
+  const [isCanvasLocked, setIsCanvasLocked] = useState(false)
+  const isCanvasLockedRef = useRef(false)
+  const [showGrid, setShowGrid] = useState(true)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const pageRef = useRef(null)
+  const isPanningRef = useRef(false)
+  const panStartRef = useRef({ x: 0, y: 0, ox: 0, oy: 0 })
+  const didPanRef = useRef(false)
 
   const [validationErrors, setValidationErrors] = useState([])
   const [showValidation, setShowValidation] = useState(true)
@@ -286,6 +296,23 @@ export default function SimulatorPage() {
   }, []);
 
   useEffect(() => { canvasZoomRef.current = canvasZoom; }, [canvasZoom]);
+  useEffect(() => { canvasOffsetRef.current = canvasOffset; }, [canvasOffset]);
+  useEffect(() => { isCanvasLockedRef.current = isCanvasLocked; }, [isCanvasLocked]);
+
+  // Fullscreen sync
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!isFullscreen) {
+      pageRef.current?.requestFullscreen?.();
+    } else {
+      document.exitFullscreen?.();
+    }
+  };
 
   // ── Admin Preview: inject a pending component passed via sessionStorage ──────
   // When admin clicks "Test in Simulator", AdminPage stores the component in
@@ -783,8 +810,8 @@ export default function SimulatorPage() {
     if (!item) return
     saveHistory();
     const rect = canvasRef.current.getBoundingClientRect()
-    const x = (e.clientX - rect.left) / canvasZoomRef.current - (item.w || 60) / 2
-    const y = (e.clientY - rect.top) / canvasZoomRef.current - (item.h || 60) / 2
+    const x = (e.clientX - rect.left - canvasOffsetRef.current.x) / canvasZoomRef.current - (item.w || 60) / 2
+    const y = (e.clientY - rect.top - canvasOffsetRef.current.y) / canvasZoomRef.current - (item.h || 60) / 2
     setComponents(prev => [...prev, {
       id: `${item.type}_${nextId++}`,
       type: item.type, label: item.label,
@@ -817,10 +844,23 @@ export default function SimulatorPage() {
           c.id === id ? { ...c, x: Math.max(0, cx + (e.clientX - sx) / canvasZoomRef.current), y: Math.max(0, cy + (e.clientY - sy) / canvasZoomRef.current) } : c
         ))
       }
+      // Canvas panning
+      if (isPanningRef.current && !isCanvasLockedRef.current) {
+        const dx = e.clientX - panStartRef.current.x;
+        const dy = e.clientY - panStartRef.current.y;
+        if (!didPanRef.current && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+          didPanRef.current = true;
+        }
+        if (didPanRef.current) {
+          const newOffset = { x: panStartRef.current.ox + dx, y: panStartRef.current.oy + dy };
+          setCanvasOffset(newOffset);
+          canvasOffsetRef.current = newOffset;
+        }
+      }
       // Track mouse for wire preview
       if (wireStart && canvasRef.current) {
         const rect = canvasRef.current.getBoundingClientRect()
-        setMousePos({ x: (e.clientX - rect.left) / canvasZoomRef.current, y: (e.clientY - rect.top) / canvasZoomRef.current })
+        setMousePos({ x: (e.clientX - rect.left - canvasOffsetRef.current.x) / canvasZoomRef.current, y: (e.clientY - rect.top - canvasOffsetRef.current.y) / canvasZoomRef.current })
       }
     }
     const onUp = () => {
@@ -829,6 +869,7 @@ export default function SimulatorPage() {
         setHistory(h => ({ past: [...h.past.slice(-20), { components: origComps, wires: JSON.parse(JSON.stringify(wires)) }], future: [] }));
       }
       movingComp.current = null;
+      isPanningRef.current = false;
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
@@ -1395,7 +1436,7 @@ export default function SimulatorPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={S.page}>
+    <div style={S.page} ref={pageRef}>
 
       {/* ADMIN PREVIEW BANNER — shown when opened via "Test in Simulator" from admin dashboard */}
       {previewBanner && (
@@ -1446,8 +1487,7 @@ export default function SimulatorPage() {
               setWires(prev => prev.filter(w => !w.from.startsWith(selected + ':') && !w.to.startsWith(selected + ':')))
             }
             setSelected(null)
-          }}>🗑 Delete</Btn>
-          <Btn onClick={() => { if (!isRunning) { saveHistory(); setComponents([]); setWires([]); setSelected(null); } }}>↺ Clear All</Btn>
+          }}>Delete</Btn>
 
           {/* THEME TOGGLE BUTTON */}
           <Btn onClick={toggleTheme} title="Toggle Dark/Light Mode">
@@ -1516,12 +1556,11 @@ export default function SimulatorPage() {
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
             opacity: isPaletteHovered ? 0 : 1, transition: 'opacity 0.15s', pointerEvents: 'none',
           }}>
-            <span style={{ fontSize: 18 }}>🧩</span>
             <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', writingMode: 'vertical-rl', letterSpacing: '0.1em' }}>Components</span>
           </div>
 
           {/* Full palette content — fades in when expanded */}
-          <div style={{
+          <div className="palette-scroll" style={{
             width: 182, opacity: isPaletteHovered ? 1 : 0, transition: 'opacity 0.2s',
             pointerEvents: isPaletteHovered ? 'auto' : 'none',
             display: 'flex', flexDirection: 'column', gap: 2, flex: 1, height: '100%', overflowY: 'auto',
@@ -1530,7 +1569,7 @@ export default function SimulatorPage() {
             <div style={S.paletteHeader}>Components</div>
             <input
               style={S.paletteSearch}
-              placeholder="🔍 Search..."
+              placeholder="Search..."
               value={paletteSearch}
               onChange={(e) => setPaletteSearch(e.target.value)}
             />
@@ -1539,7 +1578,7 @@ export default function SimulatorPage() {
               <button
                 onClick={() => componentZipInputRef.current.click()}
                 style={{ width: '100%', padding: '8px', borderRadius: 4, border: '1px dashed var(--border)', background: 'transparent', color: 'var(--text2)', cursor: 'pointer', fontSize: 12 }}>
-                ☁ Upload ZIP to Test
+                Upload ZIP to Test
               </button>
             </div>
             {CATALOG.map(group => {
@@ -1559,7 +1598,6 @@ export default function SimulatorPage() {
                       onDragStart={e => onPaletteDragStart(e, item)}
                       title={`Drag to canvas to add ${item.label}`}
                     >
-                      <span style={{ fontSize: 16 }}>{item.icon}</span>
                       <span style={{ fontSize: 13, color: 'var(--text2)' }}>{item.label}</span>
                     </div>
                   ))}
@@ -1576,14 +1614,29 @@ export default function SimulatorPage() {
 
         {/* CANVAS + SVG WIRE LAYER */}
         <main
-          style={{ ...S.canvas, cursor: wireStart ? 'crosshair' : 'default' }}
+          style={{
+            ...S.canvas,
+            cursor: wireStart ? 'crosshair' : isCanvasLocked ? 'default' : 'grab',
+            backgroundImage: showGrid
+              ? 'linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)'
+              : 'none',
+          }}
           ref={canvasRef}
           onDrop={onCanvasDrop}
           onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }}
+          onMouseDown={e => {
+            if (isCanvasLocked || wireStart || movingComp.current) return;
+            if (e.button !== 0 && e.button !== 1) return;
+            e.preventDefault();
+            didPanRef.current = false;
+            isPanningRef.current = true;
+            panStartRef.current = { x: e.clientX, y: e.clientY, ox: canvasOffsetRef.current.x, oy: canvasOffsetRef.current.y };
+          }}
           onClick={(e) => {
+            if (didPanRef.current) return;
             if (wireStart) {
               const r = canvasRef.current.getBoundingClientRect();
-              const newPt = { x: (e.clientX - r.left) / canvasZoom, y: (e.clientY - r.top) / canvasZoom };
+              const newPt = { x: (e.clientX - r.left - canvasOffsetRef.current.x) / canvasZoom, y: (e.clientY - r.top - canvasOffsetRef.current.y) / canvasZoom };
               setWireStart(prev => ({ ...prev, waypoints: [...(prev.waypoints || []), newPt] }));
             } else {
               setSelected(null)
@@ -1592,7 +1645,7 @@ export default function SimulatorPage() {
           onMouseMove={e => {
             if (wireStart && canvasRef.current) {
               const r = canvasRef.current.getBoundingClientRect()
-              setMousePos({ x: (e.clientX - r.left) / canvasZoom, y: (e.clientY - r.top) / canvasZoom })
+              setMousePos({ x: (e.clientX - r.left - canvasOffsetRef.current.x) / canvasZoom, y: (e.clientY - r.top - canvasOffsetRef.current.y) / canvasZoom })
             }
           }}
         >
@@ -1600,7 +1653,7 @@ export default function SimulatorPage() {
           <div style={{
             position: 'absolute', top: 0, left: 0,
             width: `${100 / canvasZoom}%`, height: `${100 / canvasZoom}%`,
-            transform: `scale(${canvasZoom})`, transformOrigin: '0 0',
+            transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px) scale(${canvasZoom})`, transformOrigin: '0 0',
           }}>
           {/* BOTTOM SVG layer for wires (Below Components) */}
           <svg
@@ -1908,14 +1961,18 @@ export default function SimulatorPage() {
               >⋮</button>
               {showCanvasMenu && (
                 <div
-                  style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: 6, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', minWidth: 168, zIndex: 200 }}
+                  style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: 6, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', minWidth: 190, zIndex: 200 }}
                   onMouseLeave={() => setShowCanvasMenu(false)}
                 >
-                  <button onClick={() => { setCanvasZoom(1); setShowCanvasMenu(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: 'var(--text)', padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>↺ Reset Zoom (100%)</button>
-                  <button onClick={() => { setCanvasZoom(0.5); setShowCanvasMenu(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: 'var(--text)', padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>🔬 Zoom Out (50%)</button>
-                  <button onClick={() => { setCanvasZoom(1.5); setShowCanvasMenu(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: 'var(--text)', padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>🔍 Zoom In (150%)</button>
+                  <button onClick={() => { setCanvasZoom(1); setCanvasOffset({ x: 0, y: 0 }); setShowCanvasMenu(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: 'var(--text)', padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Fit</button>
+                  <button onClick={() => { undo(); setShowCanvasMenu(false); }} disabled={history.past.length === 0 || isRunning} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: history.past.length === 0 || isRunning ? 'var(--text3)' : 'var(--text)', padding: '9px 14px', fontSize: 13, cursor: history.past.length === 0 || isRunning ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>Undo</button>
+                  <button onClick={() => { redo(); setShowCanvasMenu(false); }} disabled={history.future.length === 0 || isRunning} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: history.future.length === 0 || isRunning ? 'var(--text3)' : 'var(--text)', padding: '9px 14px', fontSize: 13, cursor: history.future.length === 0 || isRunning ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>Redo</button>
                   <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
-                  <button onClick={() => { if (!isRunning) { saveHistory(); setComponents([]); setWires([]); setSelected(null); } setShowCanvasMenu(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: 'var(--red)', padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>🗑 Clear Canvas</button>
+                  <button onClick={() => { setShowGrid(g => !g); setShowCanvasMenu(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: 'var(--text)', padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>{showGrid ? 'Hide Grid' : 'Show Grid'}</button>
+                  <button onClick={() => { setIsCanvasLocked(l => !l); setShowCanvasMenu(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: 'var(--text)', padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>{isCanvasLocked ? 'Unlock Canvas' : 'Lock Canvas'}</button>
+                  <button onClick={() => { toggleFullscreen(); setShowCanvasMenu(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: 'var(--text)', padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</button>
+                  <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
+                  <button onClick={() => { if (!isRunning) { saveHistory(); setComponents([]); setWires([]); setSelected(null); } setShowCanvasMenu(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: 'var(--red)', padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Clear Canvas</button>
                 </div>
               )}
             </div>
@@ -2365,7 +2422,6 @@ const S = {
   canvas: {
     flex: 1, position: 'relative', overflow: 'hidden',
     backgroundColor: 'var(--canvas-bg)',
-    backgroundImage: 'linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)',
     backgroundSize: '24px 24px',
   },
   emptyState: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', textAlign: 'center', pointerEvents: 'none' },
