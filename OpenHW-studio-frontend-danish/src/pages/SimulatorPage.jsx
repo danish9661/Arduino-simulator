@@ -159,6 +159,10 @@ export default function SimulatorPage() {
   const [isPanelOpen, setIsPanelOpen] = useState(true)
   const [panelWidth, setPanelWidth] = useState(400)
   const [isDragging, setIsDragging] = useState(false)
+  const [isPaletteHovered, setIsPaletteHovered] = useState(false)
+  const [canvasZoom, setCanvasZoom] = useState(1)
+  const [showCanvasMenu, setShowCanvasMenu] = useState(false)
+  const canvasZoomRef = useRef(1)
 
   const [validationErrors, setValidationErrors] = useState([])
   const [showValidation, setShowValidation] = useState(true)
@@ -280,6 +284,8 @@ export default function SimulatorPage() {
   useEffect(() => {
     loadLibraries();
   }, []);
+
+  useEffect(() => { canvasZoomRef.current = canvasZoom; }, [canvasZoom]);
 
   // ── Admin Preview: inject a pending component passed via sessionStorage ──────
   // When admin clicks "Test in Simulator", AdminPage stores the component in
@@ -777,8 +783,8 @@ export default function SimulatorPage() {
     if (!item) return
     saveHistory();
     const rect = canvasRef.current.getBoundingClientRect()
-    const x = e.clientX - rect.left - (item.w || 60) / 2
-    const y = e.clientY - rect.top - (item.h || 60) / 2
+    const x = (e.clientX - rect.left) / canvasZoomRef.current - (item.w || 60) / 2
+    const y = (e.clientY - rect.top) / canvasZoomRef.current - (item.h || 60) / 2
     setComponents(prev => [...prev, {
       id: `${item.type}_${nextId++}`,
       type: item.type, label: item.label,
@@ -808,13 +814,13 @@ export default function SimulatorPage() {
         movingComp.current.moved = true
         const { id, sx, sy, cx, cy } = movingComp.current
         setComponents(prev => prev.map(c =>
-          c.id === id ? { ...c, x: Math.max(0, cx + e.clientX - sx), y: Math.max(0, cy + e.clientY - sy) } : c
+          c.id === id ? { ...c, x: Math.max(0, cx + (e.clientX - sx) / canvasZoomRef.current), y: Math.max(0, cy + (e.clientY - sy) / canvasZoomRef.current) } : c
         ))
       }
       // Track mouse for wire preview
       if (wireStart && canvasRef.current) {
         const rect = canvasRef.current.getBoundingClientRect()
-        setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+        setMousePos({ x: (e.clientX - rect.left) / canvasZoomRef.current, y: (e.clientY - rect.top) / canvasZoomRef.current })
       }
     }
     const onUp = () => {
@@ -1491,51 +1497,80 @@ export default function SimulatorPage() {
 
       <div style={S.workspace}>
 
-        {/* PALETTE */}
-        <aside style={S.palette}>
-          <div style={S.paletteHeader}>Components</div>
-          <input
-            style={S.paletteSearch}
-            placeholder="🔍 Search..."
-            value={paletteSearch}
-            onChange={(e) => setPaletteSearch(e.target.value)}
-          />
-          <div style={{ marginBottom: 12 }}>
-            <input type="file" ref={componentZipInputRef} onChange={handleUploadZip} accept=".zip" style={{ display: 'none' }} />
-            <button
-              onClick={() => componentZipInputRef.current.click()}
-              style={{ width: '100%', padding: '8px', borderRadius: 4, border: '1px dashed var(--border)', background: 'transparent', color: 'var(--text2)', cursor: 'pointer', fontSize: 12 }}>
-              ☁ Upload ZIP to Test
-            </button>
+        {/* PALETTE — hover to expand, collapses when mouse leaves */}
+        <aside
+          style={{
+            ...S.palette,
+            width: isPaletteHovered ? 182 : 38,
+            overflow: 'hidden',
+            transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+            position: 'relative',
+            padding: 0,
+          }}
+          onMouseEnter={() => setIsPaletteHovered(true)}
+          onMouseLeave={() => setIsPaletteHovered(false)}
+        >
+          {/* Collapsed indicator — visible only when closed */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+            opacity: isPaletteHovered ? 0 : 1, transition: 'opacity 0.15s', pointerEvents: 'none',
+          }}>
+            <span style={{ fontSize: 18 }}>🧩</span>
+            <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', writingMode: 'vertical-rl', letterSpacing: '0.1em' }}>Components</span>
           </div>
-          {CATALOG.map(group => {
-            const filteredItems = group.items.filter(item =>
-              item.label.toLowerCase().includes(paletteSearch.toLowerCase()) ||
-              item.type.toLowerCase().includes(paletteSearch.toLowerCase())
-            );
-            if (filteredItems.length === 0) return null;
-            return (
-              <div key={group.group}>
-                <div style={S.groupName}>{group.group}</div>
-                {filteredItems.map(item => (
-                  <div
-                    key={item.type}
-                    style={S.paletteItem}
-                    draggable
-                    onDragStart={e => onPaletteDragStart(e, item)}
-                    title={`Drag to canvas to add ${item.label}`}
-                  >
-                    <span style={{ fontSize: 16 }}>{item.icon}</span>
-                    <span style={{ fontSize: 13, color: 'var(--text2)' }}>{item.label}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-          <div style={S.paletteTip}>
-            Drag → drop to place<br />
-            Click <em>Wire Mode</em> then click pins to connect<br />
-            Del key removes selected
+
+          {/* Full palette content — fades in when expanded */}
+          <div style={{
+            width: 182, opacity: isPaletteHovered ? 1 : 0, transition: 'opacity 0.2s',
+            pointerEvents: isPaletteHovered ? 'auto' : 'none',
+            display: 'flex', flexDirection: 'column', gap: 2, flex: 1, height: '100%', overflowY: 'auto',
+            padding: '10px 8px',
+          }}>
+            <div style={S.paletteHeader}>Components</div>
+            <input
+              style={S.paletteSearch}
+              placeholder="🔍 Search..."
+              value={paletteSearch}
+              onChange={(e) => setPaletteSearch(e.target.value)}
+            />
+            <div style={{ marginBottom: 12 }}>
+              <input type="file" ref={componentZipInputRef} onChange={handleUploadZip} accept=".zip" style={{ display: 'none' }} />
+              <button
+                onClick={() => componentZipInputRef.current.click()}
+                style={{ width: '100%', padding: '8px', borderRadius: 4, border: '1px dashed var(--border)', background: 'transparent', color: 'var(--text2)', cursor: 'pointer', fontSize: 12 }}>
+                ☁ Upload ZIP to Test
+              </button>
+            </div>
+            {CATALOG.map(group => {
+              const filteredItems = group.items.filter(item =>
+                item.label.toLowerCase().includes(paletteSearch.toLowerCase()) ||
+                item.type.toLowerCase().includes(paletteSearch.toLowerCase())
+              );
+              if (filteredItems.length === 0) return null;
+              return (
+                <div key={group.group}>
+                  <div style={S.groupName}>{group.group}</div>
+                  {filteredItems.map(item => (
+                    <div
+                      key={item.type}
+                      style={S.paletteItem}
+                      draggable
+                      onDragStart={e => onPaletteDragStart(e, item)}
+                      title={`Drag to canvas to add ${item.label}`}
+                    >
+                      <span style={{ fontSize: 16 }}>{item.icon}</span>
+                      <span style={{ fontSize: 13, color: 'var(--text2)' }}>{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+            <div style={S.paletteTip}>
+              Drag → drop to place<br />
+              Click <em>Wire Mode</em> then click pins to connect<br />
+              Del key removes selected
+            </div>
           </div>
         </aside>
 
@@ -1548,7 +1583,7 @@ export default function SimulatorPage() {
           onClick={(e) => {
             if (wireStart) {
               const r = canvasRef.current.getBoundingClientRect();
-              const newPt = { x: e.clientX - r.left, y: e.clientY - r.top };
+              const newPt = { x: (e.clientX - r.left) / canvasZoom, y: (e.clientY - r.top) / canvasZoom };
               setWireStart(prev => ({ ...prev, waypoints: [...(prev.waypoints || []), newPt] }));
             } else {
               setSelected(null)
@@ -1557,10 +1592,16 @@ export default function SimulatorPage() {
           onMouseMove={e => {
             if (wireStart && canvasRef.current) {
               const r = canvasRef.current.getBoundingClientRect()
-              setMousePos({ x: e.clientX - r.left, y: e.clientY - r.top })
+              setMousePos({ x: (e.clientX - r.left) / canvasZoom, y: (e.clientY - r.top) / canvasZoom })
             }
           }}
         >
+          {/* Zoom Wrapper — scales all circuit content */}
+          <div style={{
+            position: 'absolute', top: 0, left: 0,
+            width: `${100 / canvasZoom}%`, height: `${100 / canvasZoom}%`,
+            transform: `scale(${canvasZoom})`, transformOrigin: '0 0',
+          }}>
           {/* BOTTOM SVG layer for wires (Below Components) */}
           <svg
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}
@@ -1623,6 +1664,39 @@ export default function SimulatorPage() {
               />
             )}
           </svg>
+
+          {/* Component Context Menu — rendered at canvas level to avoid overflow:hidden clipping */}
+          {(() => {
+            const comp = components.find(c => c.id === selected);
+            if (!comp) return null;
+            const reg = COMPONENT_REGISTRY[comp.type];
+            if (!reg?.ContextMenu) return null;
+            const showDuringRun = !!reg.contextMenuDuringRun;
+            if (isRunning && !showDuringRun) return null;
+            return (
+              <div key={`cmenu-${comp.id}`} style={{
+                position: 'absolute',
+                left: comp.x + comp.w / 2,
+                top: comp.y - 14,
+                transform: 'translateX(-50%) translateY(-100%)',
+                background: 'var(--bg2)', border: '1px solid var(--border)',
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '6px 10px', borderRadius: '10px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.6)', cursor: 'default',
+                pointerEvents: 'all', whiteSpace: 'nowrap', zIndex: 200
+              }}
+                onMouseDown={e => e.stopPropagation()}
+                onClick={e => e.stopPropagation()}
+              >
+                {React.createElement(reg.ContextMenu, {
+                  attrs: comp.attrs,
+                  onUpdate: (key, value) => updateComponentAttr(comp.id, key, value)
+                })}
+                <div style={{ position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid var(--border)' }} />
+                <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--bg2)' }} />
+              </div>
+            );
+          })()}
 
           {/* HTML Overlay for Wire Context Menus (Bypasses SVG foreignObject event bugs) */}
           {(() => {
@@ -1799,60 +1873,53 @@ export default function SimulatorPage() {
                   {comp.label}
                 </div>
 
-                {/* Component Context Menu */}
-                {isSelected && !isRunning && (
-                  <div style={{
-                    position: 'absolute', top: -50, left: '50%', transform: 'translateX(-50%)',
-                    background: 'var(--bg2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '6px 10px', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', cursor: 'default',
-                    pointerEvents: 'all', whiteSpace: 'nowrap', zIndex: 100
-                  }}
-                    onMouseDown={e => e.stopPropagation()}
-                    onClick={e => e.stopPropagation()}
-                  >
-                    {comp.type === 'wokwi-led' && (
-                      <>
-                        <span style={{ fontSize: 12, color: 'var(--text2)' }}>Color:</span>
-                        <select value={comp.attrs.color || 'red'} onChange={e => updateComponentAttr(comp.id, 'color', e.target.value)} style={{ background: 'var(--bg)', color: 'white', border: '1px solid var(--border)', borderRadius: 4, padding: 2, outline: 'none' }}>
-                          <option value="red">Red</option>
-                          <option value="green">Green</option>
-                          <option value="blue">Blue</option>
-                          <option value="yellow">Yellow</option>
-                          <option value="orange">Orange</option>
-                          <option value="white">White</option>
-                        </select>
-                      </>
-                    )}
-                    {comp.type === 'wokwi-resistor' && (
-                      <>
-                        <span style={{ fontSize: 12, color: 'var(--text2)' }}>Res (Ω):</span>
-                        <input type="text" value={comp.attrs.value ?? '1000'} onChange={e => updateComponentAttr(comp.id, 'value', e.target.value)} style={{ width: 60, background: 'var(--bg)', color: 'white', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 4px', outline: 'none' }} />
-                      </>
-                    )}
-                    {comp.type === 'wokwi-power-supply' && (
-                      <>
-                        <span style={{ fontSize: 12, color: 'var(--text2)' }}>Voltage:</span>
-                        <input type="number" step="0.1" value={comp.attrs.voltage ?? '5.0'} onChange={e => updateComponentAttr(comp.id, 'voltage', e.target.value)} style={{ width: 50, background: 'var(--bg)', color: 'white', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 4px', outline: 'none' }} />
-                        <span style={{ fontSize: 12, color: 'var(--text2)' }}>V</span>
-                      </>
-                    )}
-                    {comp.type === 'wokwi-neopixel-matrix' && (
-                      <>
-                        <span style={{ fontSize: 12, color: 'var(--text2)' }}>Cols:</span>
-                        <input type="number" min="1" max="16" value={comp.attrs.cols ?? '8'} onChange={e => updateComponentAttr(comp.id, 'cols', e.target.value)} style={{ width: 40, background: 'var(--bg)', color: 'white', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 4px', outline: 'none' }} />
-                        <span style={{ fontSize: 12, color: 'var(--text2)' }}>Rows:</span>
-                        <input type="number" min="1" max="16" value={comp.attrs.rows ?? '8'} onChange={e => updateComponentAttr(comp.id, 'rows', e.target.value)} style={{ width: 40, background: 'var(--bg)', color: 'white', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 4px', outline: 'none' }} />
-                      </>
-                    )}
-
-
-                    <div style={{ position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid var(--border)' }} />
-                    <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--bg2)' }} />
-                  </div>
-                )}
               </div>
             )
           })}
+          </div>{/* end zoom wrapper */}
+
+          {/* Canvas Zoom Toolbar — anchored inside canvas so it moves with code panel resize */}
+          <div
+            style={{ position: 'absolute', bottom: 12, right: 12, zIndex: 100, display: 'flex', alignItems: 'center', gap: 4, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, padding: '4px 6px', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}
+            onClick={e => e.stopPropagation()}
+            onMouseDown={e => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setCanvasZoom(z => Math.max(0.25, parseFloat((z - 0.25).toFixed(2))))}
+              style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '2px 7px', borderRadius: 6 }}
+              title="Zoom Out"
+            >−</button>
+            <button
+              onClick={() => setCanvasZoom(1)}
+              style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer', fontSize: 11, padding: '2px 6px', borderRadius: 6, minWidth: 40, fontFamily: 'JetBrains Mono, monospace' }}
+              title="Reset Zoom"
+            >{Math.round(canvasZoom * 100)}%</button>
+            <button
+              onClick={() => setCanvasZoom(z => Math.min(2, parseFloat((z + 0.25).toFixed(2))))}
+              style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '2px 7px', borderRadius: 6 }}
+              title="Zoom In"
+            >+</button>
+            <div style={{ width: 1, height: 16, background: 'var(--border)', margin: '0 2px' }} />
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowCanvasMenu(m => !m)}
+                style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 16, padding: '2px 7px', borderRadius: 6 }}
+                title="Canvas Menu"
+              >⋮</button>
+              {showCanvasMenu && (
+                <div
+                  style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: 6, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', minWidth: 168, zIndex: 200 }}
+                  onMouseLeave={() => setShowCanvasMenu(false)}
+                >
+                  <button onClick={() => { setCanvasZoom(1); setShowCanvasMenu(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: 'var(--text)', padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>↺ Reset Zoom (100%)</button>
+                  <button onClick={() => { setCanvasZoom(0.5); setShowCanvasMenu(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: 'var(--text)', padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>🔬 Zoom Out (50%)</button>
+                  <button onClick={() => { setCanvasZoom(1.5); setShowCanvasMenu(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: 'var(--text)', padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>🔍 Zoom In (150%)</button>
+                  <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
+                  <button onClick={() => { if (!isRunning) { saveHistory(); setComponents([]); setWires([]); setSelected(null); } setShowCanvasMenu(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: 'var(--red)', padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>🗑 Clear Canvas</button>
+                </div>
+              )}
+            </div>
+          </div>
         </main>
 
         {/* RIGHT PANEL */}
