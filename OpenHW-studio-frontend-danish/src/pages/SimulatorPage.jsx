@@ -1623,34 +1623,34 @@ export default function SimulatorPage() {
               flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2,
               padding: '4px 8px 8px',
             }}>
-            {CATALOG.map(group => {
-              const filteredItems = group.items.filter(item =>
-                item.label.toLowerCase().includes(paletteSearch.toLowerCase()) ||
-                item.type.toLowerCase().includes(paletteSearch.toLowerCase())
-              );
-              if (filteredItems.length === 0) return null;
-              return (
-                <div key={group.group}>
-                  <div style={S.groupName}>{group.group}</div>
-                  {filteredItems.map(item => (
-                    <div
-                      key={item.type}
-                      style={S.paletteItem}
-                      draggable
-                      onDragStart={e => onPaletteDragStart(e, item)}
-                      title={`Drag to canvas to add ${item.label}`}
-                    >
-                      <span style={{ fontSize: 13, color: 'var(--text2)' }}>{item.label}</span>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-            <div style={S.paletteTip}>
-              Drag → drop to place<br />
-              Click <em>Wire Mode</em> then click pins to connect<br />
-              Del key removes selected
-            </div>
+              {CATALOG.map(group => {
+                const filteredItems = group.items.filter(item =>
+                  item.label.toLowerCase().includes(paletteSearch.toLowerCase()) ||
+                  item.type.toLowerCase().includes(paletteSearch.toLowerCase())
+                );
+                if (filteredItems.length === 0) return null;
+                return (
+                  <div key={group.group}>
+                    <div style={S.groupName}>{group.group}</div>
+                    {filteredItems.map(item => (
+                      <div
+                        key={item.type}
+                        style={S.paletteItem}
+                        draggable
+                        onDragStart={e => onPaletteDragStart(e, item)}
+                        title={`Drag to canvas to add ${item.label}`}
+                      >
+                        <span style={{ fontSize: 13, color: 'var(--text2)' }}>{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+              <div style={S.paletteTip}>
+                Drag → drop to place<br />
+                Click <em>Wire Mode</em> then click pins to connect<br />
+                Del key removes selected
+              </div>
             </div>
           </div>
         </aside>
@@ -1693,6 +1693,10 @@ export default function SimulatorPage() {
           }}
           onDoubleClick={e => {
             if (wireStart || isRunning) return;
+            // Don't open search if clicking on an input, button, select, textarea, or inside a context menu
+            const tag = e.target.tagName.toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'button' || tag === 'select') return;
+            if (e.target.closest('[data-contextmenu]')) return;
             const rect = canvasRef.current.getBoundingClientRect();
             const canvasX = (e.clientX - rect.left - canvasOffsetRef.current.x) / canvasZoomRef.current;
             const canvasY = (e.clientY - rect.top - canvasOffsetRef.current.y) / canvasZoomRef.current;
@@ -1707,280 +1711,282 @@ export default function SimulatorPage() {
             width: `${100 / canvasZoom}%`, height: `${100 / canvasZoom}%`,
             transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px) scale(${canvasZoom})`, transformOrigin: '0 0',
           }}>
-          {/* BOTTOM SVG layer for wires (Below Components) */}
-          <svg
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}
-          >
-            {wires.filter(w => w.isBelow === true).map(w => {
-              const fromParts = w.from.split(':')
-              const toParts = w.to.split(':')
-              const p1 = getPinPos(fromParts[0], fromParts[1])
-              const p2 = getPinPos(toParts[0], toParts[1])
-              if (!p1 || !p2) return null
-              const isSelectedWire = selected === w.id;
+            {/* BOTTOM SVG layer for wires (Below Components) */}
+            <svg
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}
+            >
+              {wires.filter(w => w.isBelow === true).map(w => {
+                const fromParts = w.from.split(':')
+                const toParts = w.to.split(':')
+                const p1 = getPinPos(fromParts[0], fromParts[1])
+                const p2 = getPinPos(toParts[0], toParts[1])
+                if (!p1 || !p2) return null
+                const isSelectedWire = selected === w.id;
 
+                return (
+                  <g key={w.id} style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setSelected(w.id); }} onDoubleClick={e => e.stopPropagation()}>
+                    <path d={multiRoutePath(p1, p2, w.waypoints)} stroke="transparent" strokeWidth={16} fill="none" style={{ pointerEvents: 'stroke' }} />
+                    <path d={multiRoutePath(p1, p2, w.waypoints)} stroke={isSelectedWire ? 'var(--orange)' : w.color} strokeWidth={isSelectedWire ? 3.5 : 2.5} fill="none" strokeDasharray={isSelectedWire ? "6 4" : "none"} strokeLinecap="round" opacity={0.6} />
+                    <circle cx={p1.x} cy={p1.y} r={isSelectedWire ? 5 : 4} fill={isSelectedWire ? 'var(--orange)' : w.color} opacity={0.6} />
+                    {(w.waypoints || []).map((pt, i) => <circle key={i} cx={pt.x} cy={pt.y} r={isSelectedWire ? 4 : 3} fill={isSelectedWire ? 'var(--orange)' : w.color} opacity={0.4} />)}
+                    <circle cx={p2.x} cy={p2.y} r={isSelectedWire ? 5 : 4} fill={isSelectedWire ? 'var(--orange)' : w.color} opacity={0.6} />
+                  </g>
+                )
+              })}
+            </svg>
+
+            {/* TOP SVG layer for wires (Above Components) & Context Menu */}
+            <svg
+              ref={svgRef}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }}
+            >
+              {/* Placed wires (Top layer) */}
+              {wires.filter(w => w.isBelow !== true).map(w => {
+                const fromParts = w.from.split(':')
+                const toParts = w.to.split(':')
+                const p1 = getPinPos(fromParts[0], fromParts[1])
+                const p2 = getPinPos(toParts[0], toParts[1])
+                if (!p1 || !p2) return null
+                const isSelectedWire = selected === w.id;
+
+                return (
+                  <g key={w.id} style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setSelected(w.id); }} onDoubleClick={e => e.stopPropagation()}>
+                    <path d={multiRoutePath(p1, p2, w.waypoints)} stroke="transparent" strokeWidth={16} fill="none" style={{ pointerEvents: 'stroke' }} />
+                    <path d={multiRoutePath(p1, p2, w.waypoints)} stroke={isSelectedWire ? 'var(--orange)' : w.color} strokeWidth={isSelectedWire ? 3.5 : 2.5} fill="none" strokeDasharray={isSelectedWire ? "6 4" : "none"} strokeLinecap="round" opacity={0.9} />
+                    <circle cx={p1.x} cy={p1.y} r={isSelectedWire ? 5 : 4} fill={isSelectedWire ? 'var(--orange)' : w.color} />
+                    {(w.waypoints || []).map((pt, i) => <circle key={i} cx={pt.x} cy={pt.y} r={isSelectedWire ? 4 : 3} fill={isSelectedWire ? 'var(--orange)' : w.color} opacity={0.6} />)}
+                    <circle cx={p2.x} cy={p2.y} r={isSelectedWire ? 5 : 4} fill={isSelectedWire ? 'var(--orange)' : w.color} />
+                  </g>
+                )
+              })}
+
+              {/* Preview wire while drawing */}
+              {wireStart && (
+                <path
+                  d={multiRoutePath({ x: wireStart.x, y: wireStart.y }, mousePos, wireStart.waypoints)}
+                  stroke="var(--orange)"
+                  strokeWidth={2}
+                  strokeDasharray="6 4"
+                  fill="none"
+                  strokeLinecap="round"
+                  opacity={0.8}
+                />
+              )}
+            </svg>
+
+            {/* Component Context Menu — rendered at canvas level to avoid overflow:hidden clipping */}
+            {(() => {
+              const comp = components.find(c => c.id === selected);
+              if (!comp) return null;
+              const reg = COMPONENT_REGISTRY[comp.type];
+              if (!reg?.ContextMenu) return null;
+              const showDuringRun = !!reg.contextMenuDuringRun;
+              if (isRunning && !showDuringRun) return null;
               return (
-                <g key={w.id} style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setSelected(w.id); }}>
-                  <path d={multiRoutePath(p1, p2, w.waypoints)} stroke="transparent" strokeWidth={16} fill="none" style={{ pointerEvents: 'stroke' }} />
-                  <path d={multiRoutePath(p1, p2, w.waypoints)} stroke={isSelectedWire ? 'var(--orange)' : w.color} strokeWidth={isSelectedWire ? 3.5 : 2.5} fill="none" strokeDasharray={isSelectedWire ? "6 4" : "none"} strokeLinecap="round" opacity={0.6} />
-                  <circle cx={p1.x} cy={p1.y} r={isSelectedWire ? 5 : 4} fill={isSelectedWire ? 'var(--orange)' : w.color} opacity={0.6} />
-                  {(w.waypoints || []).map((pt, i) => <circle key={i} cx={pt.x} cy={pt.y} r={isSelectedWire ? 4 : 3} fill={isSelectedWire ? 'var(--orange)' : w.color} opacity={0.4} />)}
-                  <circle cx={p2.x} cy={p2.y} r={isSelectedWire ? 5 : 4} fill={isSelectedWire ? 'var(--orange)' : w.color} opacity={0.6} />
-                </g>
-              )
-            })}
-          </svg>
-
-          {/* TOP SVG layer for wires (Above Components) & Context Menu */}
-          <svg
-            ref={svgRef}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }}
-          >
-            {/* Placed wires (Top layer) */}
-            {wires.filter(w => w.isBelow !== true).map(w => {
-              const fromParts = w.from.split(':')
-              const toParts = w.to.split(':')
-              const p1 = getPinPos(fromParts[0], fromParts[1])
-              const p2 = getPinPos(toParts[0], toParts[1])
-              if (!p1 || !p2) return null
-              const isSelectedWire = selected === w.id;
-
-              return (
-                <g key={w.id} style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setSelected(w.id); }}>
-                  <path d={multiRoutePath(p1, p2, w.waypoints)} stroke="transparent" strokeWidth={16} fill="none" style={{ pointerEvents: 'stroke' }} />
-                  <path d={multiRoutePath(p1, p2, w.waypoints)} stroke={isSelectedWire ? 'var(--orange)' : w.color} strokeWidth={isSelectedWire ? 3.5 : 2.5} fill="none" strokeDasharray={isSelectedWire ? "6 4" : "none"} strokeLinecap="round" opacity={0.9} />
-                  <circle cx={p1.x} cy={p1.y} r={isSelectedWire ? 5 : 4} fill={isSelectedWire ? 'var(--orange)' : w.color} />
-                  {(w.waypoints || []).map((pt, i) => <circle key={i} cx={pt.x} cy={pt.y} r={isSelectedWire ? 4 : 3} fill={isSelectedWire ? 'var(--orange)' : w.color} opacity={0.6} />)}
-                  <circle cx={p2.x} cy={p2.y} r={isSelectedWire ? 5 : 4} fill={isSelectedWire ? 'var(--orange)' : w.color} />
-                </g>
-              )
-            })}
-
-            {/* Preview wire while drawing */}
-            {wireStart && (
-              <path
-                d={multiRoutePath({ x: wireStart.x, y: wireStart.y }, mousePos, wireStart.waypoints)}
-                stroke="var(--orange)"
-                strokeWidth={2}
-                strokeDasharray="6 4"
-                fill="none"
-                strokeLinecap="round"
-                opacity={0.8}
-              />
-            )}
-          </svg>
-
-          {/* Component Context Menu — rendered at canvas level to avoid overflow:hidden clipping */}
-          {(() => {
-            const comp = components.find(c => c.id === selected);
-            if (!comp) return null;
-            const reg = COMPONENT_REGISTRY[comp.type];
-            if (!reg?.ContextMenu) return null;
-            const showDuringRun = !!reg.contextMenuDuringRun;
-            if (isRunning && !showDuringRun) return null;
-            return (
-              <div key={`cmenu-${comp.id}`} style={{
-                position: 'absolute',
-                left: comp.x + comp.w / 2,
-                top: comp.y - 14,
-                transform: 'translateX(-50%) translateY(-100%)',
-                background: 'var(--bg2)', border: '1px solid var(--border)',
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '6px 10px', borderRadius: '10px',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.6)', cursor: 'default',
-                pointerEvents: 'all', whiteSpace: 'nowrap', zIndex: 200
-              }}
-                onMouseDown={e => e.stopPropagation()}
-                onClick={e => e.stopPropagation()}
-              >
-                {React.createElement(reg.ContextMenu, {
-                  attrs: comp.attrs,
-                  onUpdate: (key, value) => updateComponentAttr(comp.id, key, value)
-                })}
-                <div style={{ position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid var(--border)' }} />
-                <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--bg2)' }} />
-              </div>
-            );
-          })()}
-
-          {/* HTML Overlay for Wire Context Menus (Bypasses SVG foreignObject event bugs) */}
-          {(() => {
-            const w = wires.find(w => w.id === selected);
-            if (!w || isRunning) return null;
-
-            const fromParts = w.from.split(':')
-            const toParts = w.to.split(':')
-            const p1 = getPinPos(fromParts[0], fromParts[1])
-            const p2 = getPinPos(toParts[0], toParts[1])
-            if (!p1 || !p2) return null
-            const pts = [p1, ...(w.waypoints || []), p2];
-            const midPt = pts[Math.floor(pts.length / 2)];
-
-            return (
-              <div key={`menu-${w.id}`} style={{
-                position: 'absolute',
-                left: midPt.x - 65,
-                top: midPt.y - 50,
-                zIndex: 50,
-                background: 'var(--bg2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8,
-                padding: '6px 10px', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', cursor: 'default'
-              }}
-                onPointerDown={e => e.stopPropagation()}
-                onClick={e => e.stopPropagation()}>
-                <input type="color" value={w.color} onChange={e => updateWireColor(w.id, e.target.value)} style={{ width: 22, height: 22, padding: 0, border: 'none', cursor: 'pointer', background: 'transparent', borderRadius: 4 }} title="Change Color" />
-                <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
-                <button
-                  style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', fontSize: 16, padding: '2px 6px', borderRadius: 6, display: 'flex', alignItems: 'center' }}
-                  onClick={(e) => { e.stopPropagation(); toggleWireLayer(w.id); }}
-                  onPointerDown={(e) => { e.stopPropagation(); }}
-                  title={w.isBelow ? "Bring to Front" : "Send to Back"}
-                >
-                  {w.isBelow ? '↑' : '↓'}
-                </button>
-                <button style={{ background: 'var(--red)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 13, padding: '4px 8px', borderRadius: 6, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }} onPointerDown={(e) => { e.stopPropagation(); deleteWire(w.id); }} onClick={(e) => { e.stopPropagation(); deleteWire(w.id); }} title="Delete Wire">✕</button>
-                <div style={{ position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid var(--border)' }} />
-                <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--bg2)' }} />
-              </div>
-            )
-          })()}
-
-          {/* Empty state */}
-          {components.length === 0 && (
-            <div style={S.emptyState}>
-              <div style={{ fontSize: 52, marginBottom: 16 }}>🔌</div>
-              <p style={{ fontSize: 16, marginBottom: 8 }}>Drag components from the left panel</p>
-              <p style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'JetBrains Mono, monospace' }}>
-                Arduino Uno · LED · Resistor · Button · Servo · LCD
-              </p>
-            </div>
-          )}
-
-          {/* Components */}
-          {components.map(comp => {
-            const pins = PIN_DEFS[comp.type] || []
-            const hasError = errorCompIds.has(comp.id)
-            const isSelected = selected === comp.id
-            return (
-              <div
-                key={comp.id}
-                style={{
+                <div key={`cmenu-${comp.id}`} data-contextmenu="true" style={{
                   position: 'absolute',
-                  left: comp.x, top: comp.y,
-                  width: comp.w, height: comp.h,
-                  cursor: wireStart ? 'crosshair' : 'move',
-                  zIndex: isSelected ? 5 : 2,
-                  userSelect: 'none',
-                  pointerEvents: 'all'
+                  left: comp.x + comp.w / 2,
+                  top: comp.y - 14,
+                  transform: 'translateX(-50%) translateY(-100%)',
+                  background: 'var(--bg2)', border: '1px solid var(--border)',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '6px 10px', borderRadius: '10px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.6)', cursor: 'default',
+                  pointerEvents: 'all', whiteSpace: 'nowrap', zIndex: 200
                 }}
-                onMouseDown={e => onCompMouseDown(e, comp.id)}
-                onClick={e => onCompClick(e, comp.id)}
-              >
-                {/* Selection ring */}
-                {isSelected && (
-                  <div style={{
-                    position: 'absolute', inset: -6, borderRadius: 8,
-                    border: '2px solid var(--accent)',
-                    boxShadow: '0 0 16px var(--glow)',
-                    pointerEvents: 'none', zIndex: 10,
-                    animation: 'none',
-                  }} />
-                )}
-                {/* Error ring */}
-                {hasError && (
-                  <div style={{
-                    position: 'absolute', inset: -6, borderRadius: 8,
-                    border: '2px solid var(--red)',
-                    boxShadow: '0 0 16px rgba(255,68,68,.4)',
-                    pointerEvents: 'none', zIndex: 10,
-                  }} />
-                )}
-
-                {/* Component Render */}
-                {COMPONENT_REGISTRY[comp.type] ? (
-                  // Local UI component rendering SVG
-                  React.createElement(COMPONENT_REGISTRY[comp.type].UI, {
-                    state: oopStates[comp.id] || {},
-                    attrs: getComponentStateAttrs(comp)
-                  })
-                ) : (
-                  // Fallback for unsupported components (if any left)
-                  <div
-                    style={{ width: '100%', height: '100%', pointerEvents: 'none', background: '#444', border: '1px solid #777' }}
-                    ref={el => {
-                      if (comp.type === 'wokwi-neopixel-matrix' && el) {
-                        neopixelRefs.current[comp.id] = el;
-                      }
-                    }}
-                    dangerouslySetInnerHTML={{
-                      __html: `<${comp.type} ${Object.entries(getComponentStateAttrs(comp)).map(([k, v]) => `${k}="${v}"`).join(' ')}></${comp.type}>`,
-                    }}
-                  />
-                )}
-
-                {/* Pins */}
-                {pins.map(pin => {
-                  const pinStrRef = `${comp.id}:${pin.id}`;
-                  const isHovered = hoveredPin === pinStrRef;
-                  const isWireStartPin = wireStart?.compId === comp.id && wireStart?.pinId === pin.id;
-
-                  // Check if a wire is connected to this pin
-                  const connectedWire = wires.find(w => w.from === pinStrRef || w.to === pinStrRef);
-                  const pinColor = connectedWire ? connectedWire.color : (isWireStartPin || isHovered ? '#f1c40f' : 'rgba(255,255,255,0.2)');
-                  const pinBorder = connectedWire ? connectedWire.color : (isHovered || isWireStartPin ? '#fff' : 'rgba(255,255,255,0.8)');
-
-                  return (
-                    <div
-                      key={pin.id}
-                      title={`${pin.description || pin.id} — click to wire`}
-                      style={{
-                        position: 'absolute',
-                        left: pin.x, top: pin.y,
-                        width: 5, height: 5,
-                        background: pinColor,
-                        border: `1px solid ${pinBorder}`,
-                        borderRadius: '0%', /* matching task3.html */
-                        cursor: 'crosshair',
-                        zIndex: isHovered ? 30 : 20, /* matching task3.html hover and port z-index */
-                        transform: `translate(-50%, -50%)${isHovered ? ' scale(1.5)' : ''}`, /* matching task3.html scale */
-                        transition: '0.2s', /* matching task3.html transition */
-                        pointerEvents: 'all', /* Fix hit detection */
-                      }}
-                      onMouseEnter={() => setHoveredPin(pinStrRef)}
-                      onMouseLeave={() => setHoveredPin(null)}
-                      onClick={e => onPinClick(e, comp.id, pin.id, pin.description || pin.id)}
-                    >
-                      {/* Pin label tooltip */}
-                      {isHovered && (
-                        <div style={{
-                          position: 'absolute', bottom: 18, left: '50%',
-                          transform: 'translateX(-50%)',
-                          background: '#111', color: '#fff',
-                          padding: '4px 8px', borderRadius: 4,
-                          fontSize: 10, whiteSpace: 'nowrap', zIndex: 9999,
-                          pointerEvents: 'none', border: '1px solid #444',
-                          boxShadow: '0 2px 5px rgba(0,0,0,0.5)',
-                        }}>
-                          {pin.description || pin.id}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-
-                {/* Component label */}
-                <div style={{
-                  position: 'absolute', bottom: -18, left: '50%',
-                  transform: 'translateX(-50%)',
-                  fontSize: 10, color: hasError ? 'var(--red)' : 'var(--text3)',
-                  whiteSpace: 'nowrap', fontFamily: 'JetBrains Mono, monospace',
-                  pointerEvents: 'none',
-                }}>
-                  {comp.label}
+                  onMouseDown={e => e.stopPropagation()}
+                  onClick={e => e.stopPropagation()}
+                  onDoubleClick={e => e.stopPropagation()}
+                >
+                  {React.createElement(reg.ContextMenu, {
+                    attrs: comp.attrs,
+                    onUpdate: (key, value) => updateComponentAttr(comp.id, key, value)
+                  })}
+                  <div style={{ position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid var(--border)' }} />
+                  <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--bg2)' }} />
                 </div>
+              );
+            })()}
 
+            {/* HTML Overlay for Wire Context Menus (Bypasses SVG foreignObject event bugs) */}
+            {(() => {
+              const w = wires.find(w => w.id === selected);
+              if (!w || isRunning) return null;
+
+              const fromParts = w.from.split(':')
+              const toParts = w.to.split(':')
+              const p1 = getPinPos(fromParts[0], fromParts[1])
+              const p2 = getPinPos(toParts[0], toParts[1])
+              if (!p1 || !p2) return null
+              const pts = [p1, ...(w.waypoints || []), p2];
+              const midPt = pts[Math.floor(pts.length / 2)];
+
+              return (
+                <div key={`menu-${w.id}`} style={{
+                  position: 'absolute',
+                  left: midPt.x - 65,
+                  top: midPt.y - 50,
+                  zIndex: 50,
+                  background: 'var(--bg2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '6px 10px', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', cursor: 'default'
+                }}
+                  onPointerDown={e => e.stopPropagation()}
+                  onClick={e => e.stopPropagation()}>
+                  <input type="color" value={w.color} onChange={e => updateWireColor(w.id, e.target.value)} style={{ width: 22, height: 22, padding: 0, border: 'none', cursor: 'pointer', background: 'transparent', borderRadius: 4 }} title="Change Color" />
+                  <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
+                  <button
+                    style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', fontSize: 16, padding: '2px 6px', borderRadius: 6, display: 'flex', alignItems: 'center' }}
+                    onClick={(e) => { e.stopPropagation(); toggleWireLayer(w.id); }}
+                    onPointerDown={(e) => { e.stopPropagation(); }}
+                    title={w.isBelow ? "Bring to Front" : "Send to Back"}
+                  >
+                    {w.isBelow ? '↑' : '↓'}
+                  </button>
+                  <button style={{ background: 'var(--red)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 13, padding: '4px 8px', borderRadius: 6, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }} onPointerDown={(e) => { e.stopPropagation(); deleteWire(w.id); }} onClick={(e) => { e.stopPropagation(); deleteWire(w.id); }} title="Delete Wire">✕</button>
+                  <div style={{ position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid var(--border)' }} />
+                  <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--bg2)' }} />
+                </div>
+              )
+            })()}
+
+            {/* Empty state */}
+            {components.length === 0 && (
+              <div style={S.emptyState}>
+                <div style={{ fontSize: 52, marginBottom: 16 }}>🔌</div>
+                <p style={{ fontSize: 16, marginBottom: 8 }}>Drag components from the left panel</p>
+                <p style={{ fontSize: 12, color: 'var(--text3)', fontFamily: 'JetBrains Mono, monospace' }}>
+                  Arduino Uno · LED · Resistor · Button · Servo · LCD
+                </p>
               </div>
-            )
-          })}
+            )}
+
+            {/* Components */}
+            {components.map(comp => {
+              const pins = PIN_DEFS[comp.type] || []
+              const hasError = errorCompIds.has(comp.id)
+              const isSelected = selected === comp.id
+              return (
+                <div
+                  key={comp.id}
+                  style={{
+                    position: 'absolute',
+                    left: comp.x, top: comp.y,
+                    width: comp.w, height: comp.h,
+                    cursor: wireStart ? 'crosshair' : 'move',
+                    zIndex: isSelected ? 5 : 2,
+                    userSelect: 'none',
+                    pointerEvents: 'all'
+                  }}
+                  onMouseDown={e => onCompMouseDown(e, comp.id)}
+                  onClick={e => onCompClick(e, comp.id)}
+                  onDoubleClick={e => e.stopPropagation()}
+                >
+                  {/* Selection ring */}
+                  {isSelected && (
+                    <div style={{
+                      position: 'absolute', inset: -6, borderRadius: 8,
+                      border: '2px solid var(--accent)',
+                      boxShadow: '0 0 16px var(--glow)',
+                      pointerEvents: 'none', zIndex: 10,
+                      animation: 'none',
+                    }} />
+                  )}
+                  {/* Error ring */}
+                  {hasError && (
+                    <div style={{
+                      position: 'absolute', inset: -6, borderRadius: 8,
+                      border: '2px solid var(--red)',
+                      boxShadow: '0 0 16px rgba(255,68,68,.4)',
+                      pointerEvents: 'none', zIndex: 10,
+                    }} />
+                  )}
+
+                  {/* Component Render */}
+                  {COMPONENT_REGISTRY[comp.type] ? (
+                    // Local UI component rendering SVG
+                    React.createElement(COMPONENT_REGISTRY[comp.type].UI, {
+                      state: oopStates[comp.id] || {},
+                      attrs: getComponentStateAttrs(comp)
+                    })
+                  ) : (
+                    // Fallback for unsupported components (if any left)
+                    <div
+                      style={{ width: '100%', height: '100%', pointerEvents: 'none', background: '#444', border: '1px solid #777' }}
+                      ref={el => {
+                        if (comp.type === 'wokwi-neopixel-matrix' && el) {
+                          neopixelRefs.current[comp.id] = el;
+                        }
+                      }}
+                      dangerouslySetInnerHTML={{
+                        __html: `<${comp.type} ${Object.entries(getComponentStateAttrs(comp)).map(([k, v]) => `${k}="${v}"`).join(' ')}></${comp.type}>`,
+                      }}
+                    />
+                  )}
+
+                  {/* Pins */}
+                  {pins.map(pin => {
+                    const pinStrRef = `${comp.id}:${pin.id}`;
+                    const isHovered = hoveredPin === pinStrRef;
+                    const isWireStartPin = wireStart?.compId === comp.id && wireStart?.pinId === pin.id;
+
+                    // Check if a wire is connected to this pin
+                    const connectedWire = wires.find(w => w.from === pinStrRef || w.to === pinStrRef);
+                    const pinColor = connectedWire ? connectedWire.color : (isWireStartPin || isHovered ? '#f1c40f' : 'rgba(255,255,255,0.2)');
+                    const pinBorder = connectedWire ? connectedWire.color : (isHovered || isWireStartPin ? '#fff' : 'rgba(255,255,255,0.8)');
+
+                    return (
+                      <div
+                        key={pin.id}
+                        title={`${pin.description || pin.id} — click to wire`}
+                        style={{
+                          position: 'absolute',
+                          left: pin.x, top: pin.y,
+                          width: 5, height: 5,
+                          background: pinColor,
+                          border: `1px solid ${pinBorder}`,
+                          borderRadius: '0%', /* matching task3.html */
+                          cursor: 'crosshair',
+                          zIndex: isHovered ? 30 : 20, /* matching task3.html hover and port z-index */
+                          transform: `translate(-50%, -50%)${isHovered ? ' scale(1.5)' : ''}`, /* matching task3.html scale */
+                          transition: '0.2s', /* matching task3.html transition */
+                          pointerEvents: 'all', /* Fix hit detection */
+                        }}
+                        onMouseEnter={() => setHoveredPin(pinStrRef)}
+                        onMouseLeave={() => setHoveredPin(null)}
+                        onClick={e => onPinClick(e, comp.id, pin.id, pin.description || pin.id)}
+                      >
+                        {/* Pin label tooltip */}
+                        {isHovered && (
+                          <div style={{
+                            position: 'absolute', bottom: 18, left: '50%',
+                            transform: 'translateX(-50%)',
+                            background: '#111', color: '#fff',
+                            padding: '4px 8px', borderRadius: 4,
+                            fontSize: 10, whiteSpace: 'nowrap', zIndex: 9999,
+                            pointerEvents: 'none', border: '1px solid #444',
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.5)',
+                          }}>
+                            {pin.description || pin.id}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+
+                  {/* Component label */}
+                  <div style={{
+                    position: 'absolute', bottom: -18, left: '50%',
+                    transform: 'translateX(-50%)',
+                    fontSize: 10, color: hasError ? 'var(--red)' : 'var(--text3)',
+                    whiteSpace: 'nowrap', fontFamily: 'JetBrains Mono, monospace',
+                    pointerEvents: 'none',
+                  }}>
+                    {comp.label}
+                  </div>
+
+                </div>
+              )
+            })}
           </div>{/* end zoom wrapper */}
 
           {/* Canvas Zoom Toolbar — anchored inside canvas so it moves with code panel resize */}
@@ -2048,7 +2054,7 @@ export default function SimulatorPage() {
             const VW = window.innerWidth, VH = window.innerHeight;
             const menuW = 240, approxH = 44 + results.length * 38 + (results.length === 0 ? 38 : 0);
             const left = quickAdd.screenX + menuW > VW ? quickAdd.screenX - menuW - 4 : quickAdd.screenX + 4;
-            const top  = quickAdd.screenY + approxH > VH ? quickAdd.screenY - approxH - 4 : quickAdd.screenY + 4;
+            const top = quickAdd.screenY + approxH > VH ? quickAdd.screenY - approxH - 4 : quickAdd.screenY + 4;
             return (
               <div
                 data-quickadd="true"
@@ -2230,7 +2236,7 @@ export default function SimulatorPage() {
                   ))}
                 </div>
                 {codeTab === 'code' && (
-                  <div style={{ flex: 1, overflow: 'auto', background: '#070b14' }}>
+                  <div className="panel-scroll" style={{ flex: 1, overflow: 'auto', background: 'var(--bg)' }}>
                     <Editor
                       value={code}
                       onValueChange={code => setCode(code)}
@@ -2241,7 +2247,7 @@ export default function SimulatorPage() {
                         fontSize: 12,
                         lineHeight: 1.7,
                         minHeight: '100%',
-                        color: '#e8edf5',
+                        color: 'var(--text)',
                         border: 'none',
                         outline: 'none',
                         resize: 'none'
@@ -2314,7 +2320,7 @@ export default function SimulatorPage() {
                   </div>
                 )}
                 {codeTab === 'serial' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, background: '#070b14', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, background: 'var(--bg)', overflow: 'hidden' }}>
                     {/* Serial Toolbar */}
                     <div style={S.serialToolbar}>
                       <span style={{
@@ -2366,7 +2372,7 @@ export default function SimulatorPage() {
                               <span style={{ ...S.serialBadge, color: badgeColor, background: badgeBg, border: `1px solid ${badgeColor}40` }}>
                                 {entry.dir?.toUpperCase() || 'RX'}
                               </span>
-                              <span style={{ flex: 1, color: entry.dir === 'tx' ? '#3498db' : entry.dir === 'sys' ? '#888' : 'var(--green)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                              <span style={{ flex: 1, color: entry.dir === 'tx' ? '#3498db' : entry.dir === 'sys' ? 'var(--text3)' : 'var(--green)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                                 {entry.text}
                               </span>
                             </div>
@@ -2376,7 +2382,7 @@ export default function SimulatorPage() {
                     </div>
 
                     {/* TX Input Row */}
-                    <div style={{ display: 'flex', gap: 6, padding: '8px 10px', borderTop: '1px solid rgba(255,255,255,0.07)', flexShrink: 0, background: '#0d1220' }}>
+                    <div style={{ display: 'flex', gap: 6, padding: '8px 10px', borderTop: '1px solid var(--border)', flexShrink: 0, background: 'var(--bg2)' }}>
                       <input
                         style={{ ...S.serialInput, flex: 1, fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}
                         placeholder="Send message to Arduino..."
@@ -2590,10 +2596,10 @@ const S = {
   codePlaceholder: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', gap: 8 },
   serialOutput: { flex: 1, overflowY: 'auto', padding: '6px 0', display: 'flex', flexDirection: 'column' },
   serialInput: { background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '7px 10px', borderRadius: 8, fontFamily: 'inherit', fontSize: 12, outline: 'none' },
-  serialToolbar: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid rgba(255,255,255,0.07)', background: '#0d1220', flexShrink: 0 },
+  serialToolbar: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid var(--border)', background: 'var(--bg2)', flexShrink: 0 },
   serialCtrlBtn: { background: 'transparent', border: '1px solid var(--border)', color: 'var(--text2)', borderRadius: 6, padding: '3px 8px', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
-  serialLine: { display: 'flex', alignItems: 'flex-start', gap: 8, padding: '2px 12px', fontSize: 11, fontFamily: 'JetBrains Mono, monospace', borderBottom: '1px solid rgba(255,255,255,0.03)' },
-  serialTs: { color: 'rgba(255,255,255,0.25)', fontSize: 10, minWidth: 84, flexShrink: 0, paddingTop: 1 },
+  serialLine: { display: 'flex', alignItems: 'flex-start', gap: 8, padding: '2px 12px', fontSize: 11, fontFamily: 'JetBrains Mono, monospace', borderBottom: '1px solid var(--border)' },
+  serialTs: { color: 'var(--text3)', fontSize: 10, minWidth: 84, flexShrink: 0, paddingTop: 1 },
   serialBadge: { display: 'inline-block', fontSize: 9, fontWeight: 700, borderRadius: 3, padding: '1px 4px', flexShrink: 0, marginTop: 1 },
   plotterToolbar: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid var(--border)', flexShrink: 0 },
   plotterLegend: { display: 'flex', flexWrap: 'wrap', gap: '4px 16px', padding: '4px 10px', borderBottom: '1px solid var(--border)', flexShrink: 0 },
