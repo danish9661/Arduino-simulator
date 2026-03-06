@@ -169,6 +169,10 @@ export default function SimulatorPage() {
   const isCanvasLockedRef = useRef(false)
   const [showGrid, setShowGrid] = useState(true)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [quickAdd, setQuickAdd] = useState(null)   // { screenX, screenY, canvasX, canvasY }
+  const [quickAddSearch, setQuickAddSearch] = useState('')
+  const [quickAddIdx, setQuickAddIdx] = useState(0)
+  const quickAddInputRef = useRef(null)
   const pageRef = useRef(null)
   const isPanningRef = useRef(false)
   const panStartRef = useRef({ x: 0, y: 0, ox: 0, oy: 0 })
@@ -298,6 +302,23 @@ export default function SimulatorPage() {
   useEffect(() => { canvasZoomRef.current = canvasZoom; }, [canvasZoom]);
   useEffect(() => { canvasOffsetRef.current = canvasOffset; }, [canvasOffset]);
   useEffect(() => { isCanvasLockedRef.current = isCanvasLocked; }, [isCanvasLocked]);
+
+  // Quick-add menu: auto-focus input when menu opens
+  useEffect(() => {
+    if (quickAdd && quickAddInputRef.current) {
+      quickAddInputRef.current.focus();
+    }
+  }, [quickAdd]);
+
+  // Quick-add menu: close when clicking outside
+  useEffect(() => {
+    if (!quickAdd) return;
+    const handler = (e) => {
+      if (!e.target.closest('[data-quickadd]')) setQuickAdd(null);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [quickAdd]);
 
   // Fullscreen sync
   useEffect(() => {
@@ -820,6 +841,20 @@ export default function SimulatorPage() {
       attrs: item.attrs || {},
     }])
     dragPayload.current = null
+  }, [saveHistory])
+
+  // ── Quick-add: place component at explicit canvas coordinates ──────────────
+  const addComponentAt = useCallback((item, canvasX, canvasY) => {
+    saveHistory()
+    const x = canvasX - (item.w || 60) / 2
+    const y = canvasY - (item.h || 60) / 2
+    setComponents(prev => [...prev, {
+      id: `${item.type}_${nextId++}`,
+      type: item.type, label: item.label,
+      x: Math.max(8, x), y: Math.max(8, y),
+      w: item.w || 60, h: item.h || 60,
+      attrs: item.attrs || {},
+    }])
   }, [saveHistory])
 
   // ── Move and Select component ──────────────────────────────────────────────
@@ -1560,27 +1595,34 @@ export default function SimulatorPage() {
           </div>
 
           {/* Full palette content — fades in when expanded */}
-          <div className="palette-scroll" style={{
+          <div style={{
             width: 182, opacity: isPaletteHovered ? 1 : 0, transition: 'opacity 0.2s',
             pointerEvents: isPaletteHovered ? 'auto' : 'none',
-            display: 'flex', flexDirection: 'column', gap: 2, flex: 1, height: '100%', overflowY: 'auto',
-            padding: '10px 8px',
+            display: 'flex', flexDirection: 'column', height: '100%',
           }}>
-            <div style={S.paletteHeader}>Components</div>
-            <input
-              style={S.paletteSearch}
-              placeholder="Search..."
-              value={paletteSearch}
-              onChange={(e) => setPaletteSearch(e.target.value)}
-            />
-            <div style={{ marginBottom: 12 }}>
-              <input type="file" ref={componentZipInputRef} onChange={handleUploadZip} accept=".zip" style={{ display: 'none' }} />
-              <button
-                onClick={() => componentZipInputRef.current.click()}
-                style={{ width: '100%', padding: '8px', borderRadius: 4, border: '1px dashed var(--border)', background: 'transparent', color: 'var(--text2)', cursor: 'pointer', fontSize: 12 }}>
-                Upload ZIP to Test
-              </button>
+            {/* Sticky top — header, search, upload always visible */}
+            <div style={{ flexShrink: 0, padding: '10px 8px 0', background: 'var(--bg2)' }}>
+              <div style={S.paletteHeader}>Components</div>
+              <input
+                style={S.paletteSearch}
+                placeholder="Search..."
+                value={paletteSearch}
+                onChange={(e) => setPaletteSearch(e.target.value)}
+              />
+              <div style={{ marginBottom: 8 }}>
+                <input type="file" ref={componentZipInputRef} onChange={handleUploadZip} accept=".zip" style={{ display: 'none' }} />
+                <button
+                  onClick={() => componentZipInputRef.current.click()}
+                  style={{ width: '100%', padding: '8px', borderRadius: 4, border: '1px dashed var(--border)', background: 'transparent', color: 'var(--text2)', cursor: 'pointer', fontSize: 12 }}>
+                  Upload ZIP to Test
+                </button>
+              </div>
             </div>
+            {/* Scrollable component list */}
+            <div className="palette-scroll" style={{
+              flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2,
+              padding: '4px 8px 8px',
+            }}>
             {CATALOG.map(group => {
               const filteredItems = group.items.filter(item =>
                 item.label.toLowerCase().includes(paletteSearch.toLowerCase()) ||
@@ -1608,6 +1650,7 @@ export default function SimulatorPage() {
               Drag → drop to place<br />
               Click <em>Wire Mode</em> then click pins to connect<br />
               Del key removes selected
+            </div>
             </div>
           </div>
         </aside>
@@ -1647,6 +1690,15 @@ export default function SimulatorPage() {
               const r = canvasRef.current.getBoundingClientRect()
               setMousePos({ x: (e.clientX - r.left - canvasOffsetRef.current.x) / canvasZoom, y: (e.clientY - r.top - canvasOffsetRef.current.y) / canvasZoom })
             }
+          }}
+          onDoubleClick={e => {
+            if (wireStart || isRunning) return;
+            const rect = canvasRef.current.getBoundingClientRect();
+            const canvasX = (e.clientX - rect.left - canvasOffsetRef.current.x) / canvasZoomRef.current;
+            const canvasY = (e.clientY - rect.top - canvasOffsetRef.current.y) / canvasZoomRef.current;
+            setQuickAdd({ screenX: e.clientX, screenY: e.clientY, canvasX, canvasY });
+            setQuickAddSearch('');
+            setQuickAddIdx(0);
           }}
         >
           {/* Zoom Wrapper — scales all circuit content */}
@@ -1977,6 +2029,98 @@ export default function SimulatorPage() {
               )}
             </div>
           </div>
+
+          {/* ── Quick-Add Popup (double-click on canvas) ── */}
+          {quickAdd && (() => {
+            const q = quickAddSearch.trim().toLowerCase();
+            const results = [];
+            if (q) {
+              outer: for (const group of LOCAL_CATALOG) {
+                for (const item of group.items) {
+                  if (item.label.toLowerCase().includes(q) || item.type.toLowerCase().includes(q)) {
+                    results.push(item);
+                    if (results.length >= 4) break outer;
+                  }
+                }
+              }
+            }
+            const selIdx = Math.max(0, Math.min(quickAddIdx, results.length - 1));
+            const VW = window.innerWidth, VH = window.innerHeight;
+            const menuW = 240, approxH = 44 + results.length * 38 + (results.length === 0 ? 38 : 0);
+            const left = quickAdd.screenX + menuW > VW ? quickAdd.screenX - menuW - 4 : quickAdd.screenX + 4;
+            const top  = quickAdd.screenY + approxH > VH ? quickAdd.screenY - approxH - 4 : quickAdd.screenY + 4;
+            return (
+              <div
+                data-quickadd="true"
+                onMouseDown={e => e.stopPropagation()}
+                style={{
+                  position: 'fixed', left, top, zIndex: 9999,
+                  width: menuW,
+                  background: 'var(--bg2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 10,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.55)',
+                  overflow: 'hidden',
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                {/* Search input */}
+                <div style={{ padding: '8px 10px', borderBottom: results.length > 0 ? '1px solid var(--border)' : 'none' }}>
+                  <input
+                    ref={quickAddInputRef}
+                    data-quickadd="true"
+                    value={quickAddSearch}
+                    onChange={e => { setQuickAddSearch(e.target.value); setQuickAddIdx(0); }}
+                    onKeyDown={e => {
+                      if (e.key === 'Escape') { e.preventDefault(); setQuickAdd(null); }
+                      else if (e.key === 'ArrowDown') { e.preventDefault(); setQuickAddIdx(i => Math.min(i + 1, results.length - 1)); }
+                      else if (e.key === 'ArrowUp') { e.preventDefault(); setQuickAddIdx(i => Math.max(i - 1, 0)); }
+                      else if (e.key === 'Enter' && results.length > 0) {
+                        e.preventDefault();
+                        addComponentAt(results[selIdx], quickAdd.canvasX, quickAdd.canvasY);
+                        setQuickAdd(null);
+                      }
+                    }}
+                    placeholder="Search component..."
+                    style={{
+                      width: '100%', boxSizing: 'border-box',
+                      background: 'var(--bg3)', border: '1px solid var(--border2)',
+                      color: 'var(--text)', padding: '7px 10px',
+                      borderRadius: 7, fontFamily: 'inherit', fontSize: 13, outline: 'none',
+                    }}
+                  />
+                </div>
+                {/* Result list */}
+                {results.map((item, i) => (
+                  <div
+                    key={item.type}
+                    data-quickadd="true"
+                    onMouseEnter={() => setQuickAddIdx(i)}
+                    onMouseDown={e => { e.preventDefault(); addComponentAt(item, quickAdd.canvasX, quickAdd.canvasY); setQuickAdd(null); }}
+                    style={{
+                      padding: '8px 12px',
+                      fontSize: 13,
+                      cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      background: i === selIdx ? 'var(--accent)' : 'transparent',
+                      color: i === selIdx ? '#fff' : 'var(--text)',
+                      userSelect: 'none',
+                    }}
+                  >
+                    <span style={{ fontWeight: 600, flex: 1 }}>{item.label}</span>
+                    {i === selIdx && <span style={{ fontSize: 10, opacity: 0.75 }}>↵</span>}
+                  </div>
+                ))}
+                {/* Empty state */}
+                {q && results.length === 0 && (
+                  <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text3)' }}>No components found</div>
+                )}
+                {!q && (
+                  <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text3)' }}>Type to search components...</div>
+                )}
+              </div>
+            );
+          })()}
         </main>
 
         {/* RIGHT PANEL */}
@@ -2047,7 +2191,7 @@ export default function SimulatorPage() {
               )}
 
               {/* Wires list */}
-              <div style={S.wiresList}>
+              <div className="panel-scroll" style={S.wiresList}>
                 <div style={S.wiresHeader}>Connections ({wires.length})</div>
                 {wires.length === 0 ? (
                   <div style={{ padding: '12px 12px 16px', fontSize: 12, color: 'var(--text3)' }}>
@@ -2126,7 +2270,7 @@ export default function SimulatorPage() {
                       </div>
                     )}
 
-                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 4 }}>
+                    <div className="panel-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 4 }}>
                       {libResults.length > 0 && <div style={{ fontSize: 11, fontWeight: 'bold', color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: 1, marginTop: 8 }}>Search Results</div>}
                       {libResults.map((lib, idx) => (
                         <div key={idx} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
@@ -2207,7 +2351,7 @@ export default function SimulatorPage() {
                     </div>
 
                     {/* Output Area */}
-                    <div ref={serialOutputRef} style={S.serialOutput}>
+                    <div ref={serialOutputRef} className="panel-scroll" style={S.serialOutput}>
                       {serialHistory.length === 0 ? (
                         <div style={{ color: 'var(--text3)', fontSize: 12, padding: '20px 0', textAlign: 'center' }}>
                           {isRunning ? 'Waiting for serial output...' : 'Run the simulator to see serial output.'}

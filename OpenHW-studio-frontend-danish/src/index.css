@@ -415,3 +415,17 @@ body {
 .palette-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
 .palette-scroll::-webkit-scrollbar-thumb:hover { background: var(--text3); }
 .palette-scroll { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+
+/* ─── PANEL SCROLLBAR (serial, code, library, wires, admin panels) ───────── */
+.panel-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+.panel-scroll::-webkit-scrollbar-track { background: transparent; border-radius: 4px; }
+.panel-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+.panel-scroll::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+.panel-scroll { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+
+/* ─── ADMIN DASHBOARD SCROLLBAR ──────────────────────────────────────────── */
+.dashboard-main::-webkit-scrollbar { width: 6px; }
+.dashboard-main::-webkit-scrollbar-track { background: transparent; }
+.dashboard-main::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+.dashboard-main::-webkit-scrollbar-thumb:hover { background: #475569; }
+.dashboard-main { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
