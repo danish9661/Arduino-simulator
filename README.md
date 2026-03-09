@@ -25,7 +25,7 @@ Browser (React UI)
       │                               │
       └── Circuit Validation ──► HALT if unsafe
                                       │
-      └── Web Worker START + .hex ──► Emulator (port 8085)
+      └── Web Worker START + .hex ──► Emulator (in-browser Web Worker)
                                             │
                                      Runs AVR CPU at 16MHz
                                      Streams pin states @ 60 FPS
@@ -37,23 +37,22 @@ Browser (React UI)
 
 ## Packages
 
-### 🎨 Frontend — `OpenHW-studio-frontend-danish/`
+### Frontend — `OpenHW-studio-frontend-danish/`
 React 18 + Vite single-page app. Provides the circuit editor canvas, Arduino code editor, and real-time simulation rendering via Wokwi web components.
 
 - **Port:** `http://localhost:5173`
-- **Key libs:** React Router, Axios, avr8js, intel-hex, Prism.js, react-simple-code-editor
+- **Key libs:** React Router, Axios, avr8js, intel-hex, Prism.js, react-simple-code-editor, JSZip, Babel Standalone
 
-### 🖥️ Backend — `openhw-studio-backend-danish/`
+### Backend — `openhw-studio-backend-danish/`
 Express.js REST API. Accepts C++ code, invokes `arduino-cli` to compile it, and returns the `.hex` output. Also handles user auth (JWT + bcrypt) and MongoDB data.
 
 - **Port:** `http://localhost:5000`
 - **Key libs:** Express, Mongoose, jsonwebtoken, bcryptjs, cors
 
-### ⚙️ Emulator — `openhw-studio-emulator-danish/`
-High-speed WebSocket server. Runs a virtual ATmega328P (Arduino Uno chip) at a simulated 16 MHz, utilizing `avr8js` **AVRIOPort** infrastructure natively for 100% accurate Hardware Interrupts (EXTI/PCINT) and Internal Pull-up Resistor simulation. Decodes WS2812B NeoPixel signals, routes I2C (TWI) and SPI peripheral buses, and streams JSON state at ~60 FPS.
+### Emulator — `openhw-studio-emulator-danish/`
+Shared component definitions library and AVR simulation engine (runs as a Web Worker inside the browser). Exports all component manifests, UI renderers, and logic classes consumed by the frontend.
 
-- **Port:** `ws://localhost:8085`
-- **Key libs:** ws, avr8js, intel-hex
+- **Key libs:** avr8js, intel-hex, TypeScript
 
 ---
 
@@ -73,13 +72,29 @@ High-speed WebSocket server. Runs a virtual ATmega328P (Arduino Uno chip) at a s
 | Potentiometer | Analog input |
 | Slide Potentiometer | Analog input |
 | NeoPixel Matrix (WS2812B) | Addressable RGB LED |
+| Shift Register (74HC595) | Digital output expander |
 
 ---
+
+## Key Features
 
 - **Circuit Validation Engine**: Pre-simulation safety check that traces wiring graphs to detect errors (e.g., missing resistors for LEDs) before the CPU starts.
 - **Admin Dashboard**: A dedicated administrative portal to manage libraries and review community component submissions via a 3-column layout.
 - **Zero-Touch Component Sync**: Custom components submitted by users can be reviewed, tested in-browser, and approved by admins with instant synchronization.
-- **In-Browser Transpilation**: Leverage Babel Standalone to transpile and execute custom component UI (React) and Logic (TypeScript) code directly in the browser memory for instant previews.
+- **In-Browser Transpilation**: Leverage Babel Standalone to transpile and execute custom component UI (React) and Logic (TypeScript) code directly in browser memory for instant previews.
+
+### Offline-First & Local Storage Features
+
+All four features below work without an internet connection and require no backend changes.
+
+| Feature | Description |
+|---|---|
+| **Compiled Hex Cache** | Compiled `.hex` results are persisted to IndexedDB. On re-run (after page refresh or offline), the cached hex is used directly — no recompilation needed. Up to 50 entries with LRU eviction. |
+| **Offline ZIP Upload Queue** | Custom component ZIPs uploaded while offline are queued in IndexedDB and auto-submitted to the backend when the internet is restored. The component is injected locally and immediately usable during the session. |
+| **Service Worker** | A registered Service Worker caches the app shell (HTML/JS/CSS) and static assets. The simulator loads and works even when the backend is unreachable. API calls are never intercepted. |
+| **Project Storage (IndexedDB)** | Full circuit state (components, wires, code, board) is auto-saved to IndexedDB every 2.5 seconds. Works for **both guests and authenticated users**. Returning visitors automatically get their last project restored. The "My Projects" modal lets users manage named saves. |
+
+For a full technical deep-dive, see **[OFFLINE_AND_STORAGE.md](./OFFLINE_AND_STORAGE.md)**.
 
 ---
 
@@ -167,7 +182,20 @@ JWT_SECRET=your_secret_key_here
 ```
 
 ---
-## Credit 
+
+## Documentation
+
+| Document | Description |
+|---|---|
+| This file | Architecture overview, setup, and feature summary |
+| [OFFLINE_AND_STORAGE.md](./OFFLINE_AND_STORAGE.md) | Full technical reference for offline features and IndexedDB storage |
+| [OpenHW-studio-frontend-danish/README.md](./OpenHW-studio-frontend-danish/README.md) | Frontend structure, pages, and features |
+| [openhw-studio-backend-danish/README.md](./openhw-studio-backend-danish/README.md) | Backend API endpoints and compilation pipeline |
+| [openhw-studio-emulator-danish/README.md](./openhw-studio-emulator-danish/README.md) | Emulator CPU simulation and WebSocket protocol |
+
+---
+
+## Credit
 KrishnaManohar101 (for initial codebase)
 
 ## License
