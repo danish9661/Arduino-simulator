@@ -1,6 +1,8 @@
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import User from "../models/User.js";
 import generateToken from "../utils/helper/token.js";
+
 
 const normalizeEmail = (rawEmail = "") => rawEmail.trim().toLowerCase();
 const isNonEmptyString = (value) =>
@@ -142,7 +144,7 @@ const signupUser = async (req, res) => {
 
 const logoutController = async (req, res) => {
   try {
-    res.cookie("jwt", "", { maxAge: 1 });
+    res.cookie("jwt", "", { httpOnly: true, sameSite: "strict", maxAge: 1 });
     res.status(200).json({ message: "User logged out successfully" });
   } catch (error) {
     console.log("Error in logoutController: ", error);
@@ -171,6 +173,11 @@ const updateUserProfile = async (req, res) => {
       return res.status(400).json({ message: "Invalid role" });
     }
 
+    // Prevent privilege escalation — only an admin can grant admin role
+    if (updates.role === "admin" && req.user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorised to assign admin role" });
+    }
+
     if (
       Object.prototype.hasOwnProperty.call(updates, "semester") &&
       updates.semester !== undefined &&
@@ -194,4 +201,71 @@ const updateUserProfile = async (req, res) => {
   }
 };
 
-export { signinUser, signupUser, logoutController, updateUserProfile }
+const googleLogin = async (req, res) => {
+  try {
+    const { access_token, role } = req.body;
+
+    if (!access_token) {
+      return res.status(400).json({ message: "Google access token is required." });
+    }
+
+    // Verify token with Google API directly using fetch or axios
+    // Because frontend uses @react-oauth/google useGoogleLogin, it sends an access token, not an ID token.
+    const googleRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${access_token}` }
+    });
+
+    if (!googleRes.ok) {
+      return res.status(401).json({ message: "Invalid Google access token." });
+    }
+
+    const payload = await googleRes.json();
+    const { email, name, picture } = payload;
+
+    // Check if user exists
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // If user doesn't exist, create them
+      const allowedRoles = ["student", "teacher"];
+      const selectedRole = allowedRoles.includes(role) ? role : "student";
+
+      user = await User.create({
+        name,
+        email,
+        role: selectedRole,
+        password: crypto.randomBytes(32).toString("hex"), // Secure dummy password — Google users authenticate via OAuth
+        // Optional: save picture if your schema supports it
+      });
+    }
+
+    // Generate JWT
+    const token = generateToken(user);
+    res.cookie("jwt", token, {
+      httpOnly: true,
+      sameSite: "strict",
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+
+    return res.status(200).json({
+      message: "Google login successful.",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        college: user.college,
+        branch: user.branch,
+        semester: user.semester,
+        bio: user.bio,
+      },
+    });
+
+  } catch (error) {
+    console.error("Google Auth Error:", error);
+    res.status(500).json({ message: "Google Authentication Failed", error: error.message });
+  }
+};
+
+export { signinUser, signupUser, logoutController, updateUserProfile, googleLogin }

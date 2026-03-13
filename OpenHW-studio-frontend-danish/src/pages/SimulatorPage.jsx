@@ -403,6 +403,7 @@ export default function SimulatorPage() {
         COMPONENT_REGISTRY[manifest.type] = {
           manifest,
           UI: uiComponent,
+          BOUNDS: exportsUI.BOUNDS,
           ContextMenu: contextMenu,
           contextMenuDuringRun: !!(exportsUI.contextMenuDuringRun || manifest.contextMenuDuringRun),
           contextMenuOnlyDuringRun: !!(exportsUI.contextMenuOnlyDuringRun || manifest.contextMenuOnlyDuringRun),
@@ -444,6 +445,26 @@ export default function SimulatorPage() {
 
   useEffect(() => {
     loadLibraries();
+  }, []);
+
+  // ── Auto-load component from Component Editor ("Test in Simulator") ────────
+  useEffect(() => {
+    const raw = localStorage.getItem('openhw_pending_component');
+    if (!raw) return;
+    localStorage.removeItem('openhw_pending_component');
+    try {
+      const { data, name, label } = JSON.parse(raw);
+      fetch(data)
+        .then(r => r.blob())
+        .then(blob => {
+          const file = new File([blob], `${name || 'component'}.zip`, { type: 'application/zip' });
+          handleUploadZip({ target: { files: [file] } });
+        })
+        .catch(err => console.error('[ComponentEditor] Failed to load pending component:', err));
+    } catch (e) {
+      console.error('[ComponentEditor] Could not parse pending component data:', e);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Offline component queue: flush to backend when connectivity restores ──
@@ -622,7 +643,7 @@ export default function SimulatorPage() {
       group.items = group.items.filter(i => i.type !== compType);
       group.items.push(newCatItem);
 
-      COMPONENT_REGISTRY[compType] = { manifest, UI: uiComponent, logicCode: transpileLogic };
+      COMPONENT_REGISTRY[compType] = { manifest, UI: uiComponent, BOUNDS: exportsUI.BOUNDS, logicCode: transpileLogic };
       if (manifest.pins) LOCAL_PIN_DEFS[compType] = manifest.pins;
 
       setCustomCatalogCounter(c => c + 1);
@@ -692,6 +713,7 @@ export default function SimulatorPage() {
             COMPONENT_REGISTRY[compType] = {
               manifest,
               UI: uiComponent,
+              BOUNDS: exportsUI.BOUNDS,
               ContextMenu: exportsUI[Object.keys(exportsUI).find(k => k.toLowerCase().includes('contextmenu'))],
               contextMenuDuringRun: !!(exportsUI.contextMenuDuringRun || manifest.contextMenuDuringRun),
               contextMenuOnlyDuringRun: !!(exportsUI.contextMenuOnlyDuringRun || manifest.contextMenuOnlyDuringRun),
@@ -2380,7 +2402,7 @@ export default function SimulatorPage() {
                   Upload ZIP
                 </button>
                 <button
-                  onClick={() => setShowCreateComponentModal(true)}
+                  onClick={() => window.open('/component-editor', '_blank')}
                   style={{ flex: 1, padding: '7px 4px', borderRadius: 6, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontWeight: 600 }}>
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                   Create
@@ -2487,7 +2509,7 @@ export default function SimulatorPage() {
                             >
                               {/* Component SVG — absolutely centred in upper area, no inner box */}
                               {hasUI ? (
-                                <div style={{ position: 'absolute', top: 'calc(50% - 7px)', left: '50%', transform: `translate(-50%, -50%) scale(${scale})`, transformOrigin: 'center center', pointerEvents: 'none', lineHeight: 0 }}>
+                                <div style={{ position: 'absolute', top: 'calc(50% - 7px)', left: '50%', transform: `translate(-50%, -50%) scale(${scale})`, transformOrigin: 'center center', pointerEvents: 'none', lineHeight: 0, width: compW, height: compH }}>
                                   {React.createElement(COMPONENT_REGISTRY[item.type].UI, { state: {}, attrs: {}, isRunning: false })}
                                 </div>
                               ) : (
@@ -2569,7 +2591,7 @@ export default function SimulatorPage() {
                 icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>,
                 label: 'Edit a Copy',
                 color: 'var(--text)',
-                action: () => { setShowCreateComponentModal(true); setPaletteContextMenu(null); setIsPaletteHovered(false); }
+                action: () => { window.open('/component-editor', '_blank'); setPaletteContextMenu(null); setIsPaletteHovered(false); }
               },
             ].map(({ icon, label, color, action }) => (
               <button

@@ -1,11 +1,17 @@
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuthStore } from '../../store/authStore.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 export default function ProtectedRoute({ children, allowedRole }) {
     const { isAuthenticated, loading, role, isAdminAuthenticated, adminRole } = useAuth();
 
+
     if (loading) {
-        return <div>Loading...</div>;
+        return <div>Loading...</div>; // Prevent redirecting while auth state is resolving
+    }
+
+    if (!isAuthenticated) {
+        return <Navigate to="/signin" replace />;
     }
 
     if (allowedRole === 'admin') {
@@ -15,13 +21,10 @@ export default function ProtectedRoute({ children, allowedRole }) {
         return children;
     }
 
-    if (!isAuthenticated) {
-        return <Navigate to="/login" replace />;
-    }
-
-    // Checking if route requires a specific role and it doesn't match
+    // If route requires a specific role and it doesn't match
     if (allowedRole && role !== allowedRole) {
-        return <Navigate to={`/${role}/dashboard`} replace />;
+        // Direct users to their appropriate dashboard based on their actual role
+        return <Navigate to={`/${role || 'student'}/dashboard`} replace />;
     }
 
     return children;
