@@ -1,0 +1,130 @@
+{
+  "title": "Potentiometer Analog Read Evaluation",
+  "description": "Automatic evaluation criteria for reading potentiometer values using Arduino",
+  "version": "2.0",
+  "passingThreshold": 85,
+  "evaluationCriteria": {
+    "wiringAccuracy": {
+      "weight": 0.44,
+      "description": "Correct electrical connections between Arduino and potentiometer",
+      "requiredConnections": [
+        {
+          "from": {
+            "component": "arduino",
+            "pin": "5V"
+          },
+          "to": {
+            "component": "potentiometer",
+            "terminal": "1"
+          }
+        },
+        {
+          "from": {
+            "component": "arduino",
+            "pin": "gnd_1"
+          },
+          "to": {
+            "component": "potentiometer",
+            "terminal": "2"
+          }
+        },
+        {
+          "from": {
+            "component": "potentiometer",
+            "terminal": "SIG"
+          },
+          "to": {
+            "component": "arduino",
+            "pin": "A0"
+          }
+        }
+      ]
+    },
+    "codeFunctionality": {
+      "weight": 0.36,
+      "description": "Arduino code that reads potentiometer value and prints it to Serial Monitor",
+      "requiredFunctions": [
+        "analogRead",
+        "Serial.begin",
+        "Serial.print",
+        "Serial.println"
+      ],
+      "expectedBehavior": {
+        "pinNumber": "A0",
+        "pattern": "analog value printed to serial monitor"
+      }
+    },
+    "components": {
+      "weight": 0.2,
+      "description": "Required components for the circuit",
+      "required": [
+        {
+          "type": "arduino",
+          "count": 1
+        },
+        {
+          "type": "potentiometer",
+          "count": 1
+        }
+      ]
+    }
+  },
+  "demoImages": [
+    {
+      "id": "circuit-layout",
+      "name": "Correct Potentiometer Circuit",
+      "filename": "circuit.png",
+      "description": "Expected wiring between Arduino and potentiometer"
+    },
+    {
+      "id": "simulation-result",
+      "name": "Serial Output",
+      "filename": "circuit.png",
+      "description": "Expected simulation output showing analog values changing"
+    }
+  ],
+  "scoring": {
+    "wiringAccuracy": {
+      "excellent": {
+        "min": 90,
+        "feedback": "Potentiometer wiring is correct!"
+      },
+      "good": {
+        "min": 75,
+        "feedback": "Most potentiometer connections are correct"
+      },
+      "needsImprovement": {
+        "min": 0,
+        "feedback": "Potentiometer wiring needs correction"
+      }
+    },
+    "codeFunctionality": {
+      "excellent": {
+        "min": 90,
+        "feedback": "Code correctly reads and prints potentiometer values!"
+      },
+      "good": {
+        "min": 75,
+        "feedback": "Analog reading works but serial output may need improvement"
+      },
+      "needsImprovement": {
+        "min": 0,
+        "feedback": "Code does not correctly read the potentiometer"
+      }
+    },
+    "components": {
+      "excellent": {
+        "min": 90,
+        "feedback": "All required components are present!"
+      },
+      "good": {
+        "min": 75,
+        "feedback": "Most required components are present."
+      },
+      "needsImprovement": {
+        "min": 0,
+        "feedback": "Missing one or more required components."
+      }
+    }
+  }
+}

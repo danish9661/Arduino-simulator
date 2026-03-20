@@ -8,15 +8,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   plugins: [react()],
-  server: {
-    fs: {
-      // Allow serving files from the emulator package which lives outside the frontend root
-      allow: [
-        path.resolve(__dirname, '..'),
-      ],
-    },
-  },
   optimizeDeps: {
+    exclude: ['@openhw/emulator'],
+    // We ensure Vite pre-bundles the emulator package from its source components.
+    // This allows the raw-html esbuild plugin below to resolve .html?raw imports correctly.
     esbuildOptions: {
       plugins: [
         {
@@ -34,6 +29,14 @@ export default defineConfig({
             }))
           },
         },
+      ],
+    },
+  },
+  server: {
+    fs: {
+      // Allow serving files from the emulator package which lives outside the frontend root
+      allow: [
+        path.resolve(__dirname, '..'),
       ],
     },
   },

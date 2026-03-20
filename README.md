@@ -18,7 +18,7 @@ Arduino-simulator/
 ```
 Browser (React UI)
       │
-      ├── POST /api/compile ──► Backend (port 5000)
+      ├── POST /api/compile ──► Backend (port 5001)
       │                               │
       │                        arduino-cli compiles
       │                         C++ → .hex file
@@ -44,10 +44,10 @@ React 18 + Vite single-page app. Provides the circuit editor canvas, Arduino cod
 - **Key libs:** React Router, Axios, avr8js, intel-hex, Prism.js, react-simple-code-editor, JSZip, Babel Standalone
 
 ### Backend — `openhw-studio-backend-danish/`
-Express.js REST API. Accepts C++ code, invokes `arduino-cli` to compile it, and returns the `.hex` output. Also handles user auth (JWT + bcrypt) and MongoDB data.
+Express.js REST API. Accepts C++ code, invokes `arduino-cli` to compile it, and returns the `.hex` output. Also handles user auth (JWT + Passport Google OAuth) and MongoDB data.
 
-- **Port:** `http://localhost:5000`
-- **Key libs:** Express, Mongoose, jsonwebtoken, bcryptjs, cors
+- **Port:** `http://localhost:5001`
+- **Key libs:** Express, Mongoose, jsonwebtoken, Passport, bcryptjs, cors
 
 ### Emulator — `openhw-studio-emulator-danish/`
 Shared component definitions library and AVR simulation engine (runs as a Web Worker inside the browser). Exports all component manifests, UI renderers, and logic classes consumed by the frontend.
@@ -82,6 +82,7 @@ Shared component definitions library and AVR simulation engine (runs as a Web Wo
 - **Admin Dashboard**: A dedicated administrative portal to manage libraries and review community component submissions via a 3-column layout.
 - **Zero-Touch Component Sync**: Custom components submitted by users can be reviewed, tested in-browser, and approved by admins with instant synchronization.
 - **In-Browser Transpilation**: Leverage Babel Standalone to transpile and execute custom component UI (React) and Logic (TypeScript) code directly in browser memory for instant previews.
+- **Advanced Workspace**: Features a resizable file explorer, protected system files (`diagram.json`), and live serial monitor.
 
 ### Offline-First & Local Storage Features
 
@@ -89,6 +90,7 @@ All four features below work without an internet connection and require no backe
 
 | Feature | Description |
 |---|---|
+| **WASM Offline Compilation** | Compile C++ code locally in the browser using a WASM-based compiler, completely eliminating the need for the backend API once the toolchain is downloaded and cached in IndexedDB. |
 | **Compiled Hex Cache** | Compiled `.hex` results are persisted to IndexedDB. On re-run (after page refresh or offline), the cached hex is used directly — no recompilation needed. Up to 50 entries with LRU eviction. |
 | **Offline ZIP Upload Queue** | Custom component ZIPs uploaded while offline are queued in IndexedDB and auto-submitted to the backend when the internet is restored. The component is injected locally and immediately usable during the session. |
 | **Service Worker** | A registered Service Worker caches the app shell (HTML/JS/CSS) and static assets. The simulator loads and works even when the backend is unreachable. API calls are never intercepted. |
@@ -174,9 +176,9 @@ npm run dev
 Then open **http://localhost:5173** in your browser.
 
 ### Environment Variables
-Create a file named `.env` inside `openhw-studio-backend-danish/`:
+Create a file named `.env` (or `env`) inside `openhw-studio-backend-danish/`:
 ```env
-PORT=5000
+PORT=5001
 MONGO_URI=mongodb://localhost:27017/openhw-studio
 JWT_SECRET=your_secret_key_here
 ```

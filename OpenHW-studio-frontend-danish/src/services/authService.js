@@ -3,7 +3,7 @@
  * Handles API communication between the frontend and the Node.js backend.
  */
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
 
 // ─── Token & User Storage Helpers ───────────────────────────────────────────
 
@@ -54,7 +54,8 @@ export const signupUser = async (userData) => {
       college: userData.college,
       branch: userData.branch,
       semester: userData.semester,
-      bio: userData.bio
+      bio: userData.bio,
+      image: userData.image
     }),
   });
 
@@ -150,7 +151,10 @@ export const fetchProfile = async () => {
   const token = getToken();
   if (!token) throw new Error('No token found');
 
-  const response = await fetch(`${BASE_URL}/user/profile`, {
+  // The /auth/me route is mounted at the root, not inside /api
+  const authUrl = BASE_URL.replace(/\/api$/, '') + '/auth/me';
+
+  const response = await fetch(authUrl, {
     headers: { 
       'Authorization': `Bearer ${token}` // Handled by protectRoute in backend
     },

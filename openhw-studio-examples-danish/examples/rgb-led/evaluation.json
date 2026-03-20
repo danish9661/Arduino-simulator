@@ -1,0 +1,204 @@
+{
+  "title": "RGB LED Circuit Evaluation",
+  "description": "Automatic evaluation criteria for RGB LED color sequencing",
+  "version": "2.0",
+  "passingThreshold": 85,
+  "evaluationCriteria": {
+    "wiringAccuracy": {
+      "weight": 0.43,
+      "description": "Correct electrical connections between RGB LED components",
+      "requiredConnections": [
+        {
+          "from": {
+            "component": "arduino",
+            "pin": "11"
+          },
+          "to": {
+            "component": "resistor",
+            "terminal": "p1"
+          }
+        },
+        {
+          "from": {
+            "component": "resistor",
+            "terminal": "p2"
+          },
+          "to": {
+            "component": "led",
+            "terminal": "A"
+          }
+        },
+        {
+          "from": {
+            "component": "arduino",
+            "pin": "10"
+          },
+          "to": {
+            "component": "resistor",
+            "terminal": "p1"
+          }
+        },
+        {
+          "from": {
+            "component": "resistor",
+            "terminal": "p2"
+          },
+          "to": {
+            "component": "led",
+            "terminal": "A"
+          }
+        },
+        {
+          "from": {
+            "component": "arduino",
+            "pin": "9"
+          },
+          "to": {
+            "component": "resistor",
+            "terminal": "p1"
+          }
+        },
+        {
+          "from": {
+            "component": "resistor",
+            "terminal": "p2"
+          },
+          "to": {
+            "component": "led",
+            "terminal": "A"
+          }
+        },
+        {
+          "from": {
+            "component": "led",
+            "terminal": "K"
+          },
+          "to": {
+            "component": "arduino",
+            "pin": "gnd_1"
+          }
+        },
+        {
+          "from": {
+            "component": "led",
+            "terminal": "K"
+          },
+          "to": {
+            "component": "arduino",
+            "pin": "gnd_1"
+          }
+        },
+        {
+          "from": {
+            "component": "led",
+            "terminal": "K"
+          },
+          "to": {
+            "component": "arduino",
+            "pin": "gnd_1"
+          }
+        }
+      ]
+    },
+    "codeFunctionality": {
+      "weight": 0.37,
+      "description": "Arduino code that cycles RGB colors using digital outputs",
+      "requiredFunctions": [
+        "pinMode",
+        "digitalWrite",
+        "delay",
+        "showColor"
+      ],
+      "expectedBehavior": {
+        "pinMode": "OUTPUT",
+        "rgbPins": [
+          11,
+          10,
+          9
+        ],
+        "colorSequence": [
+          "red",
+          "green",
+          "blue",
+          "yellow",
+          "cyan",
+          "magenta",
+          "white",
+          "off"
+        ],
+        "delayMs": 700,
+        "offDelayMs": 500
+      }
+    },
+    "components": {
+      "weight": 0.2,
+      "description": "Required components for the circuit",
+      "required": [
+        {
+          "type": "arduino",
+          "count": 1
+        },
+        {
+          "type": "led",
+          "count": 3
+        },
+        {
+          "type": "resistor",
+          "count": 3
+        }
+      ]
+    }
+  },
+  "demoImages": [
+    {
+      "id": "circuit-layout",
+      "name": "Circuit Layout",
+      "filename": "circuit.png",
+      "description": "Expected RGB LED wiring with resistors"
+    }
+  ],
+  "scoring": {
+    "wiringAccuracy": {
+      "excellent": {
+        "min": 90,
+        "feedback": "All RGB connections are correct!"
+      },
+      "good": {
+        "min": 75,
+        "feedback": "Most RGB connections are correct with minor issues"
+      },
+      "needsImprovement": {
+        "min": 0,
+        "feedback": "RGB wiring needs significant correction"
+      }
+    },
+    "codeFunctionality": {
+      "excellent": {
+        "min": 90,
+        "feedback": "RGB color sequencing works perfectly!"
+      },
+      "good": {
+        "min": 75,
+        "feedback": "RGB sequencing works but may need minor improvements"
+      },
+      "needsImprovement": {
+        "min": 0,
+        "feedback": "RGB color sequencing needs significant work"
+      }
+    },
+    "components": {
+      "excellent": {
+        "min": 90,
+        "feedback": "All required components are present!"
+      },
+      "good": {
+        "min": 75,
+        "feedback": "Most required components are present."
+      },
+      "needsImprovement": {
+        "min": 0,
+        "feedback": "Missing one or more required components."
+      }
+    }
+  }
+}

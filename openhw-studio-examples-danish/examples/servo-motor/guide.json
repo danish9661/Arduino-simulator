@@ -1,0 +1,10 @@
+{
+  "title": "Servo Motor",
+  "board": "Arduino Uno",
+  "description": "Position a servo shaft to specific angles using PWM control.",
+  "objectives": [
+    "Generate servo control pulses with Servo library",
+    "Move shaft between multiple target angles",
+    "Understand mapping between angle and pulse timing"
+  ]
+}

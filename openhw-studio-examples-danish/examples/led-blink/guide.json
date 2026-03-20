@@ -1,0 +1,10 @@
+﻿{
+  "title": "LED Blink",
+  "board": "Arduino Uno",
+  "description": "Build your first output circuit using one LED and a current-limiting resistor.",
+  "objectives": [
+    "Understand digital output pins on Arduino",
+    "Connect LED with proper resistor in series",
+    "Use delay and digitalWrite to create blinking patterns"
+  ]
+}

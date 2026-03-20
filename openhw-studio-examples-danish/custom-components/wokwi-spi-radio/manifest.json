@@ -1,0 +1,32 @@
+{
+  "type": "wokwi-spi-radio",
+  "label": "SPI Radio (CSN/GDO)",
+  "group": "Sensors",
+  "description": "Generic SPI radio transceiver mock with CSN-controlled SPI commands and GPIO interrupt lines (GDO0/GDO2). Useful for validating radio drivers and IRQ flows in simulation.",
+  "w": 140,
+  "h": 90,
+  "attrs": {
+    "irqOnWrite": {
+      "type": "boolean",
+      "label": "IRQ on TX write",
+      "default": true
+    },
+    "whoAmI": {
+      "type": "number",
+      "label": "WHO_AM_I register",
+      "default": 66,
+      "min": 0,
+      "max": 255
+    }
+  },
+  "pins": [
+    { "id": "VCC", "x": 10, "y": 10, "type": "power", "description": "3.3V supply" },
+    { "id": "GND", "x": 10, "y": 80, "type": "power", "description": "Ground" },
+    { "id": "MOSI", "x": 130, "y": 20, "type": "digital", "description": "SPI master-out" },
+    { "id": "MISO", "x": 130, "y": 34, "type": "digital", "description": "SPI master-in" },
+    { "id": "SCK", "x": 130, "y": 48, "type": "digital", "description": "SPI clock" },
+    { "id": "CSN", "x": 130, "y": 62, "type": "digital", "description": "Active-low chip select" },
+    { "id": "GDO0", "x": 70, "y": 10, "type": "digital", "description": "IRQ/status output 0" },
+    { "id": "GDO2", "x": 90, "y": 10, "type": "digital", "description": "IRQ/status output 2" }
+  ]
+}

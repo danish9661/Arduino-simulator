@@ -1,0 +1,10 @@
+{
+  "title": "DC Motor",
+  "board": "Arduino Uno",
+  "description": "Drive and reverse a DC motor using an H-bridge motor driver.",
+  "objectives": [
+    "Control motor direction with IN1 and IN2",
+    "Use PWM on enable pin for speed control",
+    "Understand basic H-bridge control logic"
+  ]
+}

@@ -1,0 +1,134 @@
+{
+  "title": "5 LED Running Light Circuit Evaluation",
+  "description": "Automatic evaluation criteria for sequential LED running light using Arduino",
+  "version": "2.0",
+  "passingThreshold": 85,
+  "evaluationCriteria": {
+    "wiringAccuracy": {
+      "weight": 0.44,
+      "description": "Correct electrical connections between Arduino, resistors, and LEDs",
+      "requiredConnections": [
+        {
+          "from": {
+            "component": "arduino",
+            "pin": "3"
+          },
+          "to": {
+            "component": "resistor",
+            "terminal": "p1"
+          }
+        },
+        {
+          "from": {
+            "component": "resistor",
+            "terminal": "p2"
+          },
+          "to": {
+            "component": "led",
+            "terminal": "A"
+          }
+        },
+        {
+          "from": {
+            "component": "led",
+            "terminal": "K"
+          },
+          "to": {
+            "component": "arduino",
+            "pin": "gnd_1"
+          }
+        }
+      ]
+    },
+    "codeFunctionality": {
+      "weight": 0.36,
+      "description": "Arduino code that produces a sequential LED running pattern",
+      "requiredFunctions": [
+        "pinMode",
+        "digitalWrite",
+        "delay"
+      ],
+      "expectedBehavior": {
+        "pinMode": "OUTPUT",
+        "blinkDelay": 120,
+        "pattern": "sequential running LEDs"
+      }
+    },
+    "components": {
+      "weight": 0.2,
+      "description": "Required components for the circuit",
+      "required": [
+        {
+          "type": "arduino",
+          "count": 1
+        },
+        {
+          "type": "led",
+          "count": 5
+        },
+        {
+          "type": "resistor",
+          "count": 5
+        }
+      ]
+    }
+  },
+  "demoImages": [
+    {
+      "id": "circuit-layout",
+      "name": "Correct Circuit Layout",
+      "filename": "circuit.png",
+      "description": "Expected component placement and wiring"
+    },
+    {
+      "id": "simulation-result",
+      "name": "Working Simulation",
+      "filename": "circuit.png",
+      "description": "Expected simulation output showing sequential LED running pattern"
+    }
+  ],
+  "scoring": {
+    "wiringAccuracy": {
+      "excellent": {
+        "min": 90,
+        "feedback": "All LED connections are correct!"
+      },
+      "good": {
+        "min": 75,
+        "feedback": "Most connections are correct with minor issues"
+      },
+      "needsImprovement": {
+        "min": 0,
+        "feedback": "Wiring needs significant correction"
+      }
+    },
+    "codeFunctionality": {
+      "excellent": {
+        "min": 90,
+        "feedback": "Code creates a smooth running LED pattern!"
+      },
+      "good": {
+        "min": 75,
+        "feedback": "Code works but the sequence or delay may need improvement"
+      },
+      "needsImprovement": {
+        "min": 0,
+        "feedback": "Code does not implement the running LED pattern correctly"
+      }
+    },
+    "components": {
+      "excellent": {
+        "min": 90,
+        "feedback": "All required components are present!"
+      },
+      "good": {
+        "min": 75,
+        "feedback": "Most required components are present."
+      },
+      "needsImprovement": {
+        "min": 0,
+        "feedback": "Missing one or more required components."
+      }
+    }
+  }
+}

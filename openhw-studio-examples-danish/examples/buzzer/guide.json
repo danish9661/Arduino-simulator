@@ -1,0 +1,10 @@
+{
+  "title": "Buzzer",
+  "board": "Arduino Uno",
+  "description": "Generate audible tones on a piezo buzzer using Arduino output pins.",
+  "objectives": [
+    "Use tone() and noTone() for basic sound generation",
+    "Connect buzzer with correct polarity",
+    "Create a simple repeating melody pattern"
+  ]
+}

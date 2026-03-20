@@ -1,0 +1,10 @@
+{
+  "title": "Temperature Sensor",
+  "board": "Arduino Uno",
+  "description": "Simulate a temperature sensor analog output and trigger an over-temperature alarm.",
+  "objectives": [
+    "Convert analog readings to voltage",
+    "Estimate temperature from sensor voltage",
+    "Activate buzzer alarm above threshold"
+  ]
+}

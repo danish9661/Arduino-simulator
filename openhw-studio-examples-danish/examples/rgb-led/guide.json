@@ -1,0 +1,10 @@
+﻿{
+  "title": "RGB LED",
+  "board": "Arduino Uno",
+  "description": "Control red, green, and blue channels to mix multiple colors.",
+  "objectives": [
+    "Drive three LED channels from separate output pins",
+    "Apply correct resistor for each channel",
+    "Build reusable code to cycle through color combinations"
+  ]
+}

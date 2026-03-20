@@ -1,0 +1,10 @@
+{
+  "title": "LED Strip",
+  "board": "Arduino Uno",
+  "description": "Simulate an LED strip style chase effect using a row of LEDs.",
+  "objectives": [
+    "Control multiple output channels in sequence",
+    "Build a forward and reverse running light pattern",
+    "Understand timing control for lighting animations"
+  ]
+}

@@ -1,0 +1,135 @@
+{
+  "title": "LED Blink Circuit Evaluation",
+  "description": "Automatic evaluation criteria for LED blink circuit implementation",
+  "version": "2.0",
+  "passingThreshold": 85,
+  "evaluationCriteria": {
+    "wiringAccuracy": {
+      "weight": 0.43,
+      "description": "Correct electrical connections between components",
+      "requiredConnections": [
+        {
+          "from": {
+            "component": "arduino",
+            "pin": "13"
+          },
+          "to": {
+            "component": "resistor",
+            "terminal": "p1"
+          }
+        },
+        {
+          "from": {
+            "component": "resistor",
+            "terminal": "p2"
+          },
+          "to": {
+            "component": "led",
+            "terminal": "A"
+          }
+        },
+        {
+          "from": {
+            "component": "led",
+            "terminal": "K"
+          },
+          "to": {
+            "component": "arduino",
+            "pin": "gnd_1"
+          }
+        }
+      ]
+    },
+    "codeFunctionality": {
+      "weight": 0.37,
+      "description": "Arduino code that creates proper blinking pattern",
+      "requiredFunctions": [
+        "pinMode",
+        "digitalWrite",
+        "delay"
+      ],
+      "expectedBehavior": {
+        "pinMode": "OUTPUT",
+        "pinNumber": 13,
+        "blinkDelay": 1000,
+        "pattern": "alternating HIGH/LOW"
+      }
+    },
+    "components": {
+      "weight": 0.2,
+      "description": "Required components for the circuit",
+      "required": [
+        {
+          "type": "arduino",
+          "count": 1
+        },
+        {
+          "type": "led",
+          "count": 1
+        },
+        {
+          "type": "resistor",
+          "count": 1
+        }
+      ]
+    }
+  },
+  "demoImages": [
+    {
+      "id": "circuit-layout",
+      "name": "Correct Circuit Layout",
+      "filename": "led-blink-circuit.png",
+      "description": "Expected component placement and wiring"
+    },
+    {
+      "id": "simulation-result",
+      "name": "Working Simulation",
+      "filename": "led-blink-simulation.png",
+      "description": "Expected simulation output showing LED blinking"
+    }
+  ],
+  "scoring": {
+    "wiringAccuracy": {
+      "excellent": {
+        "min": 90,
+        "feedback": "All connections are correct!"
+      },
+      "good": {
+        "min": 75,
+        "feedback": "Most connections are correct with minor issues"
+      },
+      "needsImprovement": {
+        "min": 0,
+        "feedback": "Wiring needs significant correction"
+      }
+    },
+    "codeFunctionality": {
+      "excellent": {
+        "min": 90,
+        "feedback": "Code works perfectly with proper blinking!"
+      },
+      "good": {
+        "min": 75,
+        "feedback": "Code works but may need minor improvements"
+      },
+      "needsImprovement": {
+        "min": 0,
+        "feedback": "Code functionality needs significant work"
+      }
+    },
+    "components": {
+      "excellent": {
+        "min": 90,
+        "feedback": "All required components are present!"
+      },
+      "good": {
+        "min": 75,
+        "feedback": "Most required components are present."
+      },
+      "needsImprovement": {
+        "min": 0,
+        "feedback": "Missing one or more required components."
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "title": "Button and Debounce",
+  "board": "Arduino Uno",
+  "description": "Read a pushbutton reliably using software debounce and toggle an LED.",
+  "objectives": [
+    "Use INPUT_PULLUP for a stable button circuit",
+    "Implement software debounce with millis()",
+    "Toggle output state on clean button press events"
+  ]
+}

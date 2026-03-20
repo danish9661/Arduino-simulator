@@ -1,0 +1,10 @@
+{
+  "title": "Potentiometer",
+  "board": "Arduino Uno",
+  "description": "Read analog voltage from a potentiometer and map it to LED brightness.",
+  "objectives": [
+    "Use analogRead on Arduino analog pins",
+    "Scale ADC values to PWM output range",
+    "Observe real-time analog to output response"
+  ]
+}

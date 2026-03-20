@@ -1,0 +1,10 @@
+{
+  "title": "LDR",
+  "board": "Arduino Uno",
+  "description": "Simulate an LDR analog signal and drive LED brightness from light level.",
+  "objectives": [
+    "Read changing analog sensor values",
+    "Map light-level input to PWM output",
+    "Understand threshold and proportional control"
+  ]
+}

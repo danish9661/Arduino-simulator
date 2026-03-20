@@ -1,0 +1,65 @@
+{
+  "title": "Button Debounce Evaluation",
+  "description": "Evaluate debounced button input and stable LED output.",
+  "version": "2.0",
+  "passingThreshold": 75,
+  "evaluationCriteria": {
+    "codeFunctionality": {
+      "weight": 0.8,
+      "description": "Arduino code that meets the expected behavior for this demo",
+      "requiredFunctions": [
+        "pinMode",
+        "digitalRead",
+        "millis"
+      ]
+    },
+    "components": {
+      "weight": 0.2,
+      "description": "Required components for the circuit",
+      "required": [
+        {
+          "type": "arduino",
+          "count": 1
+        }
+      ]
+    }
+  },
+  "demoImages": [
+    {
+      "id": "circuit-layout",
+      "name": "Circuit Layout",
+      "filename": "circuit.png",
+      "description": "Expected component placement and wiring"
+    }
+  ],
+  "scoring": {
+    "codeFunctionality": {
+      "excellent": {
+        "min": 90,
+        "feedback": "Code meets all expected requirements."
+      },
+      "good": {
+        "min": 75,
+        "feedback": "Code meets most requirements with minor issues."
+      },
+      "needsImprovement": {
+        "min": 0,
+        "feedback": "Code needs significant improvement."
+      }
+    },
+    "components": {
+      "excellent": {
+        "min": 90,
+        "feedback": "All required components are present!"
+      },
+      "good": {
+        "min": 75,
+        "feedback": "Most required components are present."
+      },
+      "needsImprovement": {
+        "min": 0,
+        "feedback": "Missing one or more required components."
+      }
+    }
+  }
+}
