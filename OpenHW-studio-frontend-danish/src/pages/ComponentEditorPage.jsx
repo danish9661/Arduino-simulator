@@ -279,6 +279,65 @@ function genDocsHTML(d) {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><title>${d.label||'Component'}</title><style>body{font-family:system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;background:#0f0f0f;color:#e0e0e0;line-height:1.6}h1{color:#4ade80}h2{color:#86efac;border-bottom:1px solid #333;padding-bottom:8px}code{background:#1e1e2e;padding:2px 6px;border-radius:4px;font-family:monospace}pre{background:#1e1e2e;padding:16px;border-radius:8px}table{width:100%;border-collapse:collapse}td,th{padding:8px 12px;border:1px solid #333}th{background:#1e1e2e;color:#4ade80}</style></head><body><h1>${d.label||'Component'}</h1><p>${d.description||''}</p><h2>Pinout</h2><table><tr><th>Pin</th><th>Type</th><th>Description</th></tr>${(d.pins||[]).map(p=>`<tr><td><code>${p.id}</code></td><td>${p.type}</td><td>${p.description||''}</td></tr>`).join('')}</table><h2>Usage</h2><pre><code>// TODO</code></pre><h2>Notes</h2><ul><li>Size: ${d.w}×${d.h} px</li><li>Pins: ${(d.pins||[]).length}</li></ul></body></html>`
 }
 
+function genContextMenuTemplate(d) {
+  const label = d?.label || 'Component'
+  const key = (label || 'component').toLowerCase().replace(/[^a-z0-9]+/g, '_')
+  return `// Auto-generated ContextMenu for ${label}
+// Props: attrs (object), onUpdate (key: string, value: any) => void
+
+export const ContextMenu = ({ attrs, onUpdate }) => {
+  const enabledKey = '${key}_enabled';
+  const valueKey = '${key}_value';
+  const modeKey = '${key}_mode';
+
+  const enabled = attrs?.[enabledKey] ?? true;
+  const value = attrs?.[valueKey] ?? 128;
+  const mode = attrs?.[modeKey] ?? 'default';
+
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+      <span style={{ fontSize:11, fontWeight:700, color:'#94a3b8' }}>${label}</span>
+
+      <label style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:11, color:'#e2e8f0' }}>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={e => onUpdate(enabledKey, e.target.checked)}
+        />
+        Enabled
+      </label>
+
+      <label style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:11, color:'#e2e8f0' }}>
+        Value
+        <input
+          type="range"
+          min={0}
+          max={255}
+          value={value}
+          onChange={e => onUpdate(valueKey, +e.target.value)}
+          style={{ width:120 }}
+        />
+        <span style={{ minWidth:28, textAlign:'right', color:'#a5f3fc' }}>{value}</span>
+      </label>
+
+      <label style={{ display:'inline-flex', alignItems:'center', gap:6, fontSize:11, color:'#e2e8f0' }}>
+        Mode
+        <select
+          value={mode}
+          onChange={e => onUpdate(modeKey, e.target.value)}
+          style={{ background:'#1e293b', color:'#e2e8f0', border:'1px solid #334155', borderRadius:6, padding:'3px 6px', fontSize:11 }}
+        >
+          <option value="default">default</option>
+          <option value="fast">fast</option>
+          <option value="safe">safe</option>
+        </select>
+      </label>
+    </div>
+  );
+};
+`
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  DragResizeBox
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1213,9 +1272,7 @@ export default function ComponentEditorPage() {
       ctxCode = s.substring(markerIdx + CTX_MENU_MARKER.length).trim()
     } else {
       // Method B: find any `export const/function ContextMenu` in the file
-      const m = s.match(
-        /(export\s+(?:default\s+)?(?:const|function|class)\s+ContextMenu[\s\S]*?)(?=\nexport\s+(?:default\s+)?(?:const|function|class)\s+\w+|$)/
-      )
+      const m = s.match(/(export\s+(?:default\s+)?(?:const|function|class)\s+ContextMenu[\s\S]*?)(?=\nexport\s+|$)/)
       if (m) ctxCode = m[0].trim()
     }
 
@@ -1235,13 +1292,8 @@ export default function ComponentEditorPage() {
       /import\s+React|from\s+['"]react(?:\/jsx-runtime)?['"]/.test(uiSrc)
       || /export\s+(?:default\s+)?(?:const|function)\s+\w*(?:UI|View|Component)\b/.test(uiSrc)
     ) {
-      // 3b. Raw TypeScript React file — strip boilerplate header, keep component exports
-      // Remove: import lines, BOUNDS constant, contextMenu flag exports
+      // 3b. Raw TypeScript React file — preserve full source so imports/hooks are visible in Step 2.
       let stripped = uiSrc
-        .replace(/^import\s+[^;]+;?[ \t]*/gm, '')          // remove all import lines
-        .replace(/export\s+const\s+BOUNDS\s*=[^;]+;[ \t]*/g, '')   // remove BOUNDS
-        .replace(/export\s+const\s+contextMenu\w+\s*=\s*true;[ \t]*/g, '') // remove ctx flags
-      // Remove the ContextMenu export so it only appears in Step 5
       if (ctxCode) {
         stripped = stripped.replace(ctxCode, '')
       }
@@ -1962,6 +2014,7 @@ export const ContextMenu = ({ attrs, onUpdate }) => (
   </div>
 );
 `
+  const autoTemplate = genContextMenuTemplate(getData())
 
     // Compute canvas preview bounds/position
     const w = Number(compW) || 100, h = Number(compH) || 80
@@ -1995,6 +2048,10 @@ export const ContextMenu = ({ attrs, onUpdate }) => (
                   onClick={() => setCtxMenuCode(defaultTemplate)}
                   style={{ padding:'4px 10px', borderRadius:6, fontSize:10, fontWeight:700, background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa', cursor:'pointer' }}
                 >Insert Template</button>
+                <button
+                  onClick={() => setCtxMenuCode(autoTemplate)}
+                  style={{ padding:'4px 10px', borderRadius:6, fontSize:10, fontWeight:700, background:'rgba(34,197,94,0.15)', border:'1px solid rgba(34,197,94,0.35)', color:'#86efac', cursor:'pointer' }}
+                >Auto Generate</button>
               </div>
             </div>
             <div style={{ flex:1, overflow:'auto' }}>

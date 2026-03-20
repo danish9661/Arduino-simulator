@@ -23,8 +23,10 @@ services:
       - JWT_SECRET=change_me_production_key
       - FRONTEND_URL=http://localhost:5000
       - ALLOWED_ORIGINS=http://localhost:5000
+      - EMULATOR_PATH=/usr/src/openhw-studio-emulator-danish
     volumes:
       - ./openhw-studio-examples-danish:/usr/src/openhw-studio-examples-danish
+      - ./openhw-studio-emulator-danish:/usr/src/openhw-studio-emulator-danish
 
   frontend-main:
     build:

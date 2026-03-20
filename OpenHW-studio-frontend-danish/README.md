@@ -240,20 +240,20 @@ npm install
 ### Local Development & NPM Linking
 During local development, you will want the frontend to immediately see changes you make to the emulator source code, without having to push those changes to GitHub first.
 
-We achieve this using **NPM Symlinks**, which tell the frontend to use the local `openhw-studio-emulator-danish` folder instead of downloading the cached version from GitHub.
+We achieve this using **Vite Resolve Aliases**, which tell the frontend to use the local `openhw-studio-emulator-danish` folder. This is controlled by the `VITE_EMULATOR_PATH` variable in your `.env` file and bypasses the need for `npm link`.
 
-To set up your local development links:
-```bash
-# 1. Register the emulator as a linkable global package
-cd openhw-studio-emulator-danish
-npm link
-cd ..
+To set up your local development:
+1. Ensure your `.env` file has the correct path:
+   ```env
+   VITE_EMULATOR_PATH=../openhw-studio-emulator-danish
+   ```
+2. Restart the Vite dev server. The `@openhw/emulator` package will now point directly to your local source.
 
-# 2. Tell the frontend to use the linked local emulator
-cd OpenHW-studio-frontend-danish
-npm link @openhw/emulator
-cd ..
-```
+*Note: You can still use `npm link` if preferred, but the environment variable approach is more portable across different machines.*
+
+### Production Deployment (Vercel / Docker)
+For production builds (like on **Vercel**), the `VITE_EMULATOR_PATH` variable should be **left unset**. The `vite.config.js` is designed to automatically fallback to the `@openhw/emulator` package installed in `node_modules` (fetched from GitHub) if the local path is not found.
+
 *Note: Once deployed to Vercel/Netlify, these local symlinks will be ignored and the remote server will correctly fetch the package directly from GitHub.*
 
 ### Start Development Server

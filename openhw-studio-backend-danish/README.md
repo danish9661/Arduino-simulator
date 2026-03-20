@@ -226,6 +226,7 @@ The backend uses a `.env` (or `env`) file for configuration. Create one in the r
 | `GOOGLE_CLIENT_SECRET` | Google OAuth 2.0 Client Secret | — |
 | `GOOGLE_CALLBACK_URL` | Authorised redirect URI for Google Login | `http://localhost:5001/auth/google/callback` |
 | `FRONTEND_URL` | Frontend URL for CORS configuration | `http://localhost:5173` |
+| `EXAMPLES_PATH` | Path to the examples directory (relative or absolute) | `../../openhw-studio-examples/examples` |
 
 ### Sample `.env` Setup:
 

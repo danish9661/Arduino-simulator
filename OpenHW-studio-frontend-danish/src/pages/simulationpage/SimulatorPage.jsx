@@ -2672,25 +2672,28 @@ export default function SimulatorPage() {
     }
   };
 
-  const sendSerialInput = useCallback(() => {
+  const sendSerialInput = useCallback((targetBoardOverride) => {
     const txt = serialInput.trim();
     if (!txt) return;
+
+    const requestedBoard = targetBoardOverride || serialBoardFilter;
+    const targetBoardId = requestedBoard !== 'all' ? requestedBoard : undefined;
 
     if (workerRef.current && isRunning) {
       workerRef.current.postMessage({
         type: 'SERIAL_INPUT',
         data: txt + '\n',
-        targetBoardId: serialBoardFilter !== 'all' ? serialBoardFilter : undefined,
+        targetBoardId,
         baudRate: serialBaudRate,
       });
-      pushSerialTxLine(txt, serialBoardFilter !== 'all' ? serialBoardFilter : 'all', 'sim');
+      pushSerialTxLine(txt, targetBoardId || 'all', 'sim');
       setSerialInput('');
       return;
     }
 
     if (hardwareConnected) {
-      const targetBoard = serialBoardFilter !== 'all'
-        ? serialBoardFilter
+      const targetBoard = targetBoardId
+        ? targetBoardId
         : (hardwareSerialTargetRef.current || hardwareBoardId || 'hardware');
       sendHardwareSerialLine(txt, targetBoard)
         .then(() => setSerialInput(''))
