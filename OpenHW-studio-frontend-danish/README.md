@@ -157,6 +157,15 @@ The **Arduino Uno Reset Button** is fully interactive inside the workspace SVG v
 ### Web Worker Simulation
 AVR simulation runs entirely in-browser via `src/worker/execute.ts` inside a Web Worker, keeping the UI thread completely unblocked.
 
+### Pico / RP2040 Workflow
+- Each Pico board folder now includes both `<boardId>.ino` and `main.py` starter files.
+- File menu supports **Disable file / Enable file** by renaming with `.disabled` suffix.
+- Disabled files are excluded from compile and MicroPython source selection.
+- If backend RP2040 Arduino core is missing, `.ino` compile failures automatically fall back to MicroPython UF2 + `main.py`.
+
+### Explorer Stability
+- Project files are normalized and deduplicated when loading saved projects to prevent duplicate file entries after refresh.
+
 ### Zero-Touch Component Sync
 The simulator polls the backend every 12 seconds for newly approved community components:
 - **Dynamic Injection**: New components are transpiled and injected into the registry and palette without a page refresh.
@@ -229,6 +238,7 @@ See **[OFFLINE_AND_STORAGE.md](../OFFLINE_AND_STORAGE.md)** for full technical d
 - Node.js 18+
 - npm 9+
 - The **Compiler Backend** running at `http://localhost:5001`
+- For Pico `.ino` compilation, backend must have `rp2040:rp2040` core installed.
 
 ### Installation
 
@@ -240,12 +250,14 @@ npm install
 ### Local Development & NPM Linking
 During local development, you will want the frontend to immediately see changes you make to the emulator source code, without having to push those changes to GitHub first.
 
-We achieve this using **Vite Resolve Aliases**, which tell the frontend to use the local `openhw-studio-emulator-danish` folder. This is controlled by the `VITE_EMULATOR_PATH` variable in your `.env` file and bypasses the need for `npm link`.
+We achieve this using **Vite Resolve Aliases**, which tell the frontend to use your local emulator repository folder. This is controlled by the `VITE_EMULATOR_PATH` variable in your `.env` file and bypasses the need for `npm link`.
+
+Set the path to your own emulator repo name. It can be relative or absolute, as long as it points at the emulator repository root.
 
 To set up your local development:
 1. Ensure your `.env` file has the correct path:
    ```env
-   VITE_EMULATOR_PATH=../openhw-studio-emulator-danish
+       VITE_EMULATOR_PATH=../path-to-openhw-studio-emulator
    ```
 2. Restart the Vite dev server. The `@openhw/emulator` package will now point directly to your local source.
 
@@ -286,7 +298,8 @@ The frontend uses Vite environment variables. Create a `.env` file in the projec
 |---|---|---|
 | `VITE_GOOGLE_CLIENT_ID` | Google OAuth 2.0 Client ID | — |
 | `VITE_API_BASE_URL` | Base URL for the Backend API | `http://localhost:5001/api` |
-| `VITE_EXAMPLES_BASE_URL` | Base URL for Example Projects URI | `http://localhost:5001/examples` |
+| `VITE_EXAMPLES_BASE_URL` | Base URL for example assets served by the backend `EXAMPLES_PATH` route | `http://localhost:5001/examples` |
+| `VITE_EMULATOR_PATH` | Local path to the emulator repository root used by Vite aliasing | `../path-to-openhw-studio-emulator` |
 | `VITE_ADMIN_EMAILS` | Comma-separated list of admin emails | — |
 
 ### Sample `.env` Setup:
@@ -296,6 +309,7 @@ VITE_GOOGLE_CLIENT_ID=your_id.apps.googleusercontent.com
 VITE_API_BASE_URL=http://localhost:5001/api
 VITE_EXAMPLES_BASE_URL=http://localhost:5001/examples
 VITE_ADMIN_EMAILS=admin@example.com,user@example.com
+VITE_EMULATOR_PATH=../path-to-openhw-studio-emulator
 ```
 
 ---

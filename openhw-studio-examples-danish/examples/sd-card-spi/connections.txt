@@ -1,0 +1,16 @@
+SD card SPI demo wiring (Arduino Uno):
+
+1) Uno 5V  -> SD VCC
+2) Uno GND -> SD GND
+3) Uno D10 -> SD CS
+4) Uno D13 -> SD SCK
+5) Uno D11 -> SD MOSI
+6) Uno D12 -> SD MISO
+
+Expected serial markers:
+- SD_CMD0_R1
+- SD_CMD8_R1
+- SD_ACMD41_R1
+- SD_CMD58_R1
+- SD_CMD17_R1 / SD_READ_TOKEN
+- SD_CMD24_R1 / SD_WRITE_TOKEN

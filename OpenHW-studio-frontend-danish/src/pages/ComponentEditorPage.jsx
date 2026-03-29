@@ -8,7 +8,9 @@ import 'prismjs/components/prism-markup'
 import 'prismjs/themes/prism-tomorrow.css'
 import JSZip from 'jszip'
 import * as Babel from '@babel/standalone'
-import * as EmulatorComponents from '@openhw/emulator/src/components/index.ts'
+import * as ReactJsxRuntime from 'react/jsx-runtime'
+import * as ReactJsxDevRuntime from 'react/jsx-dev-runtime'
+import * as EmulatorComponents from '@openhw/emulator'
 
 // ─── Component Registry (same as SimulatorPage) ───────────────────────────────
 const COMP_REGISTRY = {}
@@ -187,12 +189,40 @@ const CTX_MENU_MARKER = '// ── Context Menu ──────────�
 
 function evalTranspiledReactModule(transformedCode) {
   const exportsObj = {}
+  const normalizeChildrenKeys = (value) => {
+    if (!Array.isArray(value)) return value
+    return value.map((child, idx) => {
+      if (Array.isArray(child)) return normalizeChildrenKeys(child)
+      if (React.isValidElement(child) && child.key == null) {
+        return React.cloneElement(child, { key: `auto_${idx}` })
+      }
+      return child
+    })
+  }
+
+  const normalizeProps = (props) => {
+    if (!props || typeof props !== 'object') return props
+    if (!Object.prototype.hasOwnProperty.call(props, 'children')) return props
+    return { ...props, children: normalizeChildrenKeys(props.children) }
+  }
+
+  const jsxRuntime = {
+    jsx: (type, props, key) => (ReactJsxRuntime.jsx || React.createElement)(type, normalizeProps(props), key),
+    jsxs: (type, props, key) => (ReactJsxRuntime.jsxs || React.createElement)(type, normalizeProps(props), key),
+    jsxDEV: (type, props, key, isStaticChildren, source, self) => (ReactJsxDevRuntime.jsxDEV || React.createElement)(type, normalizeProps(props), key, isStaticChildren, source, self),
+    Fragment: ReactJsxRuntime.Fragment || React.Fragment,
+  }
   const reactModule = { __esModule: true, default: React, ...React }
+  const refreshSig = () => () => {}
+  const refreshReg = () => {}
+  const stableS = () => {}
   // Provide common React hooks as function args so user code that references
   // bare hook names (e.g. useRef) still works after import stripping.
   // eslint-disable-next-line no-new-func
   const evalFn = new Function(
     'exports', 'require', 'React',
+    '_s', '$RefreshSig$', '$RefreshReg$',
+    'jsx', 'jsxs', 'jsxDEV', 'Fragment',
     'useState', 'useRef', 'useEffect', 'useMemo', 'useCallback',
     'useReducer', 'useLayoutEffect', 'useImperativeHandle', 'useContext',
     'useId', 'useDeferredValue', 'useTransition', 'useSyncExternalStore',
@@ -200,8 +230,20 @@ function evalTranspiledReactModule(transformedCode) {
   )
   evalFn(
     exportsObj,
-    (m) => m === 'react' || m === 'react/jsx-runtime' ? reactModule : null,
+    (m) => {
+      if (m === 'react') return reactModule
+      if (m === 'react/jsx-runtime') return ReactJsxRuntime
+      if (m === 'react/jsx-dev-runtime') return ReactJsxDevRuntime
+      return null
+    },
     React,
+    stableS,
+    refreshSig,
+    refreshReg,
+    jsxRuntime.jsx,
+    jsxRuntime.jsxs,
+    jsxRuntime.jsxDEV,
+    jsxRuntime.Fragment,
     React.useState,
     React.useRef,
     React.useEffect,
@@ -685,8 +727,13 @@ function CanvasPanel({ open, onToggle, svgCode, reactCode, imageMode, compW, com
   // ── All components: user comp first, then reference comps ───────────────────
   const allComps = useMemo(() => {
     const userComp = {
-      id: USER_COMP_ID, type: compType||'custom',
-      label: compLabel||'My Component', x: 0, y: 0, w, h,
+      id: USER_COMP_ID,
+      type: compType||'custom',
+      label: compLabel||'My Component',
+      x: 0,
+      y: 0,
+      w,
+      h,
     }
     return [userComp, ...refComps]
   }, [compType, compLabel, w, h, refComps])
@@ -1196,6 +1243,7 @@ export default function ComponentEditorPage() {
   const [doneSteps, setDoneSteps] = useState(new Set())
   const [canvasOpen,setCanvasOpen]= useState(true)
   const [saving,    setSaving]    = useState(false)
+  const [s2EditorFont, setS2EditorFont] = useState(13)
 
   // ── Preview zoom per step ─────────────────────────────────────────────────
   const [s2Zoom, setS2Zoom] = useState(null)  // null = auto-fit
@@ -1263,6 +1311,8 @@ export default function ComponentEditorPage() {
   const parseUISource = useCallback((src) => {
     // Normalize line endings so regexes work on Windows files too
     const s = (src || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+    const ctxExportRegex = /(export\s+(?:default\s+)?(?:const|function|class)\s+[A-Za-z0-9_]*ContextMenu[A-Za-z0-9_]*[\s\S]*?)(?=\nexport\s+|$)/i
+    const uiExportRegex = /(export\s+(?:default\s+)?(?:const|function|class)\s+[A-Za-z0-9_]*(?:UI|View|Component)[A-Za-z0-9_]*\b[\s\S]*?)(?=\nexport\s+|$)/i
 
     // ── 1. Extract ContextMenu block ──────────────────────────────────────────
     let ctxCode = ''
@@ -1271,13 +1321,16 @@ export default function ComponentEditorPage() {
       // Method A: our generated marker separator
       ctxCode = s.substring(markerIdx + CTX_MENU_MARKER.length).trim()
     } else {
-      // Method B: find any `export const/function ContextMenu` in the file
-      const m = s.match(/(export\s+(?:default\s+)?(?:const|function|class)\s+ContextMenu[\s\S]*?)(?=\nexport\s+|$)/)
+      // Method B: detect any exported symbol whose name contains "ContextMenu"
+      const m = s.match(ctxExportRegex)
       if (m) ctxCode = m[0].trim()
     }
 
     // ── 2. Get the UI-only body (strip ctx block when marker was used) ─────────
-    const uiSrc = markerIdx !== -1 ? s.substring(0, markerIdx).trim() : s
+    let uiSrc = markerIdx !== -1 ? s.substring(0, markerIdx).trim() : s
+    if (ctxCode) {
+      uiSrc = uiSrc.replace(ctxExportRegex, '').trim()
+    }
 
     // ── 3. Determine mode and extract the visual component code ───────────────
     let outReactCode = '', outSvgCode = '', outMode = 'code'
@@ -1286,23 +1339,27 @@ export default function ComponentEditorPage() {
     const reactMarker = '// ── Component UI (React mode) ──────────────────────────────────────'
     const reactMarkerIdx = uiSrc.indexOf(reactMarker)
     if (reactMarkerIdx !== -1) {
-      outReactCode = uiSrc.substring(reactMarkerIdx + reactMarker.length).trim()
+      const reactBody = uiSrc.substring(reactMarkerIdx + reactMarker.length).trim()
+      const uiOnly = reactBody.match(uiExportRegex)
+      outReactCode = (uiOnly ? uiOnly[0] : reactBody).trim()
       outMode = 'react'
     } else if (
       /import\s+React|from\s+['"]react(?:\/jsx-runtime)?['"]/.test(uiSrc)
       || /export\s+(?:default\s+)?(?:const|function)\s+\w*(?:UI|View|Component)\b/.test(uiSrc)
     ) {
-      // 3b. Raw TypeScript React file — preserve full source so imports/hooks are visible in Step 2.
-      let stripped = uiSrc
-      if (ctxCode) {
-        stripped = stripped.replace(ctxCode, '')
-      }
-      outReactCode = stripped.trim()
+      // 3b. Raw TypeScript React file — keep only the visual UI export for Step 2 editor.
+      const uiOnly = uiSrc.match(uiExportRegex)
+      outReactCode = (uiOnly ? uiOnly[0] : uiSrc).trim()
       outMode = 'react'
     } else {
       // 3c. SVG mode — pull out the inline SVG element
       const svgM = uiSrc.match(/<svg[\s\S]*?<\/svg>/)
       if (svgM) { outSvgCode = svgM[0]; outMode = 'code' }
+      else if (uiSrc.trim()) {
+        // Fallback: keep non-empty source visible in the editor instead of blank panes.
+        outReactCode = uiSrc.trim()
+        outMode = 'react'
+      }
     }
 
     return { reactCode: outReactCode, svgCode: outSvgCode, svgMode: outMode, ctxMenuCode: ctxCode }
@@ -1339,11 +1396,16 @@ export default function ComponentEditorPage() {
         }
         if (data.ui) {
           const { reactCode: rc, svgCode: sc, svgMode: sm, ctxMenuCode: ctx } = parseUISource(data.ui)
-          if (ctx)  setCtxMenuCode(ctx)
+          setCtxMenuCode(ctx || '')
           if (sm === 'react') { setReactCode(rc); setSvgMode('react') }
           else if (sm === 'code' && sc) { setSvgCode(sc); setSvgMode('code') }
+          uiEdited.current = true
+          setUiCode(data.ui)
         }
         if (data.logic) setLogicCode(data.logic)
+        if (data.validation) setValidCode(data.validation)
+        if (data.index) setIndexCode(data.index)
+        if (data.docs) setDocsCode(data.docs)
       } catch (e) {
         console.error('[Editor] Failed to import Edit a Copy data:', e)
       }
@@ -1419,7 +1481,7 @@ export default function ComponentEditorPage() {
       if (uiStr) {
         // Use shared parser — handles CRLF, marker, regex, boilerplate strip
         const { reactCode: rc, svgCode: sc, svgMode: sm, ctxMenuCode: ctx } = parseUISource(uiStr)
-        if (ctx) setCtxMenuCode(ctx)
+        setCtxMenuCode(ctx || '')
         if (sm === 'react') { setSvgMode('react'); setReactCode(rc) }
         else if (sm === 'code' && sc) { setSvgCode(sc); setSvgMode('code') }
 
@@ -1427,7 +1489,7 @@ export default function ComponentEditorPage() {
 
         // Extract BOUNDS from the raw source
         const normalized = uiStr.replace(/\r\n/g, '\n')
-        const bm = normalized.match(/BOUNDS\s*=\s*\{\s*x:\s*(\d+)[^}]*y:\s*(\d+)[^}]*w:\s*(\d+)[^}]*h:\s*(\d+)/)
+        const bm = normalized.match(/BOUNDS\s*=\s*\{\s*x:\s*([\d.-]+)[^}]*y:\s*([\d.-]+)[^}]*w:\s*([\d.-]+)[^}]*h:\s*([\d.-]+)/)
         if (bm) setBounds({ x:+bm[1], y:+bm[2], w:+bm[3], h:+bm[4] })
       }
       if (logicStr) setLogicCode(logicStr)
@@ -1598,7 +1660,7 @@ export default function ComponentEditorPage() {
             >React JSX</button>
           </div>
 
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden', minHeight: 0 }}>
             {svgMode==='upload' && (
               <div 
                 onClick={()=>svgFileRef.current?.click()} 
@@ -1615,18 +1677,22 @@ export default function ComponentEditorPage() {
               </div>
             )}
             {(svgMode==='code' || svgMode==='react') && (
-              <div style={{ flex:1, display:'flex', flexDirection:'column' }}>
+              <div style={{ flex:1, display:'flex', flexDirection:'column', minHeight: 0 }}>
                 <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,0.02)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize:11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase' }}>Editor</span>
-                  <span style={{ fontSize:10, color: 'var(--text3)' }}>{svgMode==='react' ? 'TypeScript / JSX' : 'XML / SVG'}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize:10, color: 'var(--text3)' }}>{svgMode==='react' ? 'TypeScript / JSX' : 'XML / SVG'}</span>
+                    <button onClick={() => setS2EditorFont(f => Math.max(11, f - 1))} style={{ padding: '2px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text2)', cursor: 'pointer', fontSize: 11 }}>A-</button>
+                    <button onClick={() => setS2EditorFont(f => Math.min(20, f + 1))} style={{ padding: '2px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text2)', cursor: 'pointer', fontSize: 11 }}>A+</button>
+                  </div>
                 </div>
-                <div style={{ flex: 1, overflow: 'auto' }}>
+                <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
                   <Editor 
                     value={svgMode === 'react' ? reactCode : svgCode} 
                     onValueChange={svgMode === 'react' ? setReactCode : setSvgCode}
                     highlight={c=>Prism.highlight(c||'', svgMode==='react' ? Prism.languages.javascript : Prism.languages.markup, svgMode==='react' ? 'javascript' : 'markup')}
                     padding={16} 
-                    style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:13, lineHeight:1.6, minHeight: '100%', color:'var(--text)', background: 'transparent' }}
+                    style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:s2EditorFont, lineHeight:1.6, minHeight:'100%', color:'var(--text)', background:'transparent', whiteSpace:'pre', overflowX:'auto', overflowY:'auto' }}
                     placeholder={svgMode === 'react' ? 'export const MyUI = () => ...' : '<svg ...>'}
                   />
                 </div>

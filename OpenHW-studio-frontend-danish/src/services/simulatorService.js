@@ -19,6 +19,12 @@ export async function compileCode(input) {
         if (error.response && error.response.data && error.response.data.details) {
             throw new Error(`Compilation Failed:\n${error.response.data.details}`);
         }
+        if (error.response && error.response.data && error.response.data.error) {
+            throw new Error(`Compilation Failed: ${error.response.data.error}`);
+        }
+        if (error.response && error.response.status) {
+            throw new Error(`Compilation request failed with status ${error.response.status}.`);
+        }
         throw error;
     }
 }

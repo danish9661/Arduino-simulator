@@ -84,6 +84,13 @@ Shared component definitions library and AVR simulation engine (runs as a Web Wo
 - **In-Browser Transpilation**: Leverage Babel Standalone to transpile and execute custom component UI (React) and Logic (TypeScript) code directly in browser memory for instant previews.
 - **Advanced Workspace**: Features a resizable file explorer, protected system files (`diagram.json`), and live serial monitor.
 
+### March 2026 Updates
+
+- **Pico dual-source workflow**: RP2040 board folders now include both `<boardId>.ino` and `main.py` starter files.
+- **Per-file enable/disable**: Code files can be toggled from the explorer context menu by appending/removing `.disabled`.
+- **Refresh stability**: Persisted project files are normalized on load to prevent duplicate file rows after page refresh.
+- **Blockly dev-noise reduction**: Custom block registration now skips already-defined types, avoiding overwrite warnings in React StrictMode.
+
 ### Offline-First & Local Storage Features
 
 All four features below work without an internet connection and require no backend changes.
@@ -107,9 +114,12 @@ Because the frontend, backend, and emulator are now decoupled, you must install 
 ### Prerequisites
 - **Node.js 18+** and **npm 9+**
 - **MongoDB** running locally (or Atlas URI)
-- **arduino-cli** installed and `arduino:avr` core installed:
+- **arduino-cli** installed with AVR and RP2040 cores:
   ```bash
+  arduino-cli config add board_manager.additional_urls https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json
+  arduino-cli core update-index
   arduino-cli core install arduino:avr
+  arduino-cli core install rp2040:rp2040
   ```
 
 ### Install Dependencies

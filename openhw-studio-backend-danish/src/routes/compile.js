@@ -1,6 +1,6 @@
 import express from 'express';
 import { Router } from 'express';
-import { compileArduinoCode, flashFirmware, listSerialPorts } from '../controllers/compileController.js';
+import { compileArduinoCode, flashFirmware, listSerialPorts, getDefaultPicoMicroPythonUf2 } from '../controllers/compileController.js';
 import { searchLibrary, installLibrary, listLibraries } from '../controllers/libController.js';
 
 const router = Router();
@@ -9,6 +9,7 @@ const router = Router();
 router.post('/', compileArduinoCode);
 router.post('/flash', flashFirmware);
 router.get('/ports', listSerialPorts);
+router.get('/pico/micropython-uf2', getDefaultPicoMicroPythonUf2);
 
 // Library Management
 router.get('/lib-search', searchLibrary);

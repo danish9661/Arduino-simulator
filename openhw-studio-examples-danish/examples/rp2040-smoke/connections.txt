@@ -1,0 +1,11 @@
+RP2040 smoke-test wiring (external LED):
+
+1) Pico GP15 -> LED A (anode)
+2) Pico GND  -> LED K (cathode)
+
+Recommended hardware-safe wiring:
+- Add 220-330 ohm resistor in series with LED anode.
+
+Optional dual-pin activity:
+1) Pico GP16 -> second LED A
+2) Pico GND  -> second LED K

@@ -1,12 +1,194 @@
-import { AVRRunner, LOGIC_REGISTRY, COMPONENT_PINS } from './execute';
+import { BoardRunner, createRunnerForBoard, LOGIC_REGISTRY, COMPONENT_PINS } from './execute';
 import { BaseComponent } from '@openhw/emulator/src/components/BaseComponent.ts';
-import { isProgrammableBoardType, areBoardsUartConnected } from './protocol-routing.js';
+import {
+    isProgrammableBoardType,
+    areBoardsUartConnected,
+    areBoardsSoftSerialConnected,
+} from './protocol-routing.js';
 
-let runner: AVRRunner | null = null;
-let boardRunners: Map<string, AVRRunner> = new Map();
+let runner: BoardRunner | null = null;
+let boardRunners: Map<string, BoardRunner> = new Map();
 let boardTypes: Map<string, string> = new Map();
 let mode: 'single' | 'multi' = 'single';
 let pinToNet: Map<string, number> = new Map();
+
+function buildMicroPythonPastePayload(scriptSource: string): string {
+    const normalized = String(scriptSource || '')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .split('\n')
+        .map((line) => line.replace(/\u0004/g, ''))
+        .join('\r\n');
+    // Ctrl-C, Ctrl-C, Ctrl-E (paste mode), script, Ctrl-D (execute)
+    return `\u0003\u0003\u0005${normalized}\r\n\u0004`;
+}
+
+function buildMicroPythonRawPayload(scriptSource: string): string {
+    const normalized = String(scriptSource || '')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .split('\n')
+        .map((line) => line.replace(/\u0004/g, ''))
+        .join('\n');
+    // Ctrl-A (raw REPL), script, Ctrl-D (execute).
+    // Do not prepend Ctrl-C here: probe kicks already interrupt to prompt,
+    // and extra Ctrl-C bytes can leak into execution as KeyboardInterrupt.
+    return `\u0001${normalized}\n\u0004`;
+}
+
+function buildMicroPythonReplProbe(boardId: string): string {
+    void boardId;
+    // Non-interrupting probe: nudge REPL to emit a prompt without injecting
+    // Ctrl-C, which can otherwise break user scripts with KeyboardInterrupt.
+    return '\r\n';
+}
+
+/**
+ * Waits until the MicroPython REPL '>>>' prompt appears on the board UART,
+ * then sends the script once via raw-REPL mode. Falls back after `timeoutMs` ms.
+ *
+ * Works by monkey-patching the runner's onStateUpdate to sniff serial bytes
+ * from the cpu.uart[0] callback, without interfering with the existing flow.
+ */
+function scheduleMicroPythonInject(
+    target: BoardRunner,
+    boardId: string,
+    pyScript: string,
+    baudOverride: number,
+    timeoutMs = 12000
+): void {
+    const rawPayload = buildMicroPythonRawPayload(pyScript);
+    const replProbePayload = buildMicroPythonReplProbe(boardId);
+    const startedAt = Date.now();
+    let uartBuf = '';
+    let finalized = false;
+    let probeTimer: any = null;
+    let timeoutGuard: any = null;
+    let injectedOnce = false;
+    let restoreUart0OnByte: (() => void) | null = null;
+
+    const clearTimers = () => {
+        if (probeTimer) {
+            clearInterval(probeTimer);
+            probeTimer = null;
+        }
+        if (timeoutGuard) {
+            clearTimeout(timeoutGuard);
+            timeoutGuard = null;
+        }
+    };
+
+    const finalize = () => {
+        if (finalized) return;
+        finalized = true;
+        clearTimers();
+        if (restoreUart0OnByte) {
+            restoreUart0OnByte();
+            restoreUart0OnByte = null;
+        }
+    };
+
+    const sendProbe = () => {
+        if (finalized) return;
+        if (!target) return;
+
+        // Keep REPL responsive and request a prompt.
+        target.setSerialBaudRate(baudOverride);
+        target.serialRx(replProbePayload);
+    };
+
+    const sendRawOnce = () => {
+        if (finalized || injectedOnce) return;
+        if (!target) return;
+
+        injectedOnce = true;
+        // Drop stale probe bytes so raw payload starts cleanly.
+        const targetAny = target as any;
+        if (Array.isArray(targetAny?.serialBuffer)) {
+            targetAny.serialBuffer.length = 0;
+        }
+        target.setSerialBaudRate(baudOverride);
+        target.serialRx(rawPayload);
+        finalize();
+    };
+
+    const shouldForceInjectFromBootTraffic = () => {
+        const targetAny = target as any;
+        const waitedMs = Date.now() - startedAt;
+        if (waitedMs < 2200) return false;
+
+        const txBytes = Number(targetAny?.debugSerialTxBytes || 0);
+        const activeUart = Number(targetAny?.activeUartIndex ?? -1);
+        const usbReady = !!targetAny?.usbCdcReady;
+
+        // USB-first MicroPython builds can expose prompt/output on USB CDC while
+        // uart[0] prompt sniffing stays quiet. Use tx activity as readiness signal.
+        if (txBytes >= 64 && (activeUart === 2 || usbReady)) return true;
+        if (txBytes >= 192) return true;
+        return false;
+    };
+
+    // Sniff UART output by wrapping the cpu uart onByte callback.
+    // rp2040js exposes cpu.uart[0].onByte – we chain onto it.
+    const patchUart = () => {
+        const cpu = (target as any).cpu;
+        if (!cpu?.uart?.[0]) return false;
+        const prev = cpu.uart[0].onByte;
+        const patched = (value: number) => {
+            if (prev) prev(value);
+            if (finalized) return;
+
+            uartBuf += String.fromCharCode(value);
+            if (uartBuf.length > 32) uartBuf = uartBuf.slice(-32);
+
+            if (uartBuf.includes('>>>')) {
+                sendRawOnce();
+            }
+        };
+        cpu.uart[0].onByte = patched;
+        restoreUart0OnByte = () => {
+            if ((cpu as any)?.uart?.[0]?.onByte === patched) {
+                cpu.uart[0].onByte = prev;
+            }
+        };
+        return true;
+    };
+
+    // The cpu may not be initialised exactly when we schedule, retry briefly.
+    let patchAttempts = 0;
+    const tryPatch = () => {
+        if (finalized) return;
+        if (patchUart()) return; // success
+        if (++patchAttempts < 10) setTimeout(tryPatch, 50);
+    };
+    tryPatch();
+
+    // Initial kick after boot; only probes here, no script payload yet.
+    setTimeout(() => {
+        if (finalized) return;
+        sendProbe();
+    }, 1400);
+
+    // Repeat probe while waiting for prompt; inject once when detected.
+    probeTimer = setInterval(() => {
+        if (finalized) {
+            clearTimers();
+            return;
+        }
+        if (shouldForceInjectFromBootTraffic()) {
+            sendRawOnce();
+            return;
+        }
+        sendProbe();
+    }, 2800);
+
+    // Final guard: if prompt sniff fails, inject exactly once anyway.
+    timeoutGuard = setTimeout(() => {
+        if (!finalized) {
+            sendRawOnce();
+        }
+    }, timeoutMs);
+}
 
 function stopAllRunners() {
     if (runner) {
@@ -98,7 +280,10 @@ function routeUartByte(sourceBoardId: string, value: number) {
         if (targetBoardId === sourceBoardId) continue;
 
         const targetType = boardTypes.get(targetBoardId) || '';
-        if (areBoardsUartConnected(sourceBoardId, sourceType, targetBoardId, targetType, areConnected)) {
+        const uartLinked = areBoardsUartConnected(sourceBoardId, sourceType, targetBoardId, targetType, areConnected);
+        const softLinked = areBoardsSoftSerialConnected(sourceBoardId, sourceType, targetBoardId, targetType, areConnected);
+
+        if (uartLinked || softLinked) {
             targetRunner.setSerialBaudRate(sourceBaud);
             targetRunner.serialRxByte(value);
         }
@@ -109,7 +294,7 @@ self.onmessage = async (e) => {
     const data = e.data;
 
     if (data.type === 'START') {
-        const { hex, components, wires, customLogics, boardHexMap, baudRate, boardBaudMap } = data;
+        const { hex, components, wires, customLogics, boardHexMap, boardPythonMap, baudRate, boardBaudMap, boardRuntimeMap } = data;
 
         stopAllRunners();
 
@@ -128,7 +313,7 @@ self.onmessage = async (e) => {
                     const LogicClass = exportsObj[Object.keys(exportsObj)[0]] || exportsObj.default;
                     if (LogicClass) {
                         LOGIC_REGISTRY[cl.type] = LogicClass;
-                        COMPONENT_PINS[cl.type] = Array.isArray(cl.pins) ? cl.pins : [];
+                        COMPONENT_PINS[cl.type] = cl.pins;
                         console.log(`[Worker] Sandbox injected component logic for: ${cl.type}`);
                     }
                 } catch (e) {
@@ -142,17 +327,42 @@ self.onmessage = async (e) => {
 
         if (programmableBoards.length <= 1) {
             mode = 'single';
-            const activeBoard = programmableBoards[0];
-            runner = new AVRRunner(
+            const singleBoardType = String(programmableBoards[0]?.type || 'wokwi-arduino-uno');
+            const singleBoardId = programmableBoards[0]?.id;
+            const pyScript = singleBoardId ? (boardPythonMap?.[singleBoardId] || '') : '';
+            const singleBoardIsRp2040 = /(rp2040|pico)/i.test(singleBoardType);
+
+            runner = createRunnerForBoard(
+                singleBoardType,
                 hex,
                 components,
                 wires,
                 (stateObj) => postMessage(stateObj),
                 {
-                    boardId: activeBoard?.id,
-                    serialBaudRate: Number(boardBaudMap?.[activeBoard?.id] ?? baudRate ?? 9600),
+                    boardId: singleBoardId,
+                    serialBaudRate: Number(boardBaudMap?.[singleBoardId] ?? baudRate ?? 9600),
+                    debugEnabled: singleBoardIsRp2040,
+                    debugIntervalMs: singleBoardIsRp2040 ? 800 : 0,
+                    // Pass pyScript metadata so the worker can inject over UART0 after boot.
+                    pyScript: typeof pyScript === 'string' ? pyScript : '',
+                    onByteTransmit: ({ boardId, value, char, source }) => {
+                        postMessage({ type: 'serial', data: char, boardId, value, source });
+                    },
+                    forceMicroPythonJsRunner: !!singleBoardId && boardRuntimeMap?.[singleBoardId] === 'micropython-js',
                 }
             );
+
+            if (singleBoardId) {
+                boardTypes.set(singleBoardId, singleBoardType);
+                if (pyScript?.trim() && (runner as any)?.cpu?.uart?.[0]) {
+                    scheduleMicroPythonInject(
+                        runner!,
+                        singleBoardId,
+                        pyScript,
+                        Number(boardBaudMap?.[singleBoardId] ?? 115200)
+                    );
+                }
+            }
             return;
         }
 
@@ -160,21 +370,32 @@ self.onmessage = async (e) => {
         buildNetIndex(wires || []);
 
         programmableBoards.forEach((boardComp: any) => {
-            const fwHex = boardHexMap?.[boardComp.id] || boardComp?.attrs?.firmwareHex || boardComp?.attrs?.hex || hex;
+            const forceMicroPythonJsRunner = boardRuntimeMap?.[boardComp.id] === 'micropython-js';
+            const fwHex = boardHexMap?.[boardComp.id] || boardComp?.attrs?.firmwareHex || boardComp?.attrs?.hex;
+            if (!forceMicroPythonJsRunner && (typeof fwHex !== 'string' || !fwHex.trim())) {
+                console.warn(`[Worker] Skipping board ${boardComp.id}: no board-specific firmware available.`);
+                return;
+            }
             const runnerComponents = [boardComp, ...sharedPeripheralComponents];
+            const pyScript = boardPythonMap?.[boardComp.id] || '';
 
-            const boardRunner = new AVRRunner(
-                fwHex,
+            const boardRunner = createRunnerForBoard(
+                String(boardComp.type || ''),
+                typeof fwHex === 'string' ? fwHex : '',
                 runnerComponents,
                 wires,
                 (stateObj) => postRunnerState(stateObj, boardComp.id),
                 {
                     boardId: boardComp.id,
                     serialBaudRate: Number(boardBaudMap?.[boardComp.id] ?? baudRate ?? 9600),
-                    onByteTransmit: ({ boardId, value, char }) => {
-                        postMessage({ type: 'serial', data: char, boardId, value });
+                    debugEnabled: /(rp2040|pico)/i.test(String(boardComp.type || '')),
+                    debugIntervalMs: /(rp2040|pico)/i.test(String(boardComp.type || '')) ? 800 : 0,
+                    pyScript: typeof pyScript === 'string' ? pyScript : '',
+                    onByteTransmit: ({ boardId, value, char, source }) => {
+                        postMessage({ type: 'serial', data: char, boardId, value, source });
                         routeUartByte(boardId, value);
                     },
+                    forceMicroPythonJsRunner,
                 }
             );
 
@@ -182,20 +403,23 @@ self.onmessage = async (e) => {
             boardTypes.set(boardComp.id, String(boardComp.type || ''));
         });
 
+        programmableBoards.forEach((boardComp: any) => {
+            const pyScript = boardPythonMap?.[boardComp.id];
+            if (typeof pyScript !== 'string' || !pyScript.trim()) return;
+            const target = boardRunners.get(boardComp.id);
+            if (!target) return;
+            if ((target as any)?.cpu?.uart?.[0]) {
+                scheduleMicroPythonInject(
+                    target,
+                    boardComp.id,
+                    pyScript,
+                    Number(boardBaudMap?.[boardComp.id] ?? 115200)
+                );
+            }
+        });
+
     } else if (data.type === 'STOP') {
         stopAllRunners();
-    } else if (data.type === 'PAUSE') {
-        if (mode === 'single' && runner) {
-            runner.pause();
-        } else {
-            boardRunners.forEach((boardRunner) => boardRunner.pause());
-        }
-    } else if (data.type === 'RESUME') {
-        if (mode === 'single' && runner) {
-            runner.resume();
-        } else {
-            boardRunners.forEach((boardRunner) => boardRunner.resume());
-        }
     } else if (data.type === 'INTERACT') {
         console.log(`[Worker] Received INTERACT for ${data.compId}: ${data.event}`);
 
@@ -217,6 +441,23 @@ self.onmessage = async (e) => {
                 console.warn(`[Worker] INTERACT target not found in any runner: ${data.compId}`);
             }
         }
+    } else if (data.type === 'SERIAL_SET_BAUD') {
+        const parsedBaud = Number(data.baudRate);
+        if (!Number.isFinite(parsedBaud)) {
+            return;
+        }
+
+        if (mode === 'single' && runner) {
+            runner.setSerialBaudRate(parsedBaud);
+        } else if (data.targetBoardId) {
+            const target = boardRunners.get(data.targetBoardId);
+            if (!target) return;
+            target.setSerialBaudRate(parsedBaud);
+        } else {
+            boardRunners.forEach((boardRunner) => {
+                boardRunner.setSerialBaudRate(parsedBaud);
+            });
+        }
     } else if (data.type === 'SERIAL_INPUT') {
         if (mode === 'single' && runner) {
             if (data.baudRate) runner.setSerialBaudRate(Number(data.baudRate));
@@ -237,11 +478,13 @@ self.onmessage = async (e) => {
             }
         }
     } else if (data.type === 'RESET') {
-        if (mode === 'single' && runner && runner.cpu) {
-            runner.cpu.reset();
+        if (mode === 'single' && runner) {
+            if (typeof runner.reset === 'function') runner.reset();
+            else if (runner.cpu) runner.cpu.reset();
         } else {
             boardRunners.forEach((boardRunner) => {
-                if (boardRunner.cpu) boardRunner.cpu.reset();
+                if (typeof boardRunner.reset === 'function') boardRunner.reset();
+                else if (boardRunner.cpu) boardRunner.cpu.reset();
             });
         }
     }

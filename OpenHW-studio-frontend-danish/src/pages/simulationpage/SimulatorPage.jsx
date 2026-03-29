@@ -17,6 +17,9 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../../context/AuthContext.jsx'
+import { useGamification } from '../../context/GamificationContext.jsx'
+import { PROJECTS } from '../../services/gamification/ProjectsConfig.js'
+import { COMPONENT_MAP } from '../../services/gamification/ComponentsConfig.js'
 import { compileCode, flashFirmware, fetchInstalledLibraries, searchLibraries, installLibrary, submitCustomComponent, fetchInstalledComponentsWithFiles } from '../../services/simulatorService.js'
 import { getCachedHex, setCachedHex, enqueueComponent, getQueuedComponents, dequeueComponent } from '../../services/offlineCache.js'
 import { saveProject, loadProject, listProjects, deleteProject, renameProject, generateProjectId, formatProjectDate } from '../../services/projectStore.js'
@@ -24,7 +27,7 @@ import html2canvas from 'html2canvas'
 import JSZip from 'jszip';
 import * as Babel from '@babel/standalone';
 
-import * as EmulatorComponents from "@openhw/emulator/src/components/index.ts";
+import * as EmulatorComponents from "@openhw/emulator";
 
 // Web Editor features
 import Editor from 'react-simple-code-editor';
@@ -40,7 +43,6 @@ import 'prismjs/themes/prism-tomorrow.css';
 const COMPONENT_REGISTRY = {};
 
 Object.entries(EmulatorComponents).forEach(([key, module]) => {
-  // Skip the base class
   if (key === 'BaseComponent') return;
 
   if (module && module.manifest) {
@@ -101,6 +103,107 @@ function resolveUiExport(exportsUI) {
   return null;
 }
 
+function toPascalCase(value) {
+  const safe = String(value || 'component');
+  return safe
+    .replace(/[^a-zA-Z0-9]+(.)/g, (_, c) => c.toUpperCase())
+    .replace(/^[a-z]/, c => c.toUpperCase())
+    .replace(/[^a-zA-Z0-9]/g, '') || 'Component';
+}
+
+function extractFunctionSource(fn) {
+  if (typeof fn !== 'function') return '';
+  try {
+    let src = String(fn).trim();
+    // Remove common fast-refresh signature calls that may appear in function bodies.
+    src = src.replace(/\b_s\s*\([^)]*\);?/g, '');
+    src = src.replace(/\$RefreshSig\$\s*\([^)]*\)/g, '(() => {})');
+    src = src.replace(/\$RefreshReg\$\s*\([^)]*\);?/g, '');
+    return src.trim();
+  } catch {
+    return '';
+  }
+}
+
+function buildUiSourceFromRegistry(registryInfo, fallbackType) {
+  if (registryInfo?.uiRaw) return registryInfo.uiRaw;
+
+  const manifest = registryInfo?.manifest || {};
+  const name = toPascalCase(manifest.type || fallbackType || 'component');
+  const uiFn = extractFunctionSource(registryInfo?.UI);
+  if (!uiFn) return '';
+
+  const b = registryInfo?.BOUNDS;
+  const bounds = (b && typeof b === 'object')
+    ? b
+    : { x: 5, y: 5, w: Math.max((manifest.w || 100) - 10, 10), h: Math.max((manifest.h || 80) - 10, 10) };
+
+  const lines = [
+    "import React from 'react';",
+    '',
+    `export const BOUNDS = { x: ${Number(bounds.x) || 0}, y: ${Number(bounds.y) || 0}, w: ${Number(bounds.w) || 10}, h: ${Number(bounds.h) || 10} };`,
+  ];
+
+  if (registryInfo?.contextMenuDuringRun || manifest.contextMenuDuringRun) {
+    lines.push('export const contextMenuDuringRun = true;');
+  }
+  if (registryInfo?.contextMenuOnlyDuringRun || manifest.contextMenuOnlyDuringRun) {
+    lines.push('export const contextMenuOnlyDuringRun = true;');
+  }
+
+  lines.push('', `export const ${name}UI = ${uiFn};`);
+
+  const ctxFn = extractFunctionSource(registryInfo?.ContextMenu);
+  if (ctxFn) {
+    lines.push('', `export const ContextMenu = ${ctxFn};`);
+  }
+
+  return lines.join('\n');
+}
+
+function buildLogicSourceFromRegistry(registryInfo, fallbackType) {
+  if (registryInfo?.logicRaw) return registryInfo.logicRaw;
+
+  const logicClassSrc = extractFunctionSource(registryInfo?.LogicClass);
+  if (logicClassSrc.startsWith('class ')) {
+    return `import { BaseComponent } from '../BaseComponent';\n\nexport ${logicClassSrc}\n`;
+  }
+
+  const name = toPascalCase(registryInfo?.manifest?.type || fallbackType || 'component');
+  return `import { BaseComponent } from '../BaseComponent';\n\nexport class ${name}Logic extends BaseComponent {\n  reset() {}\n  update() {}\n}\n`;
+}
+
+function buildValidationSourceFromRegistry(registryInfo) {
+  if (registryInfo?.validationRaw) return registryInfo.validationRaw;
+  const validation = registryInfo?.validation;
+  if (Array.isArray(validation)) {
+    const rows = validation.map((rule) => {
+      const id = JSON.stringify(rule?.id || 'rule');
+      const description = JSON.stringify(rule?.description || '');
+      const check = typeof rule?.check === 'function'
+        ? String(rule.check)
+        : '() => ({ pass: true })';
+      return `  {\n    id: ${id},\n    description: ${description},\n    check: ${check},\n  }`;
+    });
+    return `export const validation = [\n${rows.join(',\n')}\n];\n`;
+  }
+  if (typeof validation === 'function') {
+    return `export const validation = ${String(validation)};\n`;
+  }
+  return 'export const validation = [];\n';
+}
+
+function buildIndexSourceFromRegistry(registryInfo, fallbackType) {
+  if (registryInfo?.indexRaw) return registryInfo.indexRaw;
+  const manifest = registryInfo?.manifest || {};
+  const name = toPascalCase(manifest.type || fallbackType || 'component');
+  const hasCtxMenu = typeof registryInfo?.ContextMenu === 'function';
+  const hasDuringRun = !!(registryInfo?.contextMenuDuringRun || manifest.contextMenuDuringRun);
+  const hasOnlyDuringRun = !!(registryInfo?.contextMenuOnlyDuringRun || manifest.contextMenuOnlyDuringRun);
+
+  return `import manifest from './manifest.json';\nimport { ${name}UI, BOUNDS${hasDuringRun ? ', contextMenuDuringRun' : ''}${hasOnlyDuringRun ? ', contextMenuOnlyDuringRun' : ''}${hasCtxMenu ? ', ContextMenu' : ''} } from './ui';\nimport { ${name}Logic } from './logic';\nimport { validation } from './validation';\n\nexport default {\n  manifest,\n  UI: ${name}UI,\n  LogicClass: ${name}Logic,\n  BOUNDS,\n  validation,${hasCtxMenu ? '\n  ContextMenu,' : ''}${hasDuringRun ? '\n  contextMenuDuringRun,' : ''}${hasOnlyDuringRun ? '\n  contextMenuOnlyDuringRun,' : ''}\n};\n`;
+}
+
 Object.values(COMPONENT_REGISTRY).forEach(module => {
   const manifest = module.manifest;
   const groupName = normalizeGroupName(manifest.group);
@@ -143,6 +246,7 @@ function syncNextIds(comps, ws) {
 }
 
 const EXAMPLES_BASE_URL = import.meta.env.VITE_EXAMPLES_BASE_URL || 'http://localhost:5001/examples';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api').replace(/\/$/, '');
 
 // ── Palette group visual helpers ─────────────────────────────────────────────
 const GROUP_ICON_SVG = {
@@ -183,6 +287,17 @@ const BOARD_FQBN = {
   rp2040: 'rp2040:rp2040:rpipico',
 };
 
+const UF2_PAYLOAD_PREFIX = 'UF2BASE64:';
+const DEFAULT_PICO_MICROPYTHON_UF2_URL = `${API_BASE_URL}/compile/pico/micropython-uf2`;
+const DISABLED_FILE_SUFFIX = '.disabled';
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
 function normalizeBoardKind(source) {
   const s = String(source || '').toLowerCase();
   if (s.includes('esp32')) return 'esp32';
@@ -192,10 +307,18 @@ function normalizeBoardKind(source) {
 }
 
 function createDefaultMainCode(boardKind, boardId) {
+  if (boardKind === 'rp2040') {
+    return `# ${boardId} MicroPython script\nfrom machine import Pin\nfrom time import sleep\n\nled = Pin('LED', Pin.OUT)\n\nwhile True:\n  led.toggle()\n  sleep(0.5)\n`;
+  }
   if (boardKind === 'esp32' || boardKind === 'stm32' || boardKind === 'rp2040') {
     return `// ${boardId} main sketch\nvoid setup() {\n  // Serial.begin(${BOARD_DEFAULT_BAUD[boardKind] || 115200});\n}\n\nvoid loop() {\n  delay(1000);\n}\n`;
   }
   return `// ${boardId} main sketch\nvoid setup() {\n  pinMode(13, OUTPUT);\n  // Serial.begin(${BOARD_DEFAULT_BAUD.arduino_uno});\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(500);\n  digitalWrite(13, LOW);\n  delay(500);\n}\n`;
+}
+
+function getDefaultMainFileName(boardKind, boardId) {
+  if (boardKind === 'rp2040') return 'main.py';
+  return `${boardId}.ino`;
 }
 
 function fileExt(path) {
@@ -203,9 +326,264 @@ function fileExt(path) {
   return idx >= 0 ? path.substring(idx).toLowerCase() : '';
 }
 
+function isFileDisabled(pathLike) {
+  return String(pathLike || '').toLowerCase().endsWith(DISABLED_FILE_SUFFIX);
+}
+
+function normalizeProjectFiles(files) {
+  const list = Array.isArray(files) ? files : [];
+  const seen = new Set();
+  const out = [];
+
+  list.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    const normalizedPath = String(entry.path || entry.id || '').trim();
+    if (!normalizedPath || seen.has(normalizedPath)) return;
+    seen.add(normalizedPath);
+
+    out.push({
+      ...entry,
+      id: normalizedPath,
+      path: normalizedPath,
+      name: String(entry.name || normalizedPath.split('/').pop() || ''),
+    });
+  });
+
+  return out;
+}
+
+function normalizeOpenCodeTabs(tabs, projectFiles) {
+  const list = Array.isArray(tabs) ? tabs : [];
+  const fileIds = new Set((projectFiles || []).map((f) => f.id));
+  const seen = new Set();
+  const out = [];
+
+  list.forEach((tabId) => {
+    const id = String(tabId || '').trim();
+    if (!id || seen.has(id) || !fileIds.has(id)) return;
+    seen.add(id);
+    out.push(id);
+  });
+
+  return out;
+}
+
+function isRp2040CoreMissingError(err) {
+  const msg = String(err?.message || err || '').toLowerCase();
+  return msg.includes("platform 'rp2040:rp2040' not found")
+    || msg.includes('platform rp2040:rp2040 is not found')
+    || msg.includes('platform not installed');
+}
+
+function looksLikeMicroPythonSource(source) {
+  const text = String(source || '').trim();
+  if (!text) return false;
+  const lower = text.toLowerCase();
+
+  return lower.includes('from machine import')
+    || lower.includes('import machine')
+    || lower.includes('machine.pin(')
+    || lower.includes('while true:')
+    || lower.includes('sleep_ms(')
+    || lower.includes('sleep_us(');
+}
+
+/**
+ * Best-effort converter: takes a simple Arduino blink sketch and returns
+ * a MicroPython equivalent. Extracts the LED pin from #define / const,
+ * and delay values from delay() calls. Falls back gracefully.
+ */
+function arduinoBlinkToMicroPython(sourceCode, boardId) {
+  const src = String(sourceCode || '');
+
+  // Extract LED pin number: #define LED <n> or const int LED = <n> or similar
+  const pinMatch =
+    src.match(/#define\s+\w*LED\w*\s+(\d+)/i) ||
+    src.match(/const\s+\w+\s+\w*LED\w*\s*=\s*(\d+)/i) ||
+    src.match(/int\s+\w*LED\w*\s*=\s*(\d+)/i) ||
+    src.match(/LED_BUILTIN\b/);
+
+  let pinExpr;
+  if (pinMatch && pinMatch[1]) {
+    pinExpr = pinMatch[1]; // bare numeric pin string, e.g. "20"
+  } else if (src.includes('LED_BUILTIN')) {
+    pinExpr = "'LED'"; // MicroPython Pico built-in LED
+  } else {
+    // Try to find any pin used with pinMode or digitalWrite
+    const pinModeMatch = src.match(/pinMode\s*\(\s*(\d+)/) ||
+                         src.match(/digitalWrite\s*\(\s*(\d+)/);
+    pinExpr = pinModeMatch ? pinModeMatch[1] : "'LED'";
+  }
+
+  // Extract delay values (ms) from delay() calls (skip delayMicroseconds)
+  const delayMatches = [...src.matchAll(/\bdelay\s*\(\s*(\d+)\s*\)/g)].map(m => Number(m[1]));
+  const delayOn  = delayMatches[0] ?? 1000;
+  const delayOff = delayMatches[1] ?? delayOn;
+
+  // Numeric pin → bare int; quoted string stays as is
+  const pinArg = /^\d+$/.test(String(pinExpr)) ? Number(pinExpr) : pinExpr;
+
+  return (
+    `# Auto-converted from Arduino sketch for ${boardId}\n` +
+    `from machine import Pin\n` +
+    `from time import sleep_ms\n` +
+    `\n` +
+    `led = Pin(${pinArg}, Pin.OUT)\n` +
+    `\n` +
+    `while True:\n` +
+    `    led.value(1)   # LED ON\n` +
+    `    sleep_ms(${delayOn})\n` +
+    `    led.value(0)   # LED OFF\n` +
+    `    sleep_ms(${delayOff})\n`
+  );
+}
+
+function arduinoSerialToMicroPython(sourceCode, boardId) {
+  const src = String(sourceCode || '');
+  if (!/\bSerial1?\s*\.\s*println\s*\(/.test(src)) return '';
+
+  const printMatches = [...src.matchAll(/\bSerial1?\s*\.\s*println\s*\(([^)]*)\)\s*;/g)]
+    .map((m) => String(m[1] || '').trim())
+    .filter(Boolean);
+  if (printMatches.length === 0) return '';
+
+  const pyLiteral = (expr) => {
+    const e = String(expr || '').trim();
+    if (/^"[\s\S]*"$/.test(e) || /^'[\s\S]*'$/.test(e)) return e;
+    if (/^[0-9.+\-*/ ()]+$/.test(e)) return `str(${e})`;
+    return `str(${JSON.stringify(e)})`;
+  };
+
+  const setupMsg = pyLiteral(printMatches[0]);
+  const loopMsg = pyLiteral(printMatches[1] || printMatches[0]);
+  const delayMatch = src.match(/\bdelay\s*\(\s*(\d+)\s*\)/i);
+  const loopDelay = delayMatch ? Math.max(1, Number(delayMatch[1])) : 1000;
+
+  return [
+    `# Auto-converted Serial sketch for ${boardId}`,
+    'from time import sleep_ms',
+    '',
+    `print(${setupMsg})`,
+    '',
+    'while True:',
+    `  print(${loopMsg})`,
+    `  sleep_ms(${loopDelay})`,
+    '',
+  ].join('\n');
+}
+
+function prepareRp2040SketchForSimulation(sourceCode) {
+  const source = String(sourceCode || '');
+  if (!source.trim()) return source;
+  if (!/\bSerial1?\b/.test(source)) return source;
+  if (/OPENHW_SIM_SERIAL_REWRITE/.test(source)) return source;
+
+  const stripBlockingSerialWaits = (text) => String(text || '')
+    // Many Arduino RP2040 sketches block forever in simulation with
+    // while (!Serial) { ... } because USB CDC is not attached.
+    .replace(
+      /\bwhile\s*\(\s*[^)]*!\s*Serial1?[^)]*\)\s*;/g,
+      '/* OPENHW_SIM_SERIAL_WAIT_REMOVED: skip blocking serial wait in simulator. */'
+    )
+    .replace(
+      /\bwhile\s*\(\s*[^)]*!\s*Serial1?[^)]*\)\s*\{/g,
+      'if (false) { /* OPENHW_SIM_SERIAL_WAIT_REMOVED */'
+    )
+    .replace(
+      /\bwhile\s*\(\s*[^)]*!\s*Serial1?[^)]*\)\s*(?!\{|;)[^;\n]*;/g,
+      '/* OPENHW_SIM_SERIAL_WAIT_REMOVED: skip blocking serial wait in simulator. */'
+    );
+
+  const rewritten = stripBlockingSerialWaits(source.replace(/\bSerial\b(?!1)/g, 'Serial1'));
+  if (rewritten === source) return source;
+
+  const serialShim = [
+    '#ifdef ARDUINO_ARCH_RP2040',
+    '// OPENHW_SIM_SERIAL_REWRITE: route Serial monitor traffic to UART0 (GP0/GP1)',
+    '// and prevent blocking while(!Serial...) waits in simulator mode.',
+    '#endif',
+    '',
+  ].join('\n');
+
+  return `${serialShim}${rewritten}`;
+}
+
+const RP2040_SIM_PROTOCOL_VERSION = 'rp2040-sim-uart0-v4';
+
+function resolveRp2040SourceMode({
+  configuredMode,
+  activePrefersIno,
+  activePrefersPy,
+  hasNativeSketch,
+  hasPythonSource,
+}) {
+  const mode = String(configuredMode || 'auto').toLowerCase();
+  if (mode === 'ino' || mode === 'native') return 'ino';
+  if (mode === 'py' || mode === 'python' || mode === 'micropython') return 'py';
+
+  if (activePrefersIno) return 'ino';
+  if (activePrefersPy) return 'py';
+  if (hasPythonSource) return 'py';
+  if (hasNativeSketch) return 'ino';
+  return 'py';
+}
+
+function resolveComponentAttrString(attrs, key, fallback = '') {
+  const raw = attrs?.[key];
+  if (typeof raw === 'string') return raw;
+  if (raw && typeof raw === 'object') {
+    if (typeof raw.value === 'string') return raw.value;
+    if (typeof raw.default === 'string') return raw.default;
+    if (raw.value != null) return String(raw.value);
+    if (raw.default != null) return String(raw.default);
+  }
+  if (raw == null) return fallback;
+  return String(raw);
+}
+
+function ensureMicroPythonSerialProbe(sourceCode, boardId) {
+  const script = String(sourceCode || '').trim();
+  const marker = 'OpenHW RP2040 UART0 ready';
+  if (script.includes(marker)) return script;
+
+  const probe = `print("${marker}: ${boardId}")`;
+  if (!script) return `${probe}\n`;
+  return `${probe}\n${script}\n`;
+}
+
+function applyRp2040MicroPythonCompat(sourceCode) {
+  const script = String(sourceCode || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .trim();
+  if (!script) return script;
+  if (script.includes('OPENHW_RP2040_SLEEP_COMPAT')) return script;
+
+  const needsSleepCompat = /\btime\.sleep_ms\s*\(|\bsleep_ms\s*\(/.test(script);
+  if (!needsSleepCompat) return script;
+
+  const prelude = [
+    '# OPENHW_RP2040_SLEEP_COMPAT',
+    'def _openhw_sleep_ms(ms):',
+    '    ms = int(ms)',
+    '    if ms <= 0:',
+    '        return',
+    '    for _ in range(ms * 500):',
+    '        pass',
+    '',
+  ].join('\n');
+
+  const rewritten = script
+    .replace(/\btime\.sleep_ms\s*\(/g, '_openhw_sleep_ms(')
+    .replace(/\bsleep_ms\s*\(/g, '_openhw_sleep_ms(');
+
+  return `${prelude}\n${rewritten}\n`;
+}
+
 function isProgrammableBoardType(type) {
   return /(arduino|esp32|stm32|rp2040|pico)/i.test(String(type || ''));
 }
+
 
 function endpointAliases(endpoint) {
   const [compId, pinIdRaw] = String(endpoint || '').split(':');
@@ -302,14 +680,90 @@ function validateCircuitLocally(components, wires) {
   return errors;
 }
 
-export default function SimulatorPage() {
-  const { isAuthenticated, user, loading: authLoading } = useAuth()
+export default function SimulatorPage({ gamificationMode = false }) {
+  const { isAuthenticated, user, logout, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const { projectName = '' } = useParams()
   const location = useLocation()
   const assessmentParams = useMemo(() => new URLSearchParams(location.search), [location.search])
   const assessmentMode = assessmentParams.get('mode') === 'assessment'
   const assessmentProjectName = assessmentParams.get('project') || projectName
+
+  // -- Gamification --
+  const { trackComponentPlaced, trackWireDrawn, trackSimulationRun, isUnlocked, coins = 0, currentLevel, currentLevelData, nextLevel, xpProgress } = typeof useGamification === 'function' ? useGamification() : {}
+  const gamProject = useMemo(() => gamificationMode && typeof PROJECTS !== 'undefined' ? (PROJECTS.find(p => p.slug === projectName) ?? null) : null, [gamificationMode, projectName])
+  const [gamPanelOpen, setGamPanelOpen] = useState(true)
+  const [gamTab, setGamTab] = useState('components')
+
+  const WOKWI_TO_COMP_ID = useMemo(() => ({
+    'wokwi-led':                    'led',
+    'wokwi-resistor':               'resistor',
+    'wokwi-pushbutton':             'button',
+    'wokwi-potentiometer':          'potentiometer',
+    'wokwi-buzzer':                 'buzzer',
+    'wokwi-rgb-led':                'rgb-led',
+    'wokwi-ntc-temperature-sensor': 'dht11',
+    'wokwi-hc-sr04':                'ultrasonic',
+    'wokwi-servo':                  'servo',
+    'wokwi-lcd1602':                'lcd',
+  }), [])
+
+  const isPaletteItemLocked = useCallback((itemType) => {
+    if (!gamificationMode) return false
+    const compId = WOKWI_TO_COMP_ID[itemType]
+    if (!compId) return false
+    return isUnlocked ? !isUnlocked(compId) : false
+  }, [gamificationMode, isUnlocked, WOKWI_TO_COMP_ID])
+
+  const [lockToast, setLockToast] = useState(null)
+  const showLockToast = useCallback((label, compId) => {
+    setLockToast({ label, compId })
+    setTimeout(() => setLockToast(null), 3500)
+  }, [])
+
+  const gamProjectComponents = useMemo(() => {
+    if (!gamProject?.components) return []
+    return gamProject.components.map(c => {
+      const compId = WOKWI_TO_COMP_ID[c.type]
+      const compDef = compId && typeof COMPONENT_MAP !== 'undefined' ? COMPONENT_MAP[compId] : null
+      const isLocked = compId && isUnlocked ? !isUnlocked(compId) : false
+      return { ...c, compId, compDef, isLocked }
+    })
+  }, [gamProject, isUnlocked, WOKWI_TO_COMP_ID])
+
+  const gamLockedCount = gamProjectComponents.filter(c => c.isLocked && c.compId).length
+  const gamAllUnlocked = gamProject ? gamLockedCount === 0 : true
+
+  const handleAssessmentSubmit = async () => {
+    if (!assessmentMode && !gamificationMode) return;
+    const assessmentName = assessmentMode ? assessmentProjectName : projectName;
+    if (!assessmentName) {
+      alert('Assessment project is missing. Please open assessment from the project page.');
+      return;
+    }
+    setIsSubmittingAssessment(true);
+    try {
+      const payload = {
+        projectName: assessmentName,
+        submittedAt: new Date().toISOString(),
+        components,
+        wires,
+        code,
+      };
+      sessionStorage.setItem(`openhw_assessment_submission:${assessmentName}`, JSON.stringify(payload));
+      navigate(`/${assessmentName}/assessment`);
+    } finally {
+      setIsSubmittingAssessment(false);
+    }
+  };
+
+  const handleGamificationSubmit = useCallback(() => {
+    if (!gamAllUnlocked) {
+      alert(`Unlock ${gamLockedCount} component${gamLockedCount > 1 ? 's' : ''} first!`)
+      return
+    }
+    handleAssessmentSubmit()
+  }, [gamAllUnlocked, gamLockedCount, handleAssessmentSubmit])
 
   // Theme Logic — defaults to light mode
   const [theme, setTheme] = useState(() => {
@@ -344,6 +798,9 @@ export default function SimulatorPage() {
   const [board, setBoard] = useState('arduino_uno')
   const [codeTab, setCodeTab] = useState('code')
   const [code, setCode] = useState('void setup() {\n  pinMode(13, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(1000);\n  digitalWrite(13, LOW);\n  delay(1000);\n}\n')
+  const [blocklyXml, setBlocklyXml] = useState('')
+  const [blocklyGeneratedCode, setBlocklyGeneratedCode] = useState('')
+  const [useBlocklyCode, setUseBlocklyCode] = useState(false)
   const [projectFiles, setProjectFiles] = useState([])
   const [openCodeTabs, setOpenCodeTabs] = useState([])
   const [activeCodeFileId, setActiveCodeFileId] = useState('')
@@ -351,7 +808,7 @@ export default function SimulatorPage() {
   const suppressCodeSyncRef = useRef(false)
   const [isPanelOpen, setIsPanelOpen] = useState(true)
   const [isPaletteHovered, setIsPaletteHovered] = useState(false)
-  const [panelWidth, setPanelWidth] = useState(470)
+  const [panelWidth, setPanelWidth] = useState(580)
   const [explorerWidth, setExplorerWidth] = useState(190)
   const [isDragging, setIsDragging] = useState(false)
   const [isExplorerDragging, setIsExplorerDragging] = useState(false)
@@ -422,6 +879,8 @@ export default function SimulatorPage() {
     downloadConsoleLog,
   } = useSimulationConsole();
 
+  // Pinch-to-zoom state refs
+
   // Plotter State
   const [plotData, setPlotData] = useState([]);
   const [selectedPlotPins, setSelectedPlotPins] = useState(['13', 'A0']);
@@ -450,6 +909,16 @@ export default function SimulatorPage() {
     });
     return labels;
   }, [serialBoardOptions]);
+
+  const serialBoardKinds = useMemo(() => {
+    const kinds = {};
+    components
+      .filter((c) => /(arduino|esp32|stm32|rp2040|pico)/i.test(c.type))
+      .forEach((c) => {
+        kinds[c.id] = normalizeBoardKind(c.type);
+      });
+    return kinds;
+  }, [components]);
 
   const serialBoardMap = useMemo(() => {
     const m = new Map();
@@ -500,11 +969,17 @@ export default function SimulatorPage() {
 
   const workerRef = useRef(null)
   const lastCompiledRef = useRef(null)
+  const micropythonUf2PayloadRef = useRef(null)
+  const rp2040DebugLastLogRef = useRef(new Map())
+  const rp2040UartMicroPythonBoardsRef = useRef(new Set())
+  const rp2040UartSilentWarnedBoardsRef = useRef(new Set())
+  const runStartGuardRef = useRef(false)
   const neopixelRefs = useRef({})
 
   const serialPlotBufferRef = useRef('');
   const serialPlotLabelsRef = useRef([]);
   const latestParsedSerialRef = useRef([]);
+  const serialIngressArbitrationRef = useRef(new Map());
 
   const canvasRef = useRef(null)
   const svgRef = useRef(null)
@@ -526,11 +1001,16 @@ export default function SimulatorPage() {
   const [myProjects, setMyProjects] = useState([]);
   const currentProjectIdRef = useRef(null);   // mirror for use inside async callbacks
   const autoSaveTimerRef = useRef(null);
-  // My Projects dropdown state
-  const [showProjectsDropdown, setShowProjectsDropdown] = useState(false);
+  // My Projects sidebar state
+  const [showProjectsSidebar, setShowProjectsSidebar] = useState(false);
+  const [projectsSidebarTab, setProjectsSidebarTab] = useState('projects'); // 'favourites' | 'projects' | 'custom' | 'settings'
+  const [favouriteProjectIds, setFavouriteProjectIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ohw_favourite_projects') || '[]'); }
+    catch { return []; }
+  });
+  const [projContextMenu, setProjContextMenu] = useState(null); // { proj, x, y }
   const [renamingProjectId, setRenamingProjectId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
-  const projectsDropdownRef = useRef(null);
   const backupRestoreInputRef = useRef(null);
 
   const handleUploadZip = async (event) => {
@@ -539,155 +1019,97 @@ export default function SimulatorPage() {
     appendConsoleEntry('info', `ZIP upload started: ${file.name}`, 'zip');
     try {
       const zip = await JSZip.loadAsync(file);
-      const allPaths = Object.keys(zip.files).filter((p) => !zip.files[p].dir);
-      const manifestPaths = allPaths.filter((p) => /(^|\/)manifest\.json$/i.test(p));
-
-      if (!manifestPaths.length) {
-        appendConsoleEntry('error', 'ZIP upload failed: no manifest.json found.', 'zip');
-        alert('Error: ZIP must contain at least one manifest.json');
+      let manifestStr = null, uiStr = null, logicStr = null, validationStr = null, indexStr = null, docHtml = null;
+      for (const relativePath of Object.keys(zip.files)) {
+        if (relativePath.endsWith('manifest.json')) manifestStr = await zip.files[relativePath].async('string');
+        if (relativePath.endsWith('ui.tsx') || relativePath.endsWith('ui.jsx')) uiStr = await zip.files[relativePath].async('string');
+        if (relativePath.endsWith('logic.ts') || relativePath.endsWith('logic.js')) logicStr = await zip.files[relativePath].async('string');
+        if (relativePath.endsWith('validation.ts') || relativePath.endsWith('validation.js')) validationStr = await zip.files[relativePath].async('string');
+        if (relativePath.endsWith('index.ts') || relativePath.endsWith('index.js')) indexStr = await zip.files[relativePath].async('string');
+        // Doc folder — any HTML file inside doc/ directory
+        if (/\/doc\/.*\.html$/i.test(relativePath) || /^doc\/.*\.html$/i.test(relativePath)) {
+          docHtml = await zip.files[relativePath].async('string');
+        }
+      }
+      if (!manifestStr || !uiStr || !logicStr || !validationStr || !indexStr) {
+        appendConsoleEntry('error', 'ZIP upload failed: required files are missing.', 'zip');
+        alert('Error: Zip must contain manifest.json, ui.tsx, logic.ts, validation.ts, and index.ts');
         return;
       }
-
-      const buildFallbackIndex = (componentType) => `import manifest from './manifest.json';\nimport { UI, BOUNDS } from './ui';\nimport { Logic } from './logic';\nimport { validation } from './validation';\n\nexport default {\n  manifest,\n  UI,\n  LogicClass: Logic,\n  BOUNDS,\n  validation\n};\n`;
-
-      const pickFile = (dirPath, names) => {
-        for (const n of names) {
-          const full = `${dirPath}${n}`;
-          if (zip.files[full] && !zip.files[full].dir) return full;
-        }
-        return null;
+      const manifest = JSON.parse(manifestStr);
+      const submitPayload = {
+        id: manifest.type, manifest, ui: uiStr, logic: logicStr, validation: validationStr, index: indexStr,
+        ...(docHtml ? { doc: docHtml } : {})
       };
 
-      const uploaded = [];
-      const failed = [];
+      let submitted = false;
+      let offlineQueued = false;
+      try {
+        await submitCustomComponent(submitPayload);
+        submitted = true;
+        appendConsoleEntry('info', `ZIP submitted to admin: ${manifest.type}`, 'zip');
+      } catch (submitErr) {
+        // Network unavailable — queue for later submission when back online
+        await enqueueComponent(submitPayload);
+        offlineQueued = true;
+        appendConsoleEntry('warn', `Offline mode: queued ${manifest.type} for later submission.`, 'zip');
+      }
 
-      for (const manifestPath of manifestPaths) {
-        try {
-          const dirPath = manifestPath.slice(0, manifestPath.lastIndexOf('manifest.json'));
-          const manifestStr = await zip.files[manifestPath].async('string');
-          const manifest = JSON.parse(manifestStr);
+      // --- ZERO-TOUCH SANDBOX INJECTION ---
+      const transpileUI = Babel.transform(uiStr, { filename: 'ui.tsx', presets: ['react', 'typescript', 'env'] }).code;
+      const transpileLogic = Babel.transform(logicStr, { filename: 'logic.ts', presets: ['typescript', 'env'] }).code;
 
-          const uiPath = pickFile(dirPath, ['ui.tsx', 'ui.jsx']);
-          const logicPath = pickFile(dirPath, ['logic.ts', 'logic.js']);
-          const validationPath = pickFile(dirPath, ['validation.ts', 'validation.js']);
-          const indexPath = pickFile(dirPath, ['index.ts', 'index.js']);
+      const exportsUI = {};
+      const evalUI = new Function('exports', 'require', 'React', transpileUI);
+      evalUI(exportsUI, (mod) => {
+        if (mod === 'react') return React;
+        return null;
+      }, React);
 
-          if (!uiPath || !logicPath || !validationPath) {
-            failed.push(`${manifest?.type || manifestPath} (missing ui/logic/validation)`);
-            appendConsoleEntry('error', `Skipped ${manifest?.type || manifestPath}: missing ui/logic/validation`, 'zip');
-            continue;
-          }
+      const uiComponent = resolveUiExport(exportsUI);
+      const contextMenu = exportsUI[Object.keys(exportsUI).find(k => k.toLowerCase().includes('contextmenu'))];
 
-          const uiStr = await zip.files[uiPath].async('string');
-          const logicStr = await zip.files[logicPath].async('string');
-          const validationStr = await zip.files[validationPath].async('string');
-          const indexStr = indexPath ? await zip.files[indexPath].async('string') : buildFallbackIndex(manifest.type || 'custom-component');
+      if (uiComponent) {
+        const newCatItem = { ...manifest };
+        delete newCatItem.pins;
+        delete newCatItem.group;
 
-          let docHtml = null;
-          const docPath = allPaths.find((p) => p.startsWith(`${dirPath}doc/`) && /\.html$/i.test(p));
-          if (docPath) docHtml = await zip.files[docPath].async('string');
+        const groupName = normalizeGroupName(manifest.group);
+        let group = LOCAL_CATALOG.find(g => g.group === groupName);
+        if (!group) {
+          group = { group: groupName, items: [] };
+          LOCAL_CATALOG.push(group);
+        }
+        group.items = group.items.filter(i => i.type !== manifest.type);
+        group.items.push(newCatItem);
+        sortCatalog(LOCAL_CATALOG);
 
-          const submitPayload = {
-            id: manifest.type,
-            manifest,
-            ui: uiStr,
-            logic: logicStr,
-            validation: validationStr,
-            index: indexStr,
-            ...(docHtml ? { doc: docHtml } : {})
-          };
-
-          let submitted = false;
-          let offlineQueued = false;
-          try {
-            await submitCustomComponent(submitPayload);
-            submitted = true;
-            appendConsoleEntry('info', `ZIP submitted to admin: ${manifest.type}`, 'zip');
-          } catch {
-            await enqueueComponent(submitPayload);
-            offlineQueued = true;
-            appendConsoleEntry('warn', `Offline mode: queued ${manifest.type} for later submission.`, 'zip');
-          }
-
-          const transpileUI = Babel.transform(uiStr, { filename: 'ui.tsx', presets: ['react', 'typescript', 'env'] }).code;
-          const transpileLogic = Babel.transform(logicStr, { filename: 'logic.ts', presets: ['typescript', 'env'] }).code;
-
-          const exportsUI = {};
-          const evalUI = new Function('exports', 'require', 'React', transpileUI);
-          evalUI(exportsUI, (mod) => (mod === 'react' ? React : null), React);
-
-          const uiComponent = resolveUiExport(exportsUI);
-          if (!uiComponent) {
-            failed.push(`${manifest.type} (UI export not found)`);
-            appendConsoleEntry('error', `Skipped ${manifest.type}: UI export not found`, 'zip');
-            continue;
-          }
-
-          const contextMenu = exportsUI[Object.keys(exportsUI).find(k => k.toLowerCase().includes('contextmenu'))];
-
-          const newCatItem = { ...manifest };
-          delete newCatItem.pins;
-          delete newCatItem.group;
-
-          const groupName = normalizeGroupName(manifest.group);
-          let group = LOCAL_CATALOG.find(g => g.group === groupName);
-          if (!group) {
-            group = { group: groupName, items: [] };
-            LOCAL_CATALOG.push(group);
-          }
-          group.items = group.items.filter(i => i.type !== manifest.type);
-          group.items.push(newCatItem);
-          sortCatalog(LOCAL_CATALOG);
-
-          COMPONENT_REGISTRY[manifest.type] = {
-            manifest,
-            UI: uiComponent,
-            BOUNDS: exportsUI.BOUNDS,
-            ContextMenu: contextMenu,
-            contextMenuDuringRun: !!(exportsUI.contextMenuDuringRun || manifest.contextMenuDuringRun),
-            contextMenuOnlyDuringRun: !!(exportsUI.contextMenuOnlyDuringRun || manifest.contextMenuOnlyDuringRun),
-            logicCode: transpileLogic,
-            ...(docHtml ? { doc: docHtml } : {})
-          };
-
-          if (Array.isArray(manifest.pins)) {
-            LOCAL_PIN_DEFS[manifest.type] = manifest.pins;
-          }
-
-          uploaded.push({ type: manifest.type, label: manifest.label || manifest.type, submitted, offlineQueued });
-        } catch (err) {
-          failed.push(`${manifestPath} (${err.message})`);
-          appendConsoleEntry('error', `Error parsing component at ${manifestPath}: ${err.message}`, 'zip');
+        COMPONENT_REGISTRY[manifest.type] = {
+          manifest,
+          UI: uiComponent,
+          BOUNDS: exportsUI.BOUNDS,
+          ContextMenu: contextMenu,
+          contextMenuDuringRun: !!(exportsUI.contextMenuDuringRun || manifest.contextMenuDuringRun),
+          contextMenuOnlyDuringRun: !!(exportsUI.contextMenuOnlyDuringRun || manifest.contextMenuOnlyDuringRun),
+          logicCode: transpileLogic,
+          uiRaw: uiStr,
+          logicRaw: logicStr,
+          validationRaw: validationStr,
+          indexRaw: indexStr,
+          ...(docHtml ? { doc: docHtml } : {})
+        };
+        if (manifest.pins) {
+          LOCAL_PIN_DEFS[manifest.type] = manifest.pins;
+        }
+        setCustomCatalogCounter(c => c + 1);
+        if (submitted) {
+          appendConsoleEntry('info', `Component injected successfully: ${manifest.label}`, 'zip');
+          alert(`Successfully submitted to admin AND injected ${manifest.label} into your local Sandbox Memory!`);
+        } else if (offlineQueued) {
+          appendConsoleEntry('warn', `Component injected locally while offline: ${manifest.label}`, 'zip');
+          alert(`You are offline. "${manifest.label}" has been injected locally and will be submitted to the admin automatically when you reconnect.`);
         }
       }
-
-      if (uploaded.length) {
-        setCustomCatalogCounter(c => c + 1);
-      }
-
-      const submittedCount = uploaded.filter(x => x.submitted).length;
-      const queuedCount = uploaded.filter(x => x.offlineQueued).length;
-
-      if (uploaded.length) {
-        appendConsoleEntry('info', `ZIP injected ${uploaded.length} component(s).`, 'zip');
-      }
-      if (submittedCount) {
-        appendConsoleEntry('info', `${submittedCount} component(s) submitted to admin.`, 'zip');
-      }
-      if (queuedCount) {
-        appendConsoleEntry('warn', `${queuedCount} component(s) queued offline for later sync.`, 'zip');
-      }
-      if (failed.length) {
-        appendConsoleEntry('error', `${failed.length} component(s) failed import.`, 'zip');
-      }
-
-      const summary = [
-        `Imported: ${uploaded.length}`,
-        `Submitted: ${submittedCount}`,
-        `Queued offline: ${queuedCount}`,
-        `Failed: ${failed.length}`,
-      ].join('\n');
-      alert(`ZIP processing complete\n\n${summary}`);
     } catch (e) {
       appendConsoleEntry('error', `ZIP processing failed: ${e.message}`, 'zip');
       alert(`Error processing ZIP: ${e.message}`);
@@ -702,6 +1124,35 @@ export default function SimulatorPage() {
   const [isSearchingLib, setIsSearchingLib] = useState(false)
   const [installingLib, setInstallingLib] = useState(null)
   const [libMessage, setLibMessage] = useState(null)
+  const libSearchCache = useRef({});
+
+  useEffect(() => {
+    if (!libQuery.trim() || libQuery.trim().length < 2) {
+      setLibResults([]);
+      return;
+    }
+
+    // Check cache first
+    if (libSearchCache.current[libQuery.trim()]) {
+      setLibResults(libSearchCache.current[libQuery.trim()]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingLib(true);
+      try {
+        const results = await searchLibraries(libQuery);
+        libSearchCache.current[libQuery.trim()] = results;
+        setLibResults(results);
+      } catch (err) {
+        console.error('[Library Search Error]', err);
+      } finally {
+        setIsSearchingLib(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [libQuery]);
 
   const loadLibraries = async () => {
     try {
@@ -743,6 +1194,8 @@ export default function SimulatorPage() {
   }, []);
 
   useEffect(() => {
+    if (gamificationMode) return; // gamification simulator starts with clean canvas
+    
     let cancelled = false;
 
     const loadDemoProject = async () => {
@@ -808,13 +1261,22 @@ export default function SimulatorPage() {
     listProjects(owner).then((projects) => {
       if (projects.length === 0) return;
       const latest = projects[0]; // already sorted newest-first
+      const normalizedFiles = normalizeProjectFiles(latest.projectFiles);
+      const normalizedTabs = normalizeOpenCodeTabs(latest.openCodeTabs, normalizedFiles);
+      const preferredActive = String(latest.activeCodeFileId || '').trim();
+      const activeId = normalizedFiles.some((f) => f.id === preferredActive)
+        ? preferredActive
+        : (normalizedTabs[0] || '');
       setBoard(latest.board || 'arduino_uno');
       setCode(latest.code || '');
+      setBlocklyXml(latest.blocklyXml || '');
+      setBlocklyGeneratedCode(latest.blocklyGeneratedCode || '');
+      setUseBlocklyCode(!!latest.useBlocklyCode);
       setComponents(latest.components || []);
       setWires(latest.connections || []);
-      setProjectFiles(Array.isArray(latest.projectFiles) ? latest.projectFiles : []);
-      setOpenCodeTabs(Array.isArray(latest.openCodeTabs) ? latest.openCodeTabs : []);
-      setActiveCodeFileId(latest.activeCodeFileId || '');
+      setProjectFiles(normalizedFiles);
+      setOpenCodeTabs(normalizedTabs);
+      setActiveCodeFileId(activeId);
       syncNextIds(latest.components, latest.connections);
       setCurrentProjectId(latest.id);
       currentProjectIdRef.current = latest.id;
@@ -844,6 +1306,9 @@ export default function SimulatorPage() {
         components,
         connections: wires,
         code,
+        blocklyXml,
+        blocklyGeneratedCode,
+        useBlocklyCode,
         projectFiles,
         openCodeTabs,
         activeCodeFileId,
@@ -853,7 +1318,7 @@ export default function SimulatorPage() {
 
     return () => clearTimeout(autoSaveTimerRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [components, wires, code, board, projectFiles, openCodeTabs, activeCodeFileId]);
+  }, [components, wires, code, blocklyXml, blocklyGeneratedCode, useBlocklyCode, board, projectFiles, openCodeTabs, activeCodeFileId]);
 
   useEffect(() => { canvasZoomRef.current = canvasZoom; }, [canvasZoom]);
   useEffect(() => { canvasOffsetRef.current = canvasOffset; }, [canvasOffset]);
@@ -877,18 +1342,10 @@ export default function SimulatorPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, [quickAdd]);
 
-  // My Projects dropdown: close when clicking outside
+  // Persist favourite projects
   useEffect(() => {
-    if (!showProjectsDropdown) return;
-    const handler = (e) => {
-      if (projectsDropdownRef.current && !projectsDropdownRef.current.contains(e.target)) {
-        setShowProjectsDropdown(false);
-        setRenamingProjectId(null);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showProjectsDropdown]);
+    localStorage.setItem('ohw_favourite_projects', JSON.stringify(favouriteProjectIds));
+  }, [favouriteProjectIds]);
 
   // Fullscreen sync
   useEffect(() => {
@@ -955,7 +1412,17 @@ export default function SimulatorPage() {
       group.items.push(newCatItem);
       sortCatalog(LOCAL_CATALOG);
 
-      COMPONENT_REGISTRY[compType] = { manifest, UI: uiComponent, BOUNDS: exportsUI.BOUNDS, logicCode: transpileLogic };
+      COMPONENT_REGISTRY[compType] = {
+        manifest,
+        UI: uiComponent,
+        BOUNDS: exportsUI.BOUNDS,
+        ContextMenu: exportsUI[Object.keys(exportsUI).find(k => k.toLowerCase().includes('contextmenu'))],
+        contextMenuDuringRun: !!(exportsUI.contextMenuDuringRun || manifest.contextMenuDuringRun),
+        contextMenuOnlyDuringRun: !!(exportsUI.contextMenuOnlyDuringRun || manifest.contextMenuOnlyDuringRun),
+        logicCode: transpileLogic,
+        uiRaw,
+        logicRaw,
+      };
       if (manifest.pins) LOCAL_PIN_DEFS[compType] = manifest.pins;
 
       setCustomCatalogCounter(c => c + 1);
@@ -1033,7 +1500,10 @@ export default function SimulatorPage() {
               contextMenuOnlyDuringRun: !!(exportsUI.contextMenuOnlyDuringRun || manifest.contextMenuOnlyDuringRun),
               logicCode: transpileLogic,
               uiRaw: uiStr,
-              logicRaw: logicStr
+              logicRaw: logicStr,
+              validationRaw: files['validation.ts'] || files['validation.js'] || '',
+              indexRaw: files['index.ts'] || files['index.js'] || '',
+              ...(files['docs/index.html'] ? { doc: files['docs/index.html'] } : {})
             };
             if (manifest.pins) LOCAL_PIN_DEFS[compType] = manifest.pins;
 
@@ -1081,12 +1551,21 @@ export default function SimulatorPage() {
   }, []);
 
   const handleSearchLibraries = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!libQuery.trim()) return;
+
+    // Check cache first
+    if (libSearchCache.current[libQuery.trim()]) {
+      setLibResults(libSearchCache.current[libQuery.trim()]);
+      setLibMessage(null);
+      return;
+    }
+
     setIsSearchingLib(true);
     setLibMessage(null);
     try {
       const libraries = await searchLibraries(libQuery);
+      libSearchCache.current[libQuery.trim()] = libraries;
       setLibResults(libraries);
       if (libraries.length === 0) setLibMessage({ type: 'error', text: 'No libraries found.' });
     } catch (err) {
@@ -1286,8 +1765,9 @@ export default function SimulatorPage() {
 
   useEffect(() => {
     setProjectFiles(prev => {
-      const next = [...prev];
-      const byId = new Map(next.map(f => [f.id, f]));
+      const normalized = normalizeProjectFiles(prev);
+      const startedWithDuplicates = normalized.length !== prev.length;
+      const next = [...normalized];
 
       // Remove board files for boards no longer present
       const validBoardIds = new Set(boardComponents.map(b => b.id));
@@ -1297,9 +1777,8 @@ export default function SimulatorPage() {
         return validBoardIds.has(m[1]);
       });
 
-      let changed = pruned.length !== next.length;
+      let changed = startedWithDuplicates || pruned.length !== next.length;
       const result = [...pruned];
-      const resultIds = new Set(result.map(f => f.id));
 
       const upsert = (fileObj) => {
         const idx = result.findIndex(f => f.id === fileObj.id);
@@ -1318,9 +1797,27 @@ export default function SimulatorPage() {
       boardComponents.forEach((bc) => {
         const kind = normalizeBoardKind(bc.type);
         const basePath = `project/${bc.id}`;
-        const files = [
-          { path: `${basePath}/${bc.id}.ino`, type: 'code', content: createDefaultMainCode(kind, bc.id) },
-        ];
+        const files = kind === 'rp2040'
+          ? [
+            {
+              path: `${basePath}/${bc.id}.ino`,
+              type: 'code',
+              content: createDefaultMainCode('arduino_uno', bc.id),
+            },
+            {
+              path: `${basePath}/main.py`,
+              type: 'code',
+              content: createDefaultMainCode('rp2040', bc.id),
+            },
+          ]
+          : [
+            {
+              path: `${basePath}/${getDefaultMainFileName(kind, bc.id)}`,
+              type: 'code',
+              content: createDefaultMainCode(kind, bc.id),
+            },
+          ];
+
         files.forEach((ff) => {
           upsert({
             id: ff.path,
@@ -1368,6 +1865,8 @@ export default function SimulatorPage() {
 
   useEffect(() => {
     if (projectFiles.length === 0) return;
+    // If activeCodeFileId is null, it means it was explicitly deselected
+    if (activeCodeFileId === null) return;
     if (activeCodeFileId && projectFileMap.has(activeCodeFileId)) return;
 
     const firstCodeFile = projectFiles.find(f => f.kind === 'code') || projectFiles[0];
@@ -1401,6 +1900,18 @@ export default function SimulatorPage() {
     const nextDefault = BOARD_DEFAULT_BAUD[selectedSerialBoardKind] || BOARD_DEFAULT_BAUD.arduino_uno;
     setSerialBaudRate(nextDefault);
   }, [selectedSerialBoardKind]);
+
+  useEffect(() => {
+    if (!isRunning || !workerRef.current) return;
+    const parsedBaud = Number(serialBaudRate);
+    if (!Number.isFinite(parsedBaud)) return;
+
+    workerRef.current.postMessage({
+      type: 'SERIAL_SET_BAUD',
+      baudRate: parsedBaud,
+      targetBoardId: serialBoardFilter !== 'all' ? serialBoardFilter : undefined,
+    });
+  }, [isRunning, serialBaudRate, serialBoardFilter]);
 
   // ── Plotter Rendering Loop ───────────────────────────────────────────────────
   useEffect(() => {
@@ -1738,6 +2249,84 @@ export default function SimulatorPage() {
     setSelectedPaletteItem(item);
   }, [addComponentAt]);
 
+  // ── Enhanced Zooming (Pinch Only) ──────────────────────────────────────────
+  const initialTouchDistanceRef = useRef(null);
+  const initialCanvasZoomRef = useRef(null);
+  const initialTouchCenterCanvasRef = useRef(null);
+
+  const onTouchStart = useCallback((e) => {
+    if (isCanvasLockedRef.current || e.touches.length !== 2) {
+      initialTouchDistanceRef.current = null;
+      return;
+    }
+    const t1 = e.touches[0], t2 = e.touches[1];
+    const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+    initialTouchDistanceRef.current = dist;
+    initialCanvasZoomRef.current = canvasZoomRef.current;
+    
+    const rect = canvasRef.current.getBoundingClientRect();
+    const mx = (t1.clientX + t2.clientX) / 2 - rect.left;
+    const my = (t1.clientY + t2.clientY) / 2 - rect.top;
+    
+    // Position on canvas relative to 0,0
+    initialTouchCenterCanvasRef.current = {
+      x: (mx - canvasOffsetRef.current.x) / canvasZoomRef.current,
+      y: (my - canvasOffsetRef.current.y) / canvasZoomRef.current
+    };
+  }, []);
+
+  const onTouchMove = useCallback((e) => {
+    if (isCanvasLockedRef.current || e.touches.length !== 2 || !initialTouchDistanceRef.current) return;
+    if (e.cancelable) e.preventDefault();
+    
+    const t1 = e.touches[0], t2 = e.touches[1];
+    const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+    
+    const scale = dist / initialTouchDistanceRef.current;
+    const newZoom = Math.min(3, Math.max(0.25, initialCanvasZoomRef.current * scale));
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const mx = (t1.clientX + t2.clientX) / 2 - rect.left;
+    const my = (t1.clientY + t2.clientY) / 2 - rect.top;
+
+    // We want initialTouchCenterCanvasRef.current to be at (mx, my) in screen space
+    const newOffsetX = mx - initialTouchCenterCanvasRef.current.x * newZoom;
+    const newOffsetY = my - initialTouchCenterCanvasRef.current.y * newZoom;
+
+    setCanvasZoom(newZoom);
+    canvasZoomRef.current = newZoom;
+    setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+    canvasOffsetRef.current = { x: newOffsetX, y: newOffsetY };
+  }, []);
+
+  const onTouchEnd = useCallback(() => {
+    initialTouchDistanceRef.current = null;
+  }, []);
+
+  // Trackpad pinch (Ctrl + Wheel)
+  const onWheel = useCallback((e) => {
+    if (isCanvasLockedRef.current || !e.ctrlKey) return;
+    e.preventDefault();
+    const zoomSpeed = 0.001; 
+    const delta = -e.deltaY * zoomSpeed;
+    const newZoom = Math.min(3, Math.max(0.25, canvasZoomRef.current + delta));
+    
+    const rect = canvasRef.current.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    
+    const cx = (mx - canvasOffsetRef.current.x) / canvasZoomRef.current;
+    const cy = (my - canvasOffsetRef.current.y) / canvasZoomRef.current;
+    
+    const newOffsetX = mx - cx * newZoom;
+    const newOffsetY = my - cy * newZoom;
+    
+    setCanvasZoom(newZoom);
+    canvasZoomRef.current = newZoom;
+    setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+    canvasOffsetRef.current = { x: newOffsetX, y: newOffsetY };
+  }, []);
+
   // ── Move and Select component ──────────────────────────────────────────────
   const onCompMouseDown = useCallback((e, id) => {
     e.stopPropagation()
@@ -1854,6 +2443,26 @@ export default function SimulatorPage() {
     window.addEventListener('mouseup', onUp)
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
   }, [wireStart, wires])
+
+  // ── Block default browser zoom/scroll with non-passive listeners ───────────
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const preventDefault = (e) => {
+      // Still prevent wheel zoom (Ctrl + Wheel)
+      if (e.ctrlKey) {
+        if (e.cancelable) e.preventDefault();
+      }
+    };
+
+    canvas.addEventListener('wheel', preventDefault, { passive: false });
+    // removed native touch blockers as touch-action: none handles it and preventDefault might break React events
+
+    return () => {
+      canvas.removeEventListener('wheel', preventDefault);
+    };
+  }, []);
 
   // ── Pin click — start or complete wire ─────────────────────────────────────
   const onPinClick = useCallback((e, compId, pinId, pinLabel) => {
@@ -2005,6 +2614,18 @@ export default function SimulatorPage() {
     }
   }, [activeCodeFileId, projectFileMap]);
 
+  const toggleCodeFileDisabled = useCallback((fileId) => {
+    const source = projectFileMap.get(fileId);
+    if (!source || source.kind !== 'code') return;
+
+    const currentlyDisabled = isFileDisabled(source.name);
+    const nextName = currentlyDisabled
+      ? source.name.slice(0, -DISABLED_FILE_SUFFIX.length)
+      : `${source.name}${DISABLED_FILE_SUFFIX}`;
+
+    renameCodeFile(fileId, nextName);
+  }, [projectFileMap, renameCodeFile]);
+
   const deleteCodeFile = useCallback((fileId) => {
     setProjectFiles(prev => prev.filter(f => f.id !== fileId));
     setOpenCodeTabs(prev => prev.filter(id => id !== fileId));
@@ -2029,49 +2650,98 @@ export default function SimulatorPage() {
   const getBoardMainCode = useCallback((boardId) => {
     const preferred = `project/${boardId}/${boardId}.ino`;
     const prefFile = projectFileMap.get(preferred);
-    if (prefFile && prefFile.content) return prefFile.content;
+    if (prefFile && prefFile.content && !isFileDisabled(prefFile.path)) return prefFile.content;
 
-    const ino = projectFiles.find(f => f.path.startsWith(`project/${boardId}/`) && fileExt(f.path) === '.ino');
+    const ino = projectFiles.find(
+      (f) => f.path.startsWith(`project/${boardId}/`) && fileExt(f.path) === '.ino' && !isFileDisabled(f.path)
+    );
     if (ino?.content) return ino.content;
 
-    return code;
-  }, [projectFileMap, projectFiles, code]);
+    return '';
+  }, [projectFileMap, projectFiles]);
 
-  const getBoardCompileFiles = useCallback((boardId) => {
+  const getBoardCompileFiles = useCallback((boardId, preferredMainPath = '') => {
     const allowed = new Set(['.ino', '.h', '.hpp', '.c', '.cpp']);
     const allFiles = projectFiles
       .filter((f) => f.path.startsWith(`project/${boardId}/`))
+      .filter((f) => !isFileDisabled(f.path))
       .filter((f) => allowed.has(fileExt(f.path)))
-      .map((f) => ({ name: f.name, content: f.content || '' }));
+      .map((f) => ({ path: f.path, name: f.name, content: f.id === activeCodeFileId ? code : (f.content || '') }));
 
     const preferredMainName = `${boardId}.ino`;
-    const main = allFiles.find((f) => f.name === preferredMainName)
+    const preferredPath = String(preferredMainPath || '').trim();
+    const main = allFiles.find((f) => f.path === preferredPath)
+      || allFiles.find((f) => f.name === preferredMainName)
       || allFiles.find((f) => fileExt(f.name) === '.ino')
       || null;
 
-    const files = allFiles.filter((f) => !(main && f.name === main.name));
+    const files = allFiles
+      .filter((f) => !(main && f.path === main.path))
+      .map((f) => ({ name: f.name, content: f.content }));
 
     return {
-      mainCode: main?.content || getBoardMainCode(boardId) || code,
+      mainCode: main?.content || getBoardMainCode(boardId) || '',
       sketchName: boardId,
       files,
+      hasMainFile: !!main,
+      mainFilePath: main?.path || '',
     };
-  }, [projectFiles, getBoardMainCode, code]);
+  }, [projectFiles, getBoardMainCode, activeCodeFileId, code]);
 
-  const createCodeFile = useCallback((requestedName, openAfterCreate = false) => {
+  const getBoardFirmwareAssets = useCallback((boardId) => {
+    const boardFiles = projectFiles
+      .filter((f) => f.path.startsWith(`project/${boardId}/`))
+      .filter((f) => !isFileDisabled(f.path));
+    const uf2File = boardFiles.find((f) => fileExt(f.path) === '.uf2' && typeof f.content === 'string' && f.content.trim());
+    const pyFiles = boardFiles
+      .filter((f) => fileExt(f.path) === '.py')
+      .map((f) => ({ name: f.name, content: String(f.content || '') }));
+
+    const mainPy = pyFiles.find((f) => f.name.toLowerCase() === 'main.py') || pyFiles[0] || null;
+
+    let uf2Payload = null;
+    if (uf2File?.content) {
+      const raw = String(uf2File.content).trim();
+      uf2Payload = raw.startsWith(UF2_PAYLOAD_PREFIX) ? raw : `${UF2_PAYLOAD_PREFIX}${raw}`;
+    }
+
+    return { uf2Payload, mainPy };
+  }, [projectFiles]);
+
+  const fetchDefaultMicroPythonUf2Payload = useCallback(async () => {
+    if (micropythonUf2PayloadRef.current) return micropythonUf2PayloadRef.current;
+
+    const response = await fetch(`${DEFAULT_PICO_MICROPYTHON_UF2_URL}?v=uart0`, { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error(`Unable to fetch default MicroPython UF2 (${response.status})`);
+    }
+
+    const buffer = await response.arrayBuffer();
+    const payload = `${UF2_PAYLOAD_PREFIX}${arrayBufferToBase64(buffer)}`;
+    micropythonUf2PayloadRef.current = payload;
+    return payload;
+  }, []);
+
+  const createCodeFile = useCallback((requestedName, openAfterCreate = false, customParent = null) => {
     const cleaned = String(requestedName || '').trim();
     if (!cleaned) return null;
 
-    const activePath = activeCodeFile?.path || '';
-    const parent = activePath.includes('/')
-      ? activePath.substring(0, activePath.lastIndexOf('/'))
-      : 'project';
+    let parent = 'project';
+    if (customParent) {
+      parent = customParent;
+    } else {
+      const activePath = activeCodeFile?.path || '';
+      parent = activePath.includes('/')
+        ? activePath.substring(0, activePath.lastIndexOf('/'))
+        : 'project';
+    }
 
+    const defaultExt = '.ino';
     const rawExt = fileExt(cleaned);
     const fileNameBase = rawExt ? cleaned.slice(0, -rawExt.length) : cleaned;
-    const ext = rawExt || '.ino';
+    const ext = rawExt || defaultExt;
     const safeBase = fileNameBase.replace(/[^a-zA-Z0-9._-]/g, '_') || 'new_file';
-    const safeExt = ext.replace(/[^a-zA-Z0-9.]/g, '') || '.ino';
+    const safeExt = ext.replace(/[^a-zA-Z0-9.]/g, '') || defaultExt;
 
     let candidate = `${safeBase}${safeExt}`;
     let candidatePath = `${parent}/${candidate}`;
@@ -2090,6 +2760,8 @@ export default function SimulatorPage() {
         ? `#include "${safeBase}.h"\n\n// ${safeBase} implementation\n`
         : safeExt === '.ino'
           ? `void setup() {\n}\n\nvoid loop() {\n}\n`
+            : safeExt === '.py'
+              ? `from machine import Pin\nfrom time import sleep\n\nled = Pin('LED', Pin.OUT)\n\nwhile True:\n  led.toggle()\n  sleep(0.5)\n`
           : '';
 
     const nextFile = {
@@ -2115,6 +2787,72 @@ export default function SimulatorPage() {
     return createCodeFile(requestedName, true);
   }, [createCodeFile]);
 
+  const uploadCodeFile = useCallback((customParent = null) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.ino,.cpp,.h,.c,.txt,.json,.xml,.py,.uf2';
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const rawExt = fileExt(file.name);
+      const readAsBinary = rawExt === '.uf2';
+      const reader = new FileReader();
+      reader.onload = (re) => {
+        let content = re.target.result;
+        if (readAsBinary) {
+          const base64 = arrayBufferToBase64(content);
+          content = `${UF2_PAYLOAD_PREFIX}${base64}`;
+        }
+        
+        let parent = 'project';
+        if (customParent) {
+          parent = customParent;
+        } else {
+          const activePath = activeCodeFile?.path || '';
+          parent = activePath.includes('/')
+            ? activePath.substring(0, activePath.lastIndexOf('/'))
+            : 'project';
+        }
+
+        const fileNameBase = rawExt ? file.name.slice(0, -rawExt.length) : file.name;
+        const ext = rawExt || '.ino';
+        const safeBase = fileNameBase.replace(/[^a-zA-Z0-9._-]/g, '_') || 'uploaded';
+        const safeExt = ext.replace(/[^a-zA-Z0-9.]/g, '') || '.ino';
+
+        let candidate = `${safeBase}${safeExt}`;
+        let candidatePath = `${parent}/${candidate}`;
+        let i = 2;
+
+        while (projectFileMap.has(candidatePath)) {
+          candidate = `${safeBase}_${i}${safeExt}`;
+          candidatePath = `${parent}/${candidate}`;
+          i++;
+        }
+
+        const boardMatch = candidatePath.match(/^project\/([^/]+)\//);
+        const nextFile = {
+          id: candidatePath,
+          path: candidatePath,
+          name: candidate,
+          kind: 'code',
+          boardId: boardMatch ? boardMatch[1] : undefined,
+          content,
+          dirty: true,
+        };
+
+        setProjectFiles(prev => [...prev, nextFile]);
+        setOpenCodeTabs(prev => prev.includes(candidatePath) ? prev : [...prev, candidatePath]);
+        setActiveCodeFileId(candidatePath);
+        
+        appendConsoleEntry('info', `File uploaded: ${candidate}`, 'code');
+      };
+      if (readAsBinary) reader.readAsArrayBuffer(file);
+      else reader.readAsText(file);
+    };
+    input.click();
+  }, [activeCodeFile, projectFileMap, appendConsoleEntry]);
+
   // ─── Project Save / Load Handlers ───────────────────────────────────────────
 
   /** Open the save dialog. Pre-fills with the current project name. */
@@ -2135,7 +2873,7 @@ export default function SimulatorPage() {
     }
     setCurrentProjectName(name);
     clearTimeout(autoSaveTimerRef.current);
-    await saveProject({ id, name, board, components, connections: wires, code, projectFiles, openCodeTabs, activeCodeFileId, owner });
+    await saveProject({ id, name, board, components, connections: wires, code, blocklyXml, blocklyGeneratedCode, useBlocklyCode, projectFiles, openCodeTabs, activeCodeFileId, owner });
     setShowSaveDialog(false);
   };
 
@@ -2152,6 +2890,7 @@ export default function SimulatorPage() {
     setCode('void setup() {\n  pinMode(13, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(1000);\n  digitalWrite(13, LOW);\n  delay(1000);\n}\n');
     setComponents([]);
     setWires([]);
+    setBlocklyXml('');
     setProjectFiles([]);
     setOpenCodeTabs([]);
     setActiveCodeFileId('');
@@ -2162,20 +2901,29 @@ export default function SimulatorPage() {
   /** Load a project from the My Projects modal. */
   const handleLoadProject = (proj) => {
     if (isRunning) return;
+    const normalizedFiles = normalizeProjectFiles(proj.projectFiles);
+    const normalizedTabs = normalizeOpenCodeTabs(proj.openCodeTabs, normalizedFiles);
+    const preferredActive = String(proj.activeCodeFileId || '').trim();
+    const activeId = normalizedFiles.some((f) => f.id === preferredActive)
+      ? preferredActive
+      : (normalizedTabs[0] || '');
     setBoard(proj.board || 'arduino_uno');
     setCode(proj.code || '');
+    setBlocklyXml(proj.blocklyXml || '');
+    setBlocklyGeneratedCode(proj.blocklyGeneratedCode || '');
+    setUseBlocklyCode(!!proj.useBlocklyCode);
     setComponents(proj.components || []);
     setWires(proj.connections || []);
-    setProjectFiles(Array.isArray(proj.projectFiles) ? proj.projectFiles : []);
-    setOpenCodeTabs(Array.isArray(proj.openCodeTabs) ? proj.openCodeTabs : []);
-    setActiveCodeFileId(proj.activeCodeFileId || '');
+    setProjectFiles(normalizedFiles);
+    setOpenCodeTabs(normalizedTabs);
+    setActiveCodeFileId(activeId);
     syncNextIds(proj.components, proj.connections);
     setCurrentProjectId(proj.id);
     currentProjectIdRef.current = proj.id;
     setCurrentProjectName(proj.name || 'Untitled');
     setHistory({ past: [], future: [] });
     lastCompiledRef.current = null;
-    setShowProjectsDropdown(false);
+    setShowProjectsSidebar(false);
   };
 
   /** Delete a project from the My Projects modal. */
@@ -2205,10 +2953,22 @@ export default function SimulatorPage() {
     await refreshProjectList();
   };
 
+  const toggleFavourite = (id) => {
+    setFavouriteProjectIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const handleCopyProject = async (proj) => {
+    const newId = generateProjectId();
+    const newName = (proj.name || 'Untitled') + ' Copy';
+    const projectData = { ...proj, id: newId, name: newName, savedAt: Date.now() };
+    await saveProject(projectData);
+    await refreshProjectList();
+  };
+
   // ─── Backup / Restore ──────────────────────────────────────────────────────
   const handleBackupWorkflow = async () => {
     const zip = new JSZip();
-    const data = { name: currentProjectName, board, components, connections: wires, code, projectFiles, openCodeTabs, activeCodeFileId, exportedAt: new Date().toISOString() };
+    const data = { name: currentProjectName, board, components, connections: wires, code, blocklyXml, blocklyGeneratedCode, useBlocklyCode, projectFiles, openCodeTabs, activeCodeFileId, exportedAt: new Date().toISOString() };
     zip.file('workflow.json', JSON.stringify(data, null, 2));
     const blob = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(blob);
@@ -2228,6 +2988,7 @@ export default function SimulatorPage() {
       if ((components.length > 0 || wires.length > 0) && !window.confirm('Restore backup? Current unsaved changes will be replaced.')) return;
       setBoard(json.board || 'arduino_uno');
       setCode(json.code || '');
+      setBlocklyXml(json.blocklyXml || '');
       setComponents(json.components || []);
       setWires(json.connections || []);
       setProjectFiles(Array.isArray(json.projectFiles) ? json.projectFiles : []);
@@ -2243,32 +3004,44 @@ export default function SimulatorPage() {
   // ─── Cloud Sync (placeholder) ───────────────────────────────────────────────
   const handleSyncToCloud = () => { alert('Sync feature coming soon!'); };
 
-  const handleAssessmentSubmit = async () => {
-    if (!assessmentMode) return;
-    if (!assessmentProjectName) {
-      alert('Assessment project is missing. Please open assessment from the project page.');
-      return;
-    }
-    setIsSubmittingAssessment(true);
-    try {
-      const payload = {
-        projectName: assessmentProjectName,
-        submittedAt: new Date().toISOString(),
-        components,
-        wires,
-        code,
-      };
-      sessionStorage.setItem(`openhw_assessment_submission:${assessmentProjectName}`, JSON.stringify(payload));
-      navigate(`/${assessmentProjectName}/assessment`);
-    } finally {
-      setIsSubmittingAssessment(false);
-    }
-  };
   // ─── Simulator Run & Stop Logic ─────────────────────────────────────────────
   const logSerial = (msg, color = 'var(--text)') => {
     // In a real implementation this would push to a serial console state array
     console.log(`[SIM]`, msg);
   };
+
+  const registerGdbArtifact = useCallback((boardId, boardKind, compiledResult) => {
+    const compiled = compiledResult && typeof compiledResult === 'object' ? compiledResult : null;
+    if (!compiled || !boardId) return;
+
+    const elfPayload = typeof compiled.elf === 'string' ? compiled.elf : '';
+    const gdbMeta = compiled.gdb && typeof compiled.gdb === 'object' ? compiled.gdb : null;
+    if (!elfPayload && !gdbMeta) return;
+
+    const artifact = {
+      boardId,
+      boardKind,
+      ts: Date.now(),
+      elf: elfPayload,
+      elfName: compiled.elfName || '',
+      firmware: compiled.hex || '',
+      artifactType: compiled.artifactType || '',
+      gdb: gdbMeta,
+    };
+
+    try {
+      localStorage.setItem(`openhw_gdb_artifact_${boardId}`, JSON.stringify(artifact));
+      localStorage.setItem('openhw_gdb_last_artifact', JSON.stringify(artifact));
+    } catch {
+      // ignore storage failures
+    }
+
+    const gdbName = gdbMeta?.gdb || 'gdb-multiarch';
+    const remoteTarget = gdbMeta?.targetRemote || 'localhost:3333';
+    const elfLabel = artifact.elfName ? ` (${artifact.elfName})` : '';
+    appendConsoleEntry('info', `GDB artifact ready for ${boardId}: ${gdbName} -> target remote ${remoteTarget}${elfLabel}`, 'debug');
+    appendConsoleEntry('info', 'Web GDB reference: https://wokwi.github.io/web-gdb/', 'debug');
+  }, [appendConsoleEntry]);
 
   const runCircuitValidation = useCallback(() => {
     try {
@@ -2341,18 +3114,38 @@ export default function SimulatorPage() {
   }, []);
 
   const pushSerialRxChunk = useCallback((chunk, boardId = 'default', source = 'sim') => {
+    const normalizedBoardId = String(boardId || 'default');
+    const normalizedSource = String(source || 'sim');
+    const nowMs = Date.now();
+    const arbState = serialIngressArbitrationRef.current.get(normalizedBoardId) || { source: '', lastAcceptedAt: 0 };
+
+    if (!arbState.source) {
+      arbState.source = normalizedSource;
+    } else if (arbState.source !== normalizedSource) {
+      const recentlyAccepted = (nowMs - Number(arbState.lastAcceptedAt || 0)) <= 240;
+      // Keep one ingress stream active per board for a short window to avoid
+      // USB/UART mirrored duplicate output bursts from RP2040 firmware.
+      if (recentlyAccepted) {
+        return;
+      }
+      arbState.source = normalizedSource;
+    }
+
+    arbState.lastAcceptedAt = nowMs;
+    serialIngressArbitrationRef.current.set(normalizedBoardId, arbState);
+
     parseSerialForPlotter(chunk);
     const ts = getSerialTimestamp();
     setSerialHistory((prev) => {
       let next = prev.length > 2000 ? prev.slice(prev.length - 1800) : [...prev];
       if (next.length > 0) {
         const last = next[next.length - 1];
-        if (last.dir === 'rx' && last.boardId === boardId && last.source === source && !last.text.endsWith('\n')) {
+        if (last.dir === 'rx' && last.boardId === normalizedBoardId && last.source === normalizedSource && !last.text.endsWith('\n')) {
           next[next.length - 1] = { ...last, text: last.text + chunk };
           return next;
         }
       }
-      return [...next, { dir: 'rx', text: chunk, ts, boardId, source }];
+      return [...next, { dir: 'rx', text: chunk, ts, boardId: normalizedBoardId, source: normalizedSource }];
     });
   }, [parseSerialForPlotter]);
 
@@ -2372,26 +3165,33 @@ export default function SimulatorPage() {
     if (typeof boardHex === 'string' && boardHex.trim()) return boardHex;
 
     const compileUnit = getBoardCompileFiles(boardComp.id);
-    const sourceCode = getBoardMainCode(boardComp.id) || code;
+    if (!compileUnit.hasMainFile) {
+      throw new Error(`No enabled .ino file found for ${boardComp.id}. Enable at least one .ino file before uploading.`);
+    }
+    const sourceCode = compileUnit.mainCode || '';
     const cacheKeyBoard = `${kind}:${boardComp.id}`;
+    const rp2040Builder = resolveComponentAttrString(boardComp?.attrs, 'builder', 'arduino-pico') || 'arduino-pico';
+    const buildEngine = kind === 'rp2040' ? rp2040Builder : 'arduino-cli';
     const cacheSource = [
-      compileUnit.mainCode || sourceCode,
+      sourceCode,
       ...compileUnit.files.map((f) => `${f.name}\n${f.content || ''}`),
       BOARD_FQBN[kind] || BOARD_FQBN.arduino_uno,
+      buildEngine,
     ].join('\n/*__SPLIT__*/\n');
 
     let compiled = await getCachedHex(cacheSource, cacheKeyBoard);
     if (!compiled) {
       compiled = await compileCode({
-        code: compileUnit.mainCode || sourceCode,
+        code: sourceCode,
         files: compileUnit.files,
         sketchName: compileUnit.sketchName,
         fqbn: BOARD_FQBN[kind] || BOARD_FQBN.arduino_uno,
+        ...(kind === 'rp2040' ? { builder: rp2040Builder } : {}),
       });
       setCachedHex(cacheSource, cacheKeyBoard, compiled);
     }
     return compiled.hex;
-  }, [code, getBoardCompileFiles, getBoardMainCode]);
+  }, [getBoardCompileFiles]);
 
   const {
     hardwareAvailablePorts,
@@ -2469,36 +3269,192 @@ export default function SimulatorPage() {
 
   const handleRun = async () => {
     try {
+      if (runStartGuardRef.current || isRunning || isCompiling) {
+        appendConsoleEntry('info', 'Run is already in progress.', 'simulator');
+        return;
+      }
+
+      runStartGuardRef.current = true;
       appendConsoleEntry('info', 'Run requested.', 'simulator');
+      rp2040UartMicroPythonBoardsRef.current.clear();
+      rp2040UartSilentWarnedBoardsRef.current.clear();
+      serialIngressArbitrationRef.current.clear();
+
       if (!runCircuitValidation()) {
         appendConsoleEntry('warn', 'Run blocked: validation errors found.', 'simulator');
+        runStartGuardRef.current = false;
         return;
       }
 
       setIsRunning(true);
       setIsCompiling(true);
+      const parsedRunBaud = Number(serialBaudRate);
+      const selectedRunBaud = Number.isFinite(parsedRunBaud)
+        ? parsedRunBaud
+        : Number(BOARD_DEFAULT_BAUD[selectedSerialBoardKind] || BOARD_DEFAULT_BAUD.arduino_uno);
+      const selectedRunBoardId = serialBoardFilter !== 'all' && serialBoardMap.has(serialBoardFilter)
+        ? serialBoardFilter
+        : '';
       const boardHexMap = {};
+      const boardPythonMap = {};
       const boardBaudMap = {};
+      const boardRuntimeMap = {};
       const programmableBoards = components.filter(c => /(arduino|esp32|stm32|rp2040|pico)/i.test(c.type));
+      const singleProgrammableBoardId = programmableBoards.length === 1 ? programmableBoards[0]?.id : '';
+      const boardsWithoutCompilableSketch = [];
       let result = null;
 
       if (programmableBoards.length > 0) {
         for (const boardComp of programmableBoards) {
           const kind = normalizeBoardKind(boardComp.type);
-          boardBaudMap[boardComp.id] = Number(BOARD_DEFAULT_BAUD[kind] || BOARD_DEFAULT_BAUD.arduino_uno);
+          const defaultBaud = Number(BOARD_DEFAULT_BAUD[kind] || BOARD_DEFAULT_BAUD.arduino_uno);
+          boardBaudMap[boardComp.id] = selectedRunBoardId
+            ? (boardComp.id === selectedRunBoardId ? selectedRunBaud : defaultBaud)
+            : selectedRunBaud;
 
-          const boardHex = boardComp?.attrs?.firmwareHex || boardComp?.attrs?.hex;
-          if (typeof boardHex === 'string' && boardHex.trim()) {
-            boardHexMap[boardComp.id] = boardHex;
-            if (!result) result = { hex: boardHex };
+          const firmwareAssets = getBoardFirmwareAssets(boardComp.id);
+          const activeFilePath = String(activeCodeFile?.path || '');
+          const activeFileExt = fileExt(activeFilePath);
+          const activeFileContent = String(code || '');
+          const activeBoardFile = activeFilePath.startsWith(`project/${boardComp.id}/`) ? activeCodeFile : null;
+          const activeFileTargetsBoard = !!activeBoardFile || singleProgrammableBoardId === boardComp.id;
+          const activeBoardExt = activeBoardFile ? fileExt(activeBoardFile.path) : '';
+          const activePythonSource = activeFileExt === '.py'
+            && activeFileTargetsBoard
+            && !isFileDisabled(activeFilePath)
+            ? (activeBoardFile ? String(activeBoardFile.content || '') : activeFileContent)
+            : '';
+          const boardEnabledFiles = projectFiles
+            .filter((f) => f.path.startsWith(`project/${boardComp.id}/`))
+            .filter((f) => !isFileDisabled(f.path));
+          const boardEnabledPyFiles = boardEnabledFiles.filter((f) => fileExt(f.path) === '.py');
+          const pythonSource = activePythonSource || String(firmwareAssets.mainPy?.content || '');
+          const hasPythonSource = boardEnabledPyFiles.some((f) => String(f.content || '').trim()) || !!pythonSource.trim();
+          const activePrefersIno = activeFileExt === '.ino' && activeFileTargetsBoard;
+          const activePrefersPy = activeFileExt === '.py' && activeFileTargetsBoard;
+          const preferredMainPath = activeBoardExt === '.ino' && activeBoardFile && !isFileDisabled(activeBoardFile.path)
+            ? activeBoardFile.path : '';
+          const compileUnit = getBoardCompileFiles(boardComp.id, preferredMainPath);
+          const compileSource = useBlocklyCode
+            ? blocklyGeneratedCode
+            : (activeFileExt === '.py' && activeFileTargetsBoard
+              ? (String(activeCodeFile?.content || '') || String(code || ''))
+              : (compileUnit.mainCode || getBoardMainCode(boardComp.id) || String(code || '')));
+
+          if (kind !== 'rp2040' && !compileUnit.hasMainFile) {
+            boardsWithoutCompilableSketch.push(boardComp.id);
             continue;
           }
 
-          const sourceCode = getBoardMainCode(boardComp.id) || code;
-          const compileUnit = getBoardCompileFiles(boardComp.id);
+          // ── RP2040: emulate a real UF2 on rp2040js and inject script via UART0 ──
+          if (kind === 'rp2040') {
+            const rawEnv = resolveComponentAttrString(boardComp?.attrs, 'env', '');
+            const rawEnvLower = rawEnv.toLowerCase();
+            const configuredMode = rawEnvLower.startsWith('micropython') ? 'py' : 'ino';
+            const configuredBuilder = resolveComponentAttrString(boardComp?.attrs, 'builder', 'arduino-pico') || 'arduino-pico';
+            const hasNativeSketch = compileUnit.hasMainFile || (activePrefersIno && !!compileSource.trim());
+            const hasExplicitPython = activePrefersPy || hasPythonSource;
+            const selectedSourceMode = resolveRp2040SourceMode({
+              configuredMode,
+              activePrefersIno,
+              activePrefersPy,
+              hasNativeSketch,
+              hasPythonSource: hasExplicitPython,
+            });
+            const useMicroPythonPath = selectedSourceMode === 'py';
+
+            if (selectedSourceMode === 'ino' && !hasNativeSketch) {
+              const msg = `RP2040 source mode is set to .ino for ${boardComp.id}, but no enabled .ino sketch was found.`;
+              appendConsoleEntry('warn', msg, 'simulator');
+              logSerial(msg, 'var(--orange)');
+              boardsWithoutCompilableSketch.push(boardComp.id);
+              continue;
+            }
+
+            if (useMicroPythonPath) {
+              const useJsMicroPythonRuntime = rawEnvLower.includes('micropython-js');
+              let pyToRun = pythonSource.trim();
+              if (!pyToRun && looksLikeMicroPythonSource(compileSource)) {
+                pyToRun = compileSource;
+              }
+              if (!pyToRun) {
+                pyToRun = arduinoSerialToMicroPython(compileSource, boardComp.id);
+              }
+              if (!pyToRun) {
+                pyToRun = arduinoBlinkToMicroPython(compileSource, boardComp.id);
+              }
+              if (!pyToRun) {
+                pyToRun = createDefaultMainCode('rp2040', boardComp.id);
+              }
+              pyToRun = applyRp2040MicroPythonCompat(pyToRun);
+              pyToRun = ensureMicroPythonSerialProbe(pyToRun, boardComp.id);
+
+              const rp2040Firmware = useJsMicroPythonRuntime
+                ? ''
+                : (firmwareAssets.uf2Payload || await fetchDefaultMicroPythonUf2Payload());
+              boardHexMap[boardComp.id] = rp2040Firmware;
+              boardPythonMap[boardComp.id] = pyToRun;
+              if (useJsMicroPythonRuntime) {
+                boardRuntimeMap[boardComp.id] = 'micropython-js';
+              } else {
+                rp2040UartMicroPythonBoardsRef.current.add(boardComp.id);
+              }
+              appendConsoleEntry(
+                'info',
+                `RP2040 running via ${useJsMicroPythonRuntime ? 'MicroPython JS runtime' : 'rp2040js + UART0 MicroPython'} on ${boardComp.id} (mode: ${configuredMode || 'auto'}).`,
+                'simulator'
+              );
+              if (!result) result = { hex: rp2040Firmware || '' };
+              continue;
+            }
+
+            const nativeCompileSource = prepareRp2040SketchForSimulation(compileSource);
+            if (nativeCompileSource !== compileSource) {
+              appendConsoleEntry('info', `RP2040: routed Serial output to UART0 monitor for ${boardComp.id}.`, 'simulator');
+            }
+
+            const cacheKeyBoard = `${kind}:${boardComp.id}`;
+            const builder = configuredBuilder;
+            const cacheSource = [
+              RP2040_SIM_PROTOCOL_VERSION,
+              builder,
+              configuredMode,
+              nativeCompileSource,
+              ...compileUnit.files.map((f) => `${f.name}\n${f.content || ''}`),
+            ].join('\n/*__SPLIT__*/\n');
+
+            let compiled = await getCachedHex(cacheSource, cacheKeyBoard);
+            if (compiled) {
+              logSerial(`Using cached compilation for ${boardComp.id}...`);
+            } else {
+              logSerial(`Compiling ${boardComp.id}...`);
+              try {
+                compiled = await compileCode({
+                  code: nativeCompileSource,
+                  files: compileUnit.files,
+                  sketchName: compileUnit.sketchName,
+                  fqbn: BOARD_FQBN[kind] || BOARD_FQBN.arduino_uno,
+                  builder,
+                });
+                setCachedHex(cacheSource, cacheKeyBoard, compiled);
+              } catch (compileErr) {
+                if (isRp2040CoreMissingError(compileErr)) {
+                  appendConsoleEntry('error', `RP2040 core is not installed for ${boardComp.id}. Native .ino mode cannot run without Arduino-Pico core.`, 'simulator');
+                }
+                throw compileErr;
+              }
+            }
+
+            boardHexMap[boardComp.id] = compiled.hex;
+            registerGdbArtifact(boardComp.id, kind, compiled);
+            appendConsoleEntry('info', `RP2040 native firmware compiled and running on ${boardComp.id}.`, 'simulator');
+            if (!result) result = compiled;
+            continue;
+          }
+
           const cacheKeyBoard = `${kind}:${boardComp.id}`;
           const cacheSource = [
-            compileUnit.mainCode || sourceCode,
+            compileSource,
             ...compileUnit.files.map((f) => `${f.name}\n${f.content || ''}`),
           ].join('\n/*__SPLIT__*/\n');
 
@@ -2507,28 +3463,56 @@ export default function SimulatorPage() {
             logSerial(`Using cached compilation for ${boardComp.id}...`);
           } else {
             logSerial(`Compiling ${boardComp.id}...`);
-            compiled = await compileCode({
-              code: compileUnit.mainCode || sourceCode,
-              files: compileUnit.files,
-              sketchName: compileUnit.sketchName,
-            });
-            setCachedHex(cacheSource, cacheKeyBoard, compiled);
+            try {
+              compiled = await compileCode({
+                code: compileSource,
+                files: compileUnit.files,
+                sketchName: compileUnit.sketchName,
+                fqbn: BOARD_FQBN[kind] || BOARD_FQBN.arduino_uno,
+              });
+              setCachedHex(cacheSource, cacheKeyBoard, compiled);
+            } catch (compileErr) {
+              throw compileErr;
+            }
           }
 
           boardHexMap[boardComp.id] = compiled.hex;
+          registerGdbArtifact(boardComp.id, kind, compiled);
           if (!result) result = compiled;
         }
       }
 
+      if (!result && programmableBoards.length > 0) {
+        const blockedMsg = boardsWithoutCompilableSketch.length > 0
+          ? `Run blocked: no enabled .ino sketch found for ${boardsWithoutCompilableSketch.join(', ')}.`
+          : 'Run blocked: no firmware was produced for programmable boards.';
+        appendConsoleEntry('warn', blockedMsg, 'simulator');
+        logSerial(blockedMsg, 'var(--orange)');
+        setIsCompiling(false);
+        setIsRunning(false);
+        runStartGuardRef.current = false;
+        return;
+      }
+
       if (!result) {
-        const cached = await getCachedHex(code, board);
+        const finalCode = useBlocklyCode ? blocklyGeneratedCode : code;
+        const fallbackKind = normalizeBoardKind(board);
+        const engine = fallbackKind === 'rp2040' ? 'arduino-pico' : 'arduino-cli';
+        const cacheStr = [finalCode, engine].join('\n/*__SPLIT__*/\n');
+        
+        const cached = await getCachedHex(cacheStr, board);
         if (cached) {
           logSerial('Using locally cached compilation (offline cache)...');
           result = cached;
         } else {
           logSerial('Compiling...');
-          result = await compileCode(code);
-          setCachedHex(code, board, result);
+          result = await compileCode({
+            code: finalCode,
+            fqbn: BOARD_FQBN[fallbackKind] || BOARD_FQBN.arduino_uno,
+            ...(fallbackKind === 'rp2040' ? { builder: 'arduino-pico' } : {}),
+          });
+          setCachedHex(cacheStr, board, result);
+          registerGdbArtifact(board || 'default', fallbackKind, result);
         }
       }
 
@@ -2540,8 +3524,159 @@ export default function SimulatorPage() {
       const worker = new Worker(new URL('../../worker/simulation.worker.ts', import.meta.url), { type: 'module' });
       workerRef.current = worker;
 
-      worker.onmessage = (event) => {
+      worker.onmessage = async (event) => {
         const msg = event.data;
+        if (msg.type === 'debug' && msg.category === 'rp2040-runtime') {
+          const incomingBoardId = String(msg.boardId || '').trim();
+          const hasKnownBoard = incomingBoardId && boardComponents.some((b) => b.id === incomingBoardId);
+          const singleBoardFallback = boardComponents.length === 1 ? boardComponents[0]?.id : '';
+          const resolvedBoardId = hasKnownBoard
+            ? incomingBoardId
+            : (singleBoardFallback || incomingBoardId || 'default');
+
+          const metrics = msg.metrics || {};
+          const reason = String(msg.reason || 'tick');
+          const pc = Number(metrics.pc);
+          const sp = Number(metrics.sp);
+          const gp20 = !!metrics.gp20;
+          const gp25 = !!metrics.gp25;
+          const tx = Number(metrics.serialTxBytes || 0);
+          const rx = Number(metrics.serialRxBytes || 0);
+          const inq = Number(metrics.serialInputQueue || 0);
+          const cycles = Number(metrics.cycles || 0);
+          const steps = Number(metrics.stepCount || 0);
+          const stall = Number(metrics.pcStallTicks || 0);
+          const running = !!metrics.running;
+          const entry = metrics.entry && typeof metrics.entry === 'object' ? metrics.entry : null;
+          const ledId = String(metrics.ledId || '').trim();
+          const ledOn = typeof metrics.ledOn === 'boolean' ? metrics.ledOn : null;
+          const ledAnodeV = Number.isFinite(Number(metrics.ledAnodeV)) ? Number(metrics.ledAnodeV) : null;
+          const ledCathodeV = Number.isFinite(Number(metrics.ledCathodeV)) ? Number(metrics.ledCathodeV) : null;
+          const ledDeltaV = Number.isFinite(Number(metrics.ledDeltaV)) ? Number(metrics.ledDeltaV) : null;
+
+          const pcHex = Number.isFinite(pc) ? `0x${(pc >>> 0).toString(16)}` : 'n/a';
+          const spHex = Number.isFinite(sp) ? `0x${(sp >>> 0).toString(16)}` : 'n/a';
+          const entryVectorHex = Number.isFinite(Number(entry?.vectorBase))
+            ? `0x${(Number(entry.vectorBase) >>> 0).toString(16)}`
+            : 'n/a';
+          const entryResolvedHex = Number.isFinite(Number(entry?.resolvedPC))
+            ? `0x${(Number(entry.resolvedPC) >>> 0).toString(16)}`
+            : 'n/a';
+
+          const debugBoardComp = components.find((c) => c.id === resolvedBoardId)
+            || boardComponents.find((b) => b.id === resolvedBoardId);
+          const isRp2040DebugBoard = normalizeBoardKind(debugBoardComp?.type || '') === 'rp2040';
+          const startupFallbackEntry = reason === 'start' && !!entry?.usedFallback;
+          if (startupFallbackEntry && isRp2040DebugBoard) {
+            appendConsoleEntry('warn', `RP2040 startup vector fallback detected on ${resolvedBoardId}; automatic recovery is disabled in deterministic mode.`, 'simulator');
+            logSerial(`RP2040 startup fallback on ${resolvedBoardId}. Automatic recovery is disabled in deterministic mode.`, 'var(--orange)');
+          }
+
+          const isUartMicroPythonBoard = rp2040UartMicroPythonBoardsRef.current.has(resolvedBoardId);
+          const queueDrained = inq <= 0;
+          const shouldWarnUartSilent = reason === 'tick'
+            && isUartMicroPythonBoard
+            && tx === 0
+            && rx >= 512
+            && (queueDrained || rx >= 2048)
+            && stall >= 3
+            && cycles >= 120_000_000
+            && !rp2040UartSilentWarnedBoardsRef.current.has(resolvedBoardId);
+
+          if (shouldWarnUartSilent) {
+            rp2040UartSilentWarnedBoardsRef.current.add(resolvedBoardId);
+            appendConsoleEntry(
+              'warn',
+              `RP2040 MicroPython UART injection appears silent on ${resolvedBoardId} (tx=0, rx=${rx}, inq=${inq}, stall=${stall}). If this persists, switch Environment to MicroPython JS runtime for this board.`,
+              'simulator'
+            );
+            logSerial(
+              `RP2040 ${resolvedBoardId}: UART injection is silent (tx=0, rx=${rx}, inq=${inq}). Try Environment=MicroPython JS runtime if UART0 UF2 remains unresponsive.`,
+              'var(--orange)'
+            );
+          }
+
+          const prev = rp2040DebugLastLogRef.current.get(resolvedBoardId) || null;
+          const now = Date.now();
+          const changed = !prev
+            || prev.pcHex !== pcHex
+            || prev.gp20 !== gp20
+            || prev.gp25 !== gp25
+            || prev.tx !== tx
+            || prev.rx !== rx
+            || prev.ledOn !== ledOn
+            || prev.ledDeltaV !== ledDeltaV
+            || reason !== 'tick';
+
+          const highPins = Array.isArray(metrics.highPins) ? metrics.highPins : [];
+          const highPinsLabel = highPins.length > 0
+            ? `${highPins.slice(0, 12).join(',')}${highPins.length > 12 ? ',+' : ''}`
+            : '-';
+          const pinBitmap = typeof metrics.pinBitmap === 'string' ? metrics.pinBitmap : '';
+
+          if (changed || now - (prev?.ts || 0) > 2500) {
+            const line = [
+              `RP2040 dbg ${resolvedBoardId}`,
+              `reason=${reason}`,
+              `run=${running ? '1' : '0'}`,
+              `pc=${pcHex}`,
+              `sp=${spHex}`,
+              `cyc=${cycles}`,
+              `steps=${steps}`,
+              `gp20=${gp20 ? 'H' : 'L'}`,
+              `gp25=${gp25 ? 'H' : 'L'}`,
+              `uart=${metrics.activeUart ?? 'n/a'}`,
+              `usb=${metrics.usbCdcReady ? '1' : '0'}`,
+              `tx=${tx}`,
+              `rx=${rx}`,
+              `inq=${inq}`,
+              `stall=${stall}`,
+              `high=${highPinsLabel}`,
+              pinBitmap ? `pins=${pinBitmap}` : '',
+              entry ? `entry=${entryVectorHex}->${entryResolvedHex}${entry.usedFallback ? ':fallback' : ''}${entry.strategy ? `:${entry.strategy}` : ''}` : '',
+              entry && Number.isFinite(Number(entry.probe0100SP))
+                ? `probe0100=sp:0x${(Number(entry.probe0100SP) >>> 0).toString(16)},pc:0x${(Number(entry.probe0100PC) >>> 0).toString(16)}`
+                : '',
+              entry && Number.isFinite(Number(entry.probe0000SP))
+                ? `probe0000=sp:0x${(Number(entry.probe0000SP) >>> 0).toString(16)},pc:0x${(Number(entry.probe0000PC) >>> 0).toString(16)}`
+                : '',
+              ledId ? `led=${ledId}:${ledOn === null ? 'n/a' : (ledOn ? 'on' : 'off')}` : '',
+              ledAnodeV !== null ? `vA=${ledAnodeV.toFixed(2)}` : '',
+              ledCathodeV !== null ? `vK=${ledCathodeV.toFixed(2)}` : '',
+              ledDeltaV !== null ? `dV=${ledDeltaV.toFixed(2)}` : '',
+              metrics.lastGpioPin ? `lastPin=${metrics.lastGpioPin}` : '',
+            ].filter(Boolean).join(' | ');
+
+            const warn = reason === 'fault' || stall > 180;
+            appendConsoleEntry(warn ? 'warn' : 'info', line, 'debug');
+            rp2040DebugLastLogRef.current.set(resolvedBoardId, {
+              ts: now,
+              pcHex,
+              gp20,
+              gp25,
+              tx,
+              rx,
+              ledOn,
+              ledDeltaV,
+            });
+          }
+
+          return;
+        }
+        if (msg.type === 'fault') {
+          const boardId = String(msg.boardId || '');
+          const pcHex = Number.isFinite(Number(msg.pc))
+            ? `0x${Number(msg.pc).toString(16)}`
+            : 'unknown';
+          appendConsoleEntry(
+            'error',
+            `RP2040 runtime fault on ${msg.boardId || 'board'} at ${pcHex}: ${msg.reason || 'invalid execution state'}`,
+            'simulator'
+          );
+          logSerial('Simulation stopped due to RP2040 runtime fault.', 'var(--red)');
+          handleStop();
+          return;
+        }
         if (msg.type === 'state' && msg.pins) {
           setPinStates(msg.pins);
           // Push to plotData history
@@ -2570,7 +3705,13 @@ export default function SimulatorPage() {
           });
         }
         if (msg.type === 'serial') {
-          pushSerialRxChunk(msg.data, msg.boardId || 'default', 'sim');
+          const incomingBoardId = String(msg.boardId || '').trim();
+          const hasKnownBoard = incomingBoardId && boardComponents.some((b) => b.id === incomingBoardId);
+          const singleBoardFallback = boardComponents.length === 1 ? boardComponents[0]?.id : '';
+          const resolvedBoardId = hasKnownBoard
+            ? incomingBoardId
+            : (singleBoardFallback || incomingBoardId || 'default');
+          pushSerialRxChunk(msg.data, resolvedBoardId, msg.source || 'sim');
         }
       };
 
@@ -2592,11 +3733,10 @@ export default function SimulatorPage() {
       const customLogics = [];
       components.forEach((c) => {
         if (COMPONENT_REGISTRY[c.type]?.logicCode) {
-          const manifestPins = COMPONENT_REGISTRY[c.type]?.manifest?.pins;
           customLogics.push({
             type: c.type,
             code: COMPONENT_REGISTRY[c.type].logicCode,
-            pins: Array.isArray(manifestPins) ? manifestPins : []
+            pins: COMPONENT_REGISTRY[c.type].manifest.pins
           });
         }
       });
@@ -2609,10 +3749,17 @@ export default function SimulatorPage() {
         components: components,
         customLogics: customLogics,
         boardHexMap: Object.keys(boardHexMap).length > 0 ? boardHexMap : undefined,
+        boardPythonMap: Object.keys(boardPythonMap).length > 0 ? boardPythonMap : undefined,
         boardBaudMap: Object.keys(boardBaudMap).length > 0 ? boardBaudMap : undefined,
-        baudRate: Number(serialBaudRate || BOARD_DEFAULT_BAUD[selectedSerialBoardKind] || BOARD_DEFAULT_BAUD.arduino_uno),
+        boardRuntimeMap: Object.keys(boardRuntimeMap).length > 0 ? boardRuntimeMap : undefined,
+        baudRate: selectedRunBaud,
       });
+
+      runStartGuardRef.current = false;
     } catch (err) {
+      runStartGuardRef.current = false;
+      rp2040UartMicroPythonBoardsRef.current.clear();
+      rp2040UartSilentWarnedBoardsRef.current.clear();
       setIsRunning(false);
       setIsCompiling(false);
       appendConsoleEntry('error', `Run failed: ${err?.message || 'Unknown error'}`, 'simulator');
@@ -2622,6 +3769,9 @@ export default function SimulatorPage() {
   };
 
   const handleStop = () => {
+    runStartGuardRef.current = false;
+    rp2040UartMicroPythonBoardsRef.current.clear();
+    rp2040UartSilentWarnedBoardsRef.current.clear();
     if (workerRef.current) {
       workerRef.current.postMessage({ type: 'STOP' });
       workerRef.current.terminate();
@@ -2640,6 +3790,7 @@ export default function SimulatorPage() {
     serialPlotBufferRef.current = '';
     serialPlotLabelsRef.current = [];
     latestParsedSerialRef.current = [];
+    serialIngressArbitrationRef.current.clear();
     appendConsoleEntry('info', 'Simulation stopped.', 'simulator');
   };
 
@@ -2706,6 +3857,14 @@ export default function SimulatorPage() {
 
     alert('Run simulator or connect hardware serial before sending data.');
   }, [serialInput, workerRef, isRunning, serialBoardFilter, serialBaudRate, pushSerialTxLine, hardwareConnected, hardwareBoardId, sendHardwareSerialLine]);
+
+  const openComponentEditor = useCallback(() => {
+    try {
+      navigate('/component-editor');
+    } catch (_) {
+      window.location.assign('/component-editor');
+    }
+  }, [navigate]);
 
   // ── PNG Export ────────────────────────────────────────────────────────────
   const downloadPng = async () => {
@@ -3413,9 +4572,9 @@ export default function SimulatorPage() {
         if (normalizedFiles.length === 0 && typeof meta.code === 'string' && meta.code.trim()) {
           if (importedBoards.length > 0) {
             normalizedFiles = importedBoards.map((bc, idx) => ({
-              id: `project/${bc.id}/${bc.id}.ino`,
-              path: `project/${bc.id}/${bc.id}.ino`,
-              name: `${bc.id}.ino`,
+              id: `project/${bc.id}/${getDefaultMainFileName(normalizeBoardKind(bc.type), bc.id)}`,
+              path: `project/${bc.id}/${getDefaultMainFileName(normalizeBoardKind(bc.type), bc.id)}`,
+              name: getDefaultMainFileName(normalizeBoardKind(bc.type), bc.id),
               kind: 'code',
               boardId: bc.id,
               boardKind: normalizeBoardKind(bc.type),
@@ -3474,8 +4633,8 @@ export default function SimulatorPage() {
     attrs.onInteract = (event) => {
       console.log(`[SimulatorPage] UI Component ${comp.id} interacted: ${event}. isRunning: ${isRunning}`);
 
-      // Handle physical Arduino board reset button presses
-      if (comp.type === 'wokwi-arduino-uno' && event === 'RESET') {
+      // Handle physical board reset button presses
+      if (isProgrammableBoardType(comp.type) && event === 'RESET') {
         if (isRunning) handleReset();
         return;
       }
@@ -3519,7 +4678,115 @@ export default function SimulatorPage() {
       )}
 
       {/* TOP BAR */}
-              <TopToolbox board={board} setBoard={setBoard} isRunning={isRunning} isPaused={isPaused} handleRun={handleRun} handlePause={handlePause} handleResume={handleResume} handleStop={handleStop} isCompiling={isCompiling} assessmentMode={assessmentMode} assessmentProjectName={assessmentProjectName} isSubmittingAssessment={isSubmittingAssessment} handleAssessmentSubmit={handleAssessmentSubmit} undo={undo} redo={redo} selected={selected} rotateComponent={rotateComponent} theme={theme} toggleTheme={toggleTheme} showViewPanel={showViewPanel} setShowViewPanel={setShowViewPanel} viewPanelSection={viewPanelSection} setViewPanelSection={setViewPanelSection} schematicDataUrl={schematicDataUrl} setSchematicDataUrl={setSchematicDataUrl} schematicLoading={schematicLoading} setSchematicLoading={setSchematicLoading} downloadSchematicPng={downloadSchematicPng} downloadSchematicPdf={downloadSchematicPdf} generateSchematic={generateSchematic} downloadCompCsv={downloadCompCsv} importFileRef={importFileRef} downloadPng={downloadPng} importPng={importPng} handleSave={handleSave} isExporting={isExporting} refreshProjectList={refreshProjectList} showProjectsDropdown={showProjectsDropdown} setShowProjectsDropdown={setShowProjectsDropdown} handleNewProject={handleNewProject} handleStartRename={handleStartRename} handleConfirmRename={handleConfirmRename} renamingProjectId={renamingProjectId} setRenamingProjectId={setRenamingProjectId} renameValue={renameValue} setRenameValue={setRenameValue} handleLoadProject={handleLoadProject} handleDeleteProject={handleDeleteProject} handleBackupWorkflow={handleBackupWorkflow} backupRestoreInputRef={backupRestoreInputRef} handleRestoreWorkflow={handleRestoreWorkflow} handleSyncToCloud={handleSyncToCloud} user={user} navigate={navigate} isAuthenticated={isAuthenticated} myProjects={myProjects} currentProjectId={currentProjectId} formatProjectDate={formatProjectDate} saveHistory={saveHistory} setWires={setWires} setComponents={setComponents} setSelected={setSelected} history={history} components={components} wires={wires} webSerialSupported={webSerialSupported} hardwareBoards={boardComponents} hardwareBoardId={hardwareBoardId} setHardwareBoardId={handleHardwareBoardChange} hardwarePortPath={hardwarePortPath} setHardwarePortPath={setHardwarePortPath} resolvedHardwarePort={resolvedHardwarePort} hardwareAvailablePorts={hardwareAvailablePorts} showAllHardwarePorts={showAllHardwarePorts} setShowAllHardwarePorts={setShowAllHardwarePorts} refreshHardwarePorts={refreshHardwarePorts} isLoadingHardwarePorts={isLoadingHardwarePorts} hardwareBaudRate={hardwareBaudRate} setHardwareBaudRate={setHardwareBaudRate} hardwareResetMethod={hardwareResetMethod} setHardwareResetMethod={setHardwareResetMethod} connectHardwareSerial={connectHardwareSerial} disconnectHardwareSerial={disconnectHardwareSerial} uploadToHardware={handleUploadToHardware} hardwareConnected={hardwareConnected} hardwareConnecting={hardwareConnecting} isUploadingHardware={isUploadingHardware} hardwareStatus={hardwareStatus} />
+              <TopToolbox board={board} setBoard={setBoard} isRunning={isRunning} isPaused={isPaused} handleRun={handleRun} handlePause={handlePause} handleResume={handleResume} handleStop={handleStop} isCompiling={isCompiling} assessmentMode={assessmentMode} assessmentProjectName={assessmentProjectName} isSubmittingAssessment={isSubmittingAssessment} handleAssessmentSubmit={handleAssessmentSubmit} undo={undo} redo={redo} selected={selected} rotateComponent={rotateComponent} theme={theme} toggleTheme={toggleTheme} showViewPanel={showViewPanel} setShowViewPanel={setShowViewPanel} viewPanelSection={viewPanelSection} setViewPanelSection={setViewPanelSection} schematicDataUrl={schematicDataUrl} setSchematicDataUrl={setSchematicDataUrl} schematicLoading={schematicLoading} setSchematicLoading={setSchematicLoading} downloadSchematicPng={downloadSchematicPng} downloadSchematicPdf={downloadSchematicPdf} generateSchematic={generateSchematic} downloadCompCsv={downloadCompCsv} importFileRef={importFileRef} downloadPng={downloadPng} importPng={importPng} handleSave={handleSave} isExporting={isExporting} refreshProjectList={refreshProjectList} setShowProjectsSidebar={setShowProjectsSidebar} setProjectsSidebarTab={setProjectsSidebarTab} backupRestoreInputRef={backupRestoreInputRef} handleRestoreWorkflow={handleRestoreWorkflow} user={user} navigate={navigate} isAuthenticated={isAuthenticated} saveHistory={saveHistory} setWires={setWires} setComponents={setComponents} setSelected={setSelected} history={history} components={components} wires={wires} webSerialSupported={webSerialSupported} hardwareBoards={boardComponents} hardwareBoardId={hardwareBoardId} setHardwareBoardId={handleHardwareBoardChange} hardwarePortPath={hardwarePortPath} setHardwarePortPath={setHardwarePortPath} resolvedHardwarePort={resolvedHardwarePort} hardwareAvailablePorts={hardwareAvailablePorts} showAllHardwarePorts={showAllHardwarePorts} setShowAllHardwarePorts={setShowAllHardwarePorts} refreshHardwarePorts={refreshHardwarePorts} isLoadingHardwarePorts={isLoadingHardwarePorts} hardwareBaudRate={hardwareBaudRate} setHardwareBaudRate={setHardwareBaudRate} hardwareResetMethod={hardwareResetMethod} setHardwareResetMethod={setHardwareResetMethod} connectHardwareSerial={connectHardwareSerial} disconnectHardwareSerial={disconnectHardwareSerial} uploadToHardware={handleUploadToHardware} hardwareConnected={hardwareConnected} hardwareConnecting={hardwareConnecting} isUploadingHardware={isUploadingHardware} hardwareStatus={hardwareStatus} />
+
+      {/* GAMIFICATION PROJECT BAR */}
+      {gamificationMode && gamProject && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px',
+          background: 'rgba(7,8,15,0.97)', borderBottom: `2px solid ${gamProject.color || '#22c55e'}44`,
+          fontFamily: "'Space Grotesk', sans-serif", flexShrink: 0, flexWrap: 'wrap', zIndex: 50,
+        }}>
+          <button
+            onClick={() => navigate('/projects')}
+            style={{ background: 'transparent', border: '1px solid rgba(255,255,255,.12)', color: 'rgba(255,255,255,.55)', borderRadius: 7, padding: '4px 11px', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+          >← Projects</button>
+
+          <span style={{ fontSize: 18, flexShrink: 0 }}>{gamProject.icon}</span>
+          <div style={{ flexShrink: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1 }}>{gamProject.title}</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,.4)', marginTop: 1 }}>
+              Project {String(gamProject.number).padStart(2, '0')} ·{' '}
+              <span style={{ color: gamProject.color || '#22c55e' }}>{gamProject.difficultyLabel}</span>
+              {' '}· ⏱ {gamProject.estimatedTime}
+            </div>
+          </div>
+
+          <div style={{ flex: 1 }} />
+
+          {/* XP bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <div style={{
+              width: 26, height: 26, borderRadius: '50%',
+              background: `${currentLevelData?.color || '#22c55e'}22`,
+              border: `2px solid ${currentLevelData?.color || '#22c55e'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 10, fontWeight: 800, color: currentLevelData?.color || '#22c55e',
+            }}>{currentLevel}</div>
+            <div style={{ width: 90 }}>
+              <div style={{ height: 3, borderRadius: 999, background: 'rgba(255,255,255,.1)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', borderRadius: 999, width: `${xpProgress}%`, background: `${currentLevelData?.color || '#22c55e'}` }} />
+              </div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,.3)', marginTop: 2 }}>{xpProgress}% to Lvl {nextLevel?.id ?? '—'}</div>
+            </div>
+          </div>
+
+          {/* Coins */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(251,191,36,.08)', border: '1px solid rgba(251,191,36,.2)', borderRadius: 7, padding: '4px 9px', flexShrink: 0 }}>
+            <span style={{ fontSize: 13 }}>🪙</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24' }}>{coins}</span>
+          </div>
+
+          {/* XP reward */}
+          <div style={{ fontSize: 10, color: '#22c55e', background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.2)', borderRadius: 7, padding: '4px 9px', flexShrink: 0, fontWeight: 700 }}>
+            +{gamProject.xpReward} XP on complete
+          </div>
+
+          {/* Component lock status */}
+          <div style={{
+            fontSize: 10, fontWeight: 700, padding: '4px 10px', borderRadius: 7,
+            background: gamAllUnlocked ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.08)',
+            border: `1px solid ${gamAllUnlocked ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)'}`,
+            color: gamAllUnlocked ? '#22c55e' : '#ef4444', flexShrink: 0,
+          }}>
+            {gamAllUnlocked ? '✅ All unlocked' : `🔒 ${gamLockedCount} locked`}
+          </div>
+
+          {/* Toggle guide panel */}
+          <button
+            onClick={() => setGamPanelOpen(p => !p)}
+            style={{
+              background: gamPanelOpen ? 'rgba(0,180,255,.1)' : 'transparent',
+              border: `1px solid ${gamPanelOpen ? 'rgba(0,180,255,.3)' : 'rgba(255,255,255,.12)'}`,
+              color: gamPanelOpen ? '#00b4ff' : 'rgba(255,255,255,.5)',
+              borderRadius: 7, padding: '4px 11px', fontSize: 11, fontWeight: 700,
+              cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+            }}
+          >{gamPanelOpen ? '⟩ Hide Guide' : '⟨ Guide'}</button>
+
+          {/* Submit assessment */}
+          <button
+            onClick={handleGamificationSubmit}
+            style={{
+              background: gamProject.color || '#22c55e', border: 'none', color: '#fff',
+              borderRadius: 7, padding: '5px 13px', fontSize: 12, fontWeight: 700,
+              cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+            }}
+          >Submit →</button>
+        </div>
+      )}
+
+      {/* GAMIFICATION LOCK TOAST */}
+      {lockToast && (
+        <div style={{
+          position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(7, 11, 25, 0.95)', border: '1px solid rgba(239, 68, 68, 0.3)',
+          boxShadow: '0 8px 32px rgba(239, 68, 68, 0.2)', padding: '12px 20px', borderRadius: 12,
+          display: 'flex', alignItems: 'center', gap: 12, zIndex: 9999, animation: 'slideUp 0.3s ease-out'
+        }}>
+          <span style={{ fontSize: 24 }}>🔒</span>
+          <div>
+            <div style={{ color: '#ef4444', fontWeight: 700, fontSize: 14 }}>{lockToast.label} is Locked</div>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>Study the theory and pass the quiz to unlock this component.</div>
+          </div>
+          {lockToast.compId && (
+            <button
+              onClick={() => navigate(`/components/${lockToast.compId}/theory`)}
+              style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 12px', fontWeight: 600, cursor: 'pointer', fontSize: 12, marginLeft: 8 }}
+            >Study Now</button>
+          )}
+        </div>
+      )}
 
 
 
@@ -3531,7 +4798,7 @@ export default function SimulatorPage() {
         </div>
       )}
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden" onClick={() => setProjContextMenu(null)}>
 
         {/* PALETTE — hover to expand */}
         <aside
@@ -3633,7 +4900,7 @@ export default function SimulatorPage() {
                   Upload ZIP
                 </button>
                 <button
-                  onClick={() => window.open('/component-editor', '_blank')}
+                  onClick={openComponentEditor}
                   style={{ flex: 1, padding: '7px 4px', borderRadius: 6, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontWeight: 600 }}>
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
                   Create
@@ -3729,18 +4996,28 @@ export default function SimulatorPage() {
                           const rawScale = Math.min(previewW / compW, previewH / compH);
                           const scale = Math.max(0.22, Math.min(1.6, rawScale));
                           const hasUI = !!COMPONENT_REGISTRY[item.type]?.UI;
+                          const locked = isPaletteItemLocked(item.type);
                           return (
                             <div
                               key={item.type}
-                              draggable
-                              onDragStart={e => onPaletteDragStart(e, item)}
-                              onClick={() => { addComponentAtCenter(item); setSelectedPaletteItem({ ...item, group: group.group }); }}
+                              draggable={!locked}
+                              onDragStart={e => !locked && onPaletteDragStart(e, item)}
+                              onClick={() => {
+                                if (locked) { showLockToast(item.label, WOKWI_TO_COMP_ID[item.type]); return; }
+                                addComponentAtCenter(item); setSelectedPaletteItem({ ...item, group: group.group });
+                              }}
                               onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setPaletteContextMenu({ x: e.clientX, y: e.clientY, item: { ...item, group: group.group } }); }}
                               title={item.label}
-                              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', padding: '0 4px 7px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', cursor: 'pointer', userSelect: 'none', transition: 'all .15s', height: 104, boxSizing: 'border-box', minWidth: 0, overflow: 'hidden', position: 'relative' }}
-                              onMouseEnter={e => { e.currentTarget.style.borderColor = groupColor; e.currentTarget.style.background = `${groupColor}14`; }}
-                              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--card)'; }}
+                              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', padding: '0 4px 7px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', cursor: locked ? 'not-allowed' : 'pointer', userSelect: 'none', transition: 'all .15s', height: 104, boxSizing: 'border-box', minWidth: 0, overflow: 'hidden', position: 'relative', opacity: locked ? 0.4 : 1, filter: locked ? 'grayscale(1)' : 'none' }}
+                              onMouseEnter={e => { if (!locked) { e.currentTarget.style.borderColor = groupColor; e.currentTarget.style.background = `${groupColor}14`; } }}
+                              onMouseLeave={e => { if (!locked) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--card)'; } }}
                             >
+                              {/* Overlay for locked state */}
+                              {locked && (
+                                <div style={{ position: 'absolute', top: 5, right: 6, zIndex: 10, fontSize: 13, background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 6, padding: '2px 4px', color: '#ef4444' }}>
+                                  🔒
+                                </div>
+                              )}
                               {/* Component SVG — absolutely centred in upper area, no inner box */}
                               {hasUI ? (
                                 <div style={{ position: 'absolute', top: 'calc(50% - 7px)', left: '50%', transform: `translate(-50%, -50%) scale(${scale})`, transformOrigin: 'center center', pointerEvents: 'none', lineHeight: 0, width: compW, height: compH }}>
@@ -3759,23 +5036,34 @@ export default function SimulatorPage() {
                       </div>
                     ) : (
                       /* LIST VIEW */
-                      filteredItems.map(item => (
-                        <div
-                          key={item.type}
-                          draggable
-                          onDragStart={e => onPaletteDragStart(e, item)}
-                          onClick={() => { addComponentAtCenter(item); setSelectedPaletteItem({ ...item, group: group.group }); }}
-                          onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setPaletteContextMenu({ x: e.clientX, y: e.clientY, item: { ...item, group: group.group } }); }}
-                          style={{ padding: '7px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--card)', cursor: 'pointer', userSelect: 'none', marginBottom: 4, borderLeft: `3px solid ${groupColor}`, transition: 'all .15s' }}
-                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg3)'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = 'var(--card)'; }}
-                        >
-                          <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text)', marginBottom: 2 }}>{item.label}</div>
-                          <div style={{ fontSize: 10, color: 'var(--text3)', lineHeight: 1.4 }}>
-                            {COMPONENT_REGISTRY[item.type]?.manifest?.description || COMPONENT_DESCRIPTIONS[item.type] || `${item.type} component`}
+                      filteredItems.map(item => {
+                        const locked = isPaletteItemLocked(item.type);
+                        return (
+                          <div
+                            key={item.type}
+                            draggable={!locked}
+                            onDragStart={e => !locked && onPaletteDragStart(e, item)}
+                            onClick={() => {
+                              if (locked) { showLockToast(item.label, WOKWI_TO_COMP_ID[item.type]); return; }
+                              addComponentAtCenter(item); setSelectedPaletteItem({ ...item, group: group.group });
+                            }}
+                            onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setPaletteContextMenu({ x: e.clientX, y: e.clientY, item: { ...item, group: group.group } }); }}
+                            style={{ padding: '7px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--card)', cursor: locked ? 'not-allowed' : 'pointer', userSelect: 'none', marginBottom: 4, borderLeft: `3px solid ${groupColor}`, transition: 'all .15s', opacity: locked ? 0.4 : 1, filter: locked ? 'grayscale(1)' : 'none', position: 'relative' }}
+                            onMouseEnter={e => { if (!locked) e.currentTarget.style.background = 'var(--bg3)'; }}
+                            onMouseLeave={e => { if (!locked) e.currentTarget.style.background = 'var(--card)'; }}
+                          >
+                            {locked && (
+                              <div style={{ position: 'absolute', top: '50%', right: 10, transform: 'translateY(-50%)', fontSize: 13, color: '#ef4444' }}>
+                                🔒
+                              </div>
+                            )}
+                            <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text)', marginBottom: 2 }}>{item.label}</div>
+                            <div style={{ fontSize: 10, color: 'var(--text3)', lineHeight: 1.4 }}>
+                              {COMPONENT_REGISTRY[item.type]?.manifest?.description || COMPONENT_DESCRIPTIONS[item.type] || `${item.type} component`}
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        )
+                      })
                     )}
                   </div>
                 );
@@ -3830,11 +5118,14 @@ export default function SimulatorPage() {
                     const registryInfo = COMPONENT_REGISTRY[item.type];
                     const editCopyData = {
                       manifest: registryInfo?.manifest || item,
-                      logic: registryInfo?.logicRaw || '',
-                      ui: registryInfo?.uiRaw || '',
+                      logic: buildLogicSourceFromRegistry(registryInfo, item.type),
+                      ui: buildUiSourceFromRegistry(registryInfo, item.type),
+                      validation: buildValidationSourceFromRegistry(registryInfo),
+                      index: buildIndexSourceFromRegistry(registryInfo, item.type),
+                      docs: registryInfo?.doc || '',
                     };
                     localStorage.setItem('openhw_edit_copy', JSON.stringify(editCopyData));
-                    window.open('/component-editor', '_blank');
+                    openComponentEditor();
                     setPaletteContextMenu(null);
                     setIsPaletteHovered(false);
                   }
@@ -3878,8 +5169,13 @@ export default function SimulatorPage() {
             backgroundImage: showGrid
               ? 'linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)'
               : 'none',
+            touchAction: 'none', // Block browser pinch-to-zoom
           }}
           ref={canvasRef}
+          onWheel={onWheel}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
           onDrop={onCanvasDrop}
           onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }}
           onMouseDown={e => {
@@ -4694,17 +5990,372 @@ export default function SimulatorPage() {
           selected={selected} setSelected={setSelected}
           validationErrors={validationErrors} showValidation={showValidation} setShowValidation={setShowValidation}
           codeTab={codeTab} setCodeTab={setCodeTab} code={code} setCode={setCode}
+          blocklyXml={blocklyXml} setBlocklyXml={setBlocklyXml}
+          blocklyGeneratedCode={blocklyGeneratedCode} setBlocklyGeneratedCode={setBlocklyGeneratedCode}
+          useBlocklyCode={useBlocklyCode} setUseBlocklyCode={setUseBlocklyCode}
           projectFiles={projectFiles} openCodeTabs={openCodeTabs} activeCodeFileId={activeCodeFileId} showCodeExplorer={showCodeExplorer}
           onToggleCodeExplorer={() => setShowCodeExplorer(v => !v)} onOpenCodeFile={openCodeFile} onCloseCodeTab={closeCodeTab}
           onSaveCodeFile={saveCodeFile} onDuplicateCodeFile={duplicateCodeFile} onRenameCodeFile={renameCodeFile} onDeleteCodeFile={deleteCodeFile} onDownloadCodeFile={downloadCodeFile}
-          onCreateCodeFile={createCodeFile} onCreateCodeTab={createCodeTab}
+          onToggleCodeFileDisabled={toggleCodeFileDisabled}
+          onCreateCodeFile={createCodeFile} onCreateCodeTab={createCodeTab} onUploadCodeFile={uploadCodeFile}
           libQuery={libQuery} setLibQuery={setLibQuery} handleSearchLibraries={handleSearchLibraries} isSearchingLib={isSearchingLib} libMessage={libMessage} libInstalled={libInstalled} libResults={libResults} handleInstallLibrary={handleInstallLibrary} installingLib={installingLib}
           serialPaused={serialPaused} setSerialPaused={setSerialPaused} isRunning={isRunning} serialHistory={serialHistory} setSerialHistory={setSerialHistory} serialOutputRef={serialOutputRef} serialInput={serialInput} setSerialInput={setSerialInput} sendSerialInput={sendSerialInput}
-          serialViewMode={serialViewMode} setSerialViewMode={setSerialViewMode} serialBoardFilter={serialBoardFilter} setSerialBoardFilter={setSerialBoardFilter} serialBoardOptions={serialBoardOptions} serialBoardLabels={serialBoardLabels} serialBaudRate={serialBaudRate} setSerialBaudRate={setSerialBaudRate} serialBaudOptions={serialBaudOptions}
+          serialViewMode={serialViewMode} setSerialViewMode={setSerialViewMode} serialBoardFilter={serialBoardFilter} setSerialBoardFilter={setSerialBoardFilter} serialBoardOptions={serialBoardOptions} serialBoardLabels={serialBoardLabels} serialBoardKinds={serialBoardKinds} serialBaudRate={serialBaudRate} setSerialBaudRate={setSerialBaudRate} serialBaudOptions={serialBaudOptions}
           hardwareConnected={hardwareConnected}
           plotterPaused={plotterPaused} setPlotterPaused={setPlotterPaused} plotData={plotData} setPlotData={setPlotData} selectedPlotPins={selectedPlotPins} setSelectedPlotPins={setSelectedPlotPins} plotterCanvasRef={plotterCanvasRef} serialPlotLabelsRef={serialPlotLabelsRef}
           showConnectionsPanel={showConnectionsPanel} wires={wires} updateWireColor={updateWireColor} deleteWire={deleteWire}
         />
+
+        {/* MY PROJECTS SIDEBAR */}
+        <aside
+          className="bg-[var(--bg2)] border-l border-[var(--border)] flex flex-col shrink-0 overflow-hidden transition-[width] duration-200"
+          style={{ width: showProjectsSidebar ? 320 : 0, borderLeft: showProjectsSidebar ? '1px solid var(--border)' : 'none' }}
+        >
+          {showProjectsSidebar && (
+            <>
+              <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
+                <span className="text-sm font-bold text-[var(--text)] tracking-tight">My Projects</span>
+                <button 
+                  onClick={() => setShowProjectsSidebar(false)} 
+                  className="bg-[var(--card)] hover:bg-[var(--bg)] border border-[var(--border)] text-[var(--text3)] hover:text-[var(--text)] rounded-lg w-7 h-7 flex items-center justify-center transition-all active:scale-95"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                </button>
+              </div>
+
+              <div className="px-5 pb-4 shrink-0">
+                <div className="flex p-1 bg-[var(--bg)] rounded-xl border border-[var(--border)]">
+                  {[
+                    { id: 'favourites', label: 'Fav' },
+                    { id: 'projects', label: 'Projects' },
+                    { id: 'custom', label: 'Custom' },
+                    { id: 'settings', label: 'Settings' },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setProjectsSidebarTab(tab.id)}
+                      className={`flex-1 py-1.5 px-1 rounded-lg text-[11px] font-bold transition-all duration-200
+                        ${projectsSidebarTab === tab.id 
+                          ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm' 
+                          : 'text-[var(--text3)] hover:text-[var(--text2)]'
+                        }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-2">
+                {projectsSidebarTab === 'favourites' && (
+                  <div>
+                    <div className="text-[11px] text-[var(--text3)] px-1 py-1.5">Starred projects appear here.</div>
+                    {myProjects.filter(p => favouriteProjectIds.includes(p.id)).length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                        <div className="w-16 h-16 rounded-2xl bg-[var(--bg)] border border-[var(--border)] flex items-center justify-center mb-4 text-[var(--text3)]">
+                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
+                        </div>
+                        <div className="text-sm font-bold text-[var(--text)] mb-1">No Favourites Yet</div>
+                        <div className="text-[11px] text-[var(--text3)] leading-normal max-w-[180px]">Star a project from the Projects tab to see it here.</div>
+                      </div>
+                    ) : myProjects.filter(p => favouriteProjectIds.includes(p.id)).map(proj => (
+                      <ProjectCard
+                        key={proj.id}
+                        proj={proj}
+                        currentProjectId={currentProjectId}
+                        renamingProjectId={renamingProjectId}
+                        renameValue={renameValue}
+                        setRenameValue={setRenameValue}
+                        handleConfirmRename={handleConfirmRename}
+                        setRenamingProjectId={setRenamingProjectId}
+                        handleLoadProject={handleLoadProject}
+                        isRunning={isRunning}
+                        setShowProjectsSidebar={setShowProjectsSidebar}
+                        onContextMenu={(projData, x, y) => setProjContextMenu({ proj: projData, x, y })}
+                        formatProjectDate={formatProjectDate}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {projectsSidebarTab === 'projects' && (
+                  <div>
+                    <div className="flex justify-between items-center mb-4 px-1">
+                      <div className="text-[10px] font-extrabold text-[var(--text3)] uppercase tracking-wider">Your Library</div>
+                      <button 
+                        onClick={() => { setShowProjectsSidebar(false); handleNewProject(); }}
+                        className="flex items-center gap-1.5 bg-[var(--accent)] text-white px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-lg shadow-[var(--accent)]/20 hover:brightness-110 active:scale-95 transition-all"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                        NEW
+                      </button>
+                    </div>
+                    {myProjects.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 px-4 text-center border border-dashed border-[var(--border)] rounded-2xl bg-[var(--bg)]/30">
+                        <div className="w-14 h-14 rounded-2xl bg-[var(--bg)] border border-[var(--border)] flex items-center justify-center mb-4 text-[var(--text3)]">
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /></svg>
+                        </div>
+                        <div className="text-sm font-bold text-[var(--text)] mb-1">No saved projects</div>
+                        <div className="text-[11px] text-[var(--text3)] leading-normal max-w-[180px]">Your circuits are auto-saved as you work.</div>
+                      </div>
+                    ) : myProjects.map(proj => (
+                      <ProjectCard
+                        key={proj.id}
+                        proj={proj}
+                        currentProjectId={currentProjectId}
+                        renamingProjectId={renamingProjectId}
+                        renameValue={renameValue}
+                        setRenameValue={setRenameValue}
+                        handleConfirmRename={handleConfirmRename}
+                        setRenamingProjectId={setRenamingProjectId}
+                        handleLoadProject={handleLoadProject}
+                        isRunning={isRunning}
+                        setShowProjectsSidebar={setShowProjectsSidebar}
+                        onContextMenu={(projData, x, y) => setProjContextMenu({ proj: projData, x, y })}
+                        formatProjectDate={formatProjectDate}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {projectsSidebarTab === 'custom' && (
+                  <div>
+                    <div className="flex justify-between items-center mb-4 px-1">
+                      <div className="text-[10px] font-extrabold text-[var(--text3)] uppercase tracking-wider">Custom Parts</div>
+                      <button 
+                        onClick={() => setShowCreateComponentModal(true)}
+                        className="flex items-center gap-1.5 bg-[var(--accent)] text-white px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-lg shadow-[var(--accent)]/20 hover:brightness-110 active:scale-95 transition-all"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                        CREATE
+                      </button>
+                    </div>
+                    <div className="flex flex-col items-center justify-center py-12 px-4 text-center border border-dashed border-[var(--border)] rounded-xl">
+                       <div className="text-sm font-bold text-[var(--text)] mb-1 opacity-50">Nothing here yet</div>
+                       <div className="text-[11px] text-[var(--text3)] leading-normal">Custom components will appear here.</div>
+                    </div>
+                  </div>
+                )}
+
+                {projectsSidebarTab === 'settings' && (
+                  <div className="flex flex-col gap-2 py-1">
+                    <div className="text-[11px] font-bold text-[var(--text3)] uppercase tracking-wider px-1 py-1.5">Data Management</div>
+                    <button className="w-full flex items-center gap-2.5 bg-[var(--card)] border border-[var(--border)] text-[var(--text)] rounded-lg px-3 py-2.5 text-[13px]" onClick={handleBackupWorkflow}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                      Backup
+                      <span className="ml-auto text-[11px] text-[var(--text3)]">Download ZIP</span>
+                    </button>
+                    <button className="w-full flex items-center gap-2.5 bg-[var(--card)] border border-[var(--border)] text-[var(--text)] rounded-lg px-3 py-2.5 text-[13px]" onClick={() => backupRestoreInputRef.current?.click()}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                      Restore
+                      <span className="ml-auto text-[11px] text-[var(--text3)]">From ZIP</span>
+                    </button>
+                    {isAuthenticated && (
+                      <button className="w-full flex items-center gap-2.5 bg-[var(--card)] border border-[var(--border)] text-[var(--text)] rounded-lg px-3 py-2.5 text-[13px]" onClick={handleSyncToCloud}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10" /><polyline points="23 20 23 14 17 14" /><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15" /></svg>
+                        Sync to Cloud
+                        <span className="ml-auto text-[11px] text-[var(--text3)]">Upload</span>
+                      </button>
+                    )}
+                    {isAuthenticated && (
+                      <>
+                        <div className="h-px bg-[var(--border)] my-1" />
+                        <div className="text-[11px] font-bold text-[var(--text3)] uppercase tracking-wider px-1 py-1.5">Account</div>
+                        <button className="w-full flex items-center gap-2.5 bg-[var(--card)] border border-[var(--red)] text-[var(--red)] rounded-lg px-3 py-2.5 text-[13px]" onClick={() => { logout(); setShowProjectsSidebar(false); }}>
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
+                          Logout
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-[var(--border)] p-4 bg-[var(--bg2)] flex flex-col gap-3 shrink-0">
+                {!isAuthenticated ? (
+                  <button 
+                    onClick={() => { const lastEmail = localStorage.getItem('ohw_last_email'); navigate('/login', { state: { email: lastEmail, from: window.location.pathname } }); }}
+                    className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] text-white py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-[var(--accent)]/20 hover:brightness-110 active:scale-[0.98] transition-all"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" y1="12" x2="3" y2="12" /></svg>
+                    Sign In to Sync
+                  </button>
+                ) : (
+                  <div 
+                    className="flex items-center gap-3 p-2.5 rounded-xl bg-[var(--card)] border border-[var(--border)] group cursor-pointer hover:border-[var(--text3)] transition-all"
+                    onClick={() => {
+                      if (user?.role === 'teacher') navigate('/teacher/dashboard')
+                      else if (user?.role === 'student') navigate('/student/dashboard')
+                      else navigate('/user/dashboard')
+                    }}
+                    title="Go to dashboard"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-[var(--accent)]/10 border border-[var(--accent)]/20 flex items-center justify-center text-[var(--accent)] text-xs font-bold uppercase">
+                      {user?.name?.[0] || 'U'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11px] font-bold text-[var(--text)] truncate">{user?.name || 'User'}</div>
+                      <div className="text-[9px] text-[var(--text3)] font-medium uppercase tracking-tight">{user?.role || 'Developer'}</div>
+                    </div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+                  </div>
+                )}
+
+                <div className="flex p-1 bg-[var(--bg)] rounded-xl border border-[var(--border)] shadow-inner">
+                  <button
+                    className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all
+                      ${!isAuthenticated 
+                        ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm border border-[var(--border)]' 
+                        : 'text-[var(--text3)] hover:text-[var(--text2)]'}`}
+                    onClick={() => { if (isAuthenticated) { if (user?.email) localStorage.setItem('ohw_last_email', user.email); logout(); } }}
+                  >
+                    Local
+                  </button>
+                  <button
+                    className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all
+                      ${isAuthenticated 
+                        ? 'bg-[var(--accent)] text-white shadow-md' 
+                        : 'text-[var(--text3)] hover:text-[var(--text2)]'}`}
+                    onClick={() => { if (!isAuthenticated) { const lastEmail = localStorage.getItem('ohw_last_email'); navigate('/login', { state: { email: lastEmail, from: window.location.pathname } }); } }}
+                  >
+                    Cloud
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </aside>
+
+        {/* GAMIFICATION GUIDE PANEL */}
+        {gamificationMode && gamPanelOpen && (
+          <aside style={{
+            width: 280, background: '#0a0d1a', borderLeft: '1px solid rgba(255,255,255,.07)',
+            display: 'flex', flexDirection: 'column', flexShrink: 0, overflow: 'hidden',
+            fontFamily: "'Space Grotesk', sans-serif",
+          }}>
+            {/* Tabs */}
+            <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,.07)', flexShrink: 0 }}>
+              {[{ id: 'components', label: '🔧 Parts' }, { id: 'wiring', label: '〰 Wiring' }, { id: 'concepts', label: '📚 Code' }].map(tab => (
+                <button key={tab.id} onClick={() => setGamTab(tab.id)} style={{
+                  flex: 1, padding: '9px 4px', background: 'none', border: 'none',
+                  borderBottom: `2px solid ${gamTab === tab.id ? '#00b4ff' : 'transparent'}`,
+                  color: gamTab === tab.id ? '#00b4ff' : 'rgba(255,255,255,.4)',
+                  fontFamily: 'inherit', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                }}>{tab.label}</button>
+              ))}
+            </div>
+
+            {/* Body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 80px' }}>
+
+              {gamTab === 'components' && (
+                <div>
+                  <div style={{
+                    padding: '9px 12px', borderRadius: 9, marginBottom: 14,
+                    background: gamAllUnlocked ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.08)',
+                    border: `1px solid ${gamAllUnlocked ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)'}`,
+                    fontSize: 12, fontWeight: 600,
+                    color: gamAllUnlocked ? '#22c55e' : '#ef4444',
+                    display: 'flex', alignItems: 'center', gap: 8,
+                  }}>
+                    {gamAllUnlocked ? '✅ All components unlocked' : `⚠️ ${gamLockedCount} need unlocking`}
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                    {(gamProjectComponents || []).map((c, i) => (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'center', gap: 9,
+                        padding: '9px 11px', borderRadius: 9,
+                        background: c.isLocked ? 'rgba(239,68,68,.05)' : 'rgba(34,197,94,.05)',
+                        border: `1px solid ${c.isLocked ? 'rgba(239,68,68,.2)' : 'rgba(34,197,94,.18)'}`,
+                      }}>
+                        <span style={{ fontSize: 18, flexShrink: 0 }}>{c.isLocked ? '🔒' : (c.compDef?.icon || '✅')}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: c.isLocked ? 'rgba(255,255,255,.45)' : '#fff' }}>
+                            {c.qty > 1 ? `${c.qty}× ` : ''}{c.label}
+                          </div>
+                          <div style={{ fontSize: 9, color: c.isLocked ? '#ef4444' : '#22c55e', marginTop: 2 }}>
+                            {c.isLocked ? 'Study theory to unlock' : 'Available in palette'}
+                          </div>
+                        </div>
+                        {c.isLocked && c.compId && (
+                          <button
+                            onClick={() => navigate(`/components/${c.compId}/theory`)}
+                            style={{ background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.35)', color: '#ef4444', borderRadius: 6, padding: '3px 7px', fontSize: 9, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+                          >Unlock →</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <button onClick={() => navigate('/components')} style={{ marginTop: 16, width: '100%', padding: '9px', background: 'rgba(0,180,255,.06)', border: '1px solid rgba(0,180,255,.2)', color: '#00b4ff', borderRadius: 9, fontFamily: 'inherit', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                    🔓 Unlock More Components
+                  </button>
+                </div>
+              )}
+
+              {gamTab === 'wiring' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {gamProject?.wiring?.length > 0 ? gamProject.wiring.map((w, i) => (
+                    <div key={i} style={{ padding: '9px 11px', borderRadius: 8, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,180,255,.15)', border: '1px solid rgba(0,180,255,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#00b4ff', flexShrink: 0 }}>{i + 1}</div>
+                      <div style={{ flex: 1, fontSize: 10, color: 'rgba(255,255,255,.75)', lineHeight: 1.5 }}>
+                        <span style={{ color: '#00b4ff', fontFamily: 'monospace' }}>{w.from}</span>
+                        <span style={{ color: 'rgba(255,255,255,.3)', margin: '0 5px' }}>→</span>
+                        <span style={{ color: '#22c55e', fontFamily: 'monospace' }}>{w.to}</span>
+                      </div>
+                    </div>
+                  )) : (
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,.3)', textAlign: 'center', padding: '32px 0' }}>No wiring guide yet.</div>
+                  )}
+                </div>
+              )}
+
+              {gamTab === 'concepts' && gamProject && (
+                <div>
+                  {gamProject.concepts?.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,.3)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 8 }}>Concepts</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 16 }}>
+                        {gamProject.concepts.map((c, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 10px', borderRadius: 6, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
+                            <span style={{ color: gamProject.color || '#22c55e', fontSize: 11 }}>▸</span>
+                            <span style={{ fontSize: 11, color: 'rgba(255,255,255,.65)', fontFamily: 'monospace' }}>{c}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {gamProject.starterCode && (
+                    <>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,.3)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 8 }}>Starter Code</div>
+                      <div style={{ background: 'rgba(0,0,0,.4)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 9, padding: '11px', overflow: 'auto' }}>
+                        <pre style={{ margin: 0, fontSize: 10, color: '#a5f3fc', lineHeight: 1.7, fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'pre-wrap' }}>{gamProject.starterCode}</pre>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            {gamProject && (
+              <div style={{ flexShrink: 0, padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,.07)', background: 'rgba(0,0,0,.3)' }}>
+                <button
+                  onClick={handleGamificationSubmit}
+                  disabled={!gamAllUnlocked}
+                  style={{ width: '100%', padding: '10px', background: gamAllUnlocked ? (gamProject.color || '#22c55e') : 'rgba(255,255,255,.05)', border: gamAllUnlocked ? 'none' : '1px solid rgba(255,255,255,.1)', color: gamAllUnlocked ? '#fff' : 'rgba(255,255,255,.25)', borderRadius: 9, fontFamily: 'inherit', fontSize: 12, fontWeight: 700, cursor: gamAllUnlocked ? 'pointer' : 'not-allowed', marginBottom: 7 }}
+                  title={gamAllUnlocked ? '' : `Unlock ${gamLockedCount} component${gamLockedCount > 1 ? 's' : ''} first`}
+                >
+                  {gamAllUnlocked ? '▶ Submit Assessment' : `🔒 Unlock ${gamLockedCount} first`}
+                </button>
+                <button onClick={() => navigate(`/${gamProject.slug}/guide`)} style={{ width: '100%', padding: '7px', background: 'transparent', border: '1px solid rgba(255,255,255,.1)', color: 'rgba(255,255,255,.35)', borderRadius: 9, fontFamily: 'inherit', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                  📖 Full Guide
+                </button>
+              </div>
+            )}
+          </aside>
+        )}
       </div>
 
       {/* ── SAVE DIALOG ──────────────────────────────────────────────────────── */}
@@ -4728,9 +6379,137 @@ export default function SimulatorPage() {
         </div>
       )}
 
+      {/* Project right-click context menu */}
+      {projContextMenu && (
+        <div
+          className="fixed z-[9999] bg-[var(--bg2)] border border-[var(--border)] rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] min-w-[200px] overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+          style={{ left: projContextMenu.x, top: Math.min(projContextMenu.y, window.innerHeight - 240) }}
+          onMouseDown={e => e.stopPropagation()}
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="px-4 py-2.5 text-[10px] font-extrabold text-[var(--text3)] uppercase tracking-wider border-b border-[var(--border)] bg-[var(--bg)]/40 flex items-center justify-between">
+            <span className="truncate mr-2">{projContextMenu.proj.name || 'Untitled Project'}</span>
+            <div className="flex gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]/30" />
+              <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]/50" />
+            </div>
+          </div>
+          
+          <div className="p-1 flex flex-col gap-0.5">
+            <button 
+              className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-semibold text-[var(--text2)] hover:text-[var(--text)] rounded-lg transition-all hover:bg-[var(--card)] group"
+              onClick={() => { toggleFavourite(projContextMenu.proj.id); setProjContextMenu(null); }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill={favouriteProjectIds.includes(projContextMenu.proj.id) ? "var(--orange, #f59e0b)" : "none"} stroke={favouriteProjectIds.includes(projContextMenu.proj.id) ? "var(--orange, #f59e0b)" : "currentColor"} strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
+              {favouriteProjectIds.includes(projContextMenu.proj.id) ? 'Unfavourite' : 'Favourite'}
+            </button>
+            
+            <button 
+              className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-semibold text-[var(--text2)] hover:text-[var(--text)] rounded-lg transition-all hover:bg-[var(--card)]"
+              onClick={() => { handleCopyProject(projContextMenu.proj); setProjContextMenu(null); }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+              Make a Copy
+            </button>
+            
+            <button 
+              className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-semibold text-[var(--text2)] hover:text-[var(--text)] rounded-lg transition-all hover:bg-[var(--card)]"
+              onClick={() => { handleStartRename(projContextMenu.proj, { stopPropagation: () => {} }); setProjContextMenu(null); setProjectsSidebarTab('projects'); }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+              Rename Project
+            </button>
+            
+            <div className="h-px bg-[var(--border)] my-1 mx-2 opacity-50" />
+            
+            <button 
+              className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-semibold text-red-500 hover:text-red-600 rounded-lg transition-all hover:bg-red-500/10"
+              onClick={() => { handleDeleteProject(projContextMenu.proj.id); setProjContextMenu(null); }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /></svg>
+              Delete Project
+            </button>
+          </div>
+        </div>
+      )}
+
 
     </div>
   )
+}
+
+function ProjectCard({ proj, currentProjectId, renamingProjectId, renameValue, setRenameValue, handleConfirmRename, setRenamingProjectId, handleLoadProject, isRunning, setShowProjectsSidebar, onContextMenu, formatProjectDate }) {
+  const isCurrent = proj.id === currentProjectId;
+
+  return (
+    <div
+      className={`group relative rounded-xl p-3.5 mb-3 cursor-pointer transition-all duration-200 border shadow-sm
+        ${isCurrent 
+          ? 'bg-[rgba(var(--accent-rgb,100,180,255),0.08)] border-[var(--accent)]' 
+          : 'bg-[var(--card)] border-[var(--border)] hover:border-[var(--text3)] hover:shadow-md'
+        }`}
+      onClick={() => { if (renamingProjectId !== proj.id) handleLoadProject(proj); }}
+      onContextMenu={(e) => { e.preventDefault(); onContextMenu(proj, e.clientX, e.clientY); }}
+    >
+      <div className="flex flex-col gap-2.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            {renamingProjectId === proj.id ? (
+              <input
+                autoFocus
+                className="bg-[var(--bg)] border border-[var(--accent)] text-[var(--text)] px-2.5 py-1.5 rounded-lg text-sm w-full outline-none ring-2 ring-[var(--accent)]/20"
+                value={renameValue}
+                onChange={e => setRenameValue(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleConfirmRename(proj.id); if (e.key === 'Escape') setRenamingProjectId(null); }}
+                onClick={e => e.stopPropagation()}
+              />
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-sm text-[var(--text)] truncate block leading-tight">
+                  {proj.name || 'Untitled Project'}
+                </span>
+                {isCurrent && (
+                  <span className="flex h-2 w-2 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)] shrink-0 animate-pulse" title="Currently open" />
+                )}
+              </div>
+            )}
+          </div>
+          {!renamingProjectId && (
+            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity translate-x-1 group-hover:translate-x-0">
+              <button 
+                className="bg-[var(--accent)] text-white text-[11px] font-bold px-3 py-1.5 rounded-lg shadow-sm hover:brightness-110 active:scale-95 transition-all"
+                onClick={(e) => { e.stopPropagation(); handleLoadProject(proj); setShowProjectsSidebar(false); }}
+                disabled={isRunning}
+              >
+                Load
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <div className="flex items-center gap-1.5 text-[11px] text-[var(--text3)] font-medium">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 12L12 6L18 12" /><path d="M6 18L12 12L18 18" /></svg>
+            {proj.board === 'arduino_uno' ? 'Arduino Uno' : (proj.board || 'Custom Board')}
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] text-[var(--text3)] font-medium">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></svg>
+            {proj.components?.length ?? 0} components
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] text-[var(--text3)] opacity-70 ml-auto">
+            {formatProjectDate(proj.savedAt)}
+          </div>
+        </div>
+      </div>
+
+      {renamingProjectId === proj.id && (
+        <div className="flex gap-2 mt-3 justify-end">
+          <button className="px-3 py-1.5 text-xs font-semibold text-[var(--text3)] hover:text-[var(--text)] transition-colors" onClick={(e) => { e.stopPropagation(); setRenamingProjectId(null); }}>Cancel</button>
+          <button className="px-4 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-lg shadow-md" onClick={(e) => { e.stopPropagation(); handleConfirmRename(proj.id); }}>Rename</button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 

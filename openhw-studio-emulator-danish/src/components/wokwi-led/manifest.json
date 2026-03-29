@@ -10,18 +10,18 @@
     },
     "pins": [
         {
-            "id": "A",
+            "id": "K",
             "x": 16,
             "y": 43,
             "type": "input",
-            "description": "Anode (+)"
+            "description": "Cathode (-)"
         },
         {
-            "id": "K",
+            "id": "A",
             "x": 24,
             "y": 43,
             "type": "input",
-            "description": "Cathode (-)"
+            "description": "Anode (+)"
         }
     ]
 }

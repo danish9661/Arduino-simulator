@@ -1,3 +1,10 @@
+import {
+  PICO_SOFTSERIAL_PINS,
+  PICO_UART_PINS,
+  UNO_SOFTSERIAL_PINS,
+  UNO_UART_PINS,
+} from './board-profiles';
+
 export function isProgrammableBoardType(type) {
   return /(arduino|esp32|stm32|rp2040|pico)/i.test(String(type || ''));
 }
@@ -35,10 +42,7 @@ export function getUartPinCandidates(boardType) {
   }
 
   if (t.includes('rp2040') || t.includes('pico')) {
-    return {
-      tx: ['TX', 'TX0', 'GP0', 'GPIO0', '0', 'D0'],
-      rx: ['RX', 'RX0', 'GP1', 'GPIO1', '1', 'D1'],
-    };
+    return PICO_UART_PINS;
   }
 
   if (t.includes('stm32')) {
@@ -48,15 +52,55 @@ export function getUartPinCandidates(boardType) {
     };
   }
 
-  return {
-    tx: ['1', 'D1', 'TX', 'TX0'],
-    rx: ['0', 'D0', 'RX', 'RX0'],
-  };
+  return UNO_UART_PINS;
+}
+
+export function getSoftwareSerialPinCandidates(boardType) {
+  const t = String(boardType || '').toLowerCase();
+
+  if (t.includes('esp32')) {
+    // Common SoftwareSerial example defaults in simulator projects.
+    return {
+      tx: ['17', 'D17', 'GPIO17'],
+      rx: ['16', 'D16', 'GPIO16'],
+    };
+  }
+
+  if (t.includes('rp2040') || t.includes('pico')) {
+    return PICO_SOFTSERIAL_PINS;
+  }
+
+  if (t.includes('stm32')) {
+    return {
+      tx: ['10', 'D10', 'PB10'],
+      rx: ['11', 'D11', 'PB11'],
+    };
+  }
+
+  // Arduino UNO / default: SoftwareSerial(11,10) => RX=11, TX=10
+  return UNO_SOFTSERIAL_PINS;
 }
 
 export function areBoardsUartConnected(sourceBoardId, sourceType, targetBoardId, targetType, areConnected) {
   const source = getUartPinCandidates(sourceType);
   const target = getUartPinCandidates(targetType);
+
+  const sourceEndpoints = withAliases(sourceBoardId, source.tx);
+  const targetEndpoints = withAliases(targetBoardId, target.rx);
+
+  for (const src of sourceEndpoints) {
+    for (const dst of targetEndpoints) {
+      if (areConnected(src, dst)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+export function areBoardsSoftSerialConnected(sourceBoardId, sourceType, targetBoardId, targetType, areConnected) {
+  const source = getSoftwareSerialPinCandidates(sourceType);
+  const target = getSoftwareSerialPinCandidates(targetType);
 
   const sourceEndpoints = withAliases(sourceBoardId, source.tx);
   const targetEndpoints = withAliases(targetBoardId, target.rx);
