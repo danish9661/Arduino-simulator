@@ -33,5 +33,9 @@ Thumbs.db
 .vscode/
 wokwi.js
 
+# Sub-repo folders (renamed temporarily during sync)
+velxio-master/
+
+
 OpenHW-studio-frontend-danish/build_output.txt
 deployment_guide.md

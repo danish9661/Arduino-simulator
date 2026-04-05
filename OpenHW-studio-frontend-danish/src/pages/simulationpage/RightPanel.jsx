@@ -24,8 +24,9 @@ export function RightPanel(props) {
     onToggleCodeFileDisabled,
     onCreateCodeFile, onCreateCodeTab, onUploadCodeFile,
     libQuery, setLibQuery, handleSearchLibraries, isSearchingLib, libMessage, libInstalled, libResults, handleInstallLibrary, installingLib,
-    serialPaused, setSerialPaused, isRunning, serialHistory, setSerialHistory, serialOutputRef, serialInput, setSerialInput, sendSerialInput,
-    serialViewMode, setSerialViewMode, serialBoardFilter, setSerialBoardFilter, serialBoardOptions, serialBoardLabels, serialBoardKinds, serialBaudRate, setSerialBaudRate, serialBaudOptions,
+    serialPaused, setSerialPaused, isRunning, serialHistory, setSerialHistory, serialOutputRef, serialInput, setSerialInput, sendSerialInput, clearSerialMonitor,
+    serialViewMode, setSerialViewMode, serialBoardFilter, setSerialBoardFilter, serialBoardOptions, serialBoardLabels, serialBoardKinds, serialBaudRate, setSerialBaudRate, serialBaudOptions, serialLineEnding, setSerialLineEnding,
+    rp2040DebugTelemetryEnabled, setRp2040DebugTelemetryEnabled,
     hardwareConnected,
     plotterPaused, setPlotterPaused, plotData, setPlotData, selectedPlotPins, setSelectedPlotPins, plotterCanvasRef, serialPlotLabelsRef,
     showConnectionsPanel, wires, updateWireColor, deleteWire,
@@ -1115,17 +1116,49 @@ export function RightPanel(props) {
                     <button
                       className="bg-transparent border border-[var(--border)] text-[var(--text2)] rounded-md px-2 py-0.5 text-[11px] cursor-pointer font-inherit whitespace-nowrap"
                       onClick={() => serialViewMode === 'monitor' ? setSerialPaused(p => !p) : setPlotterPaused(p => !p)}
-                      title={serialViewMode === 'monitor' ? (serialPaused ? 'Resume auto-scroll' : 'Pause auto-scroll') : (plotterPaused ? 'Resume plotting' : 'Pause plotting')}
+                      title={serialViewMode === 'monitor' ? (serialPaused ? 'Resume serial monitor' : 'Pause serial monitor') : (plotterPaused ? 'Resume plotting' : 'Pause plotting')}
                     >
                       {(serialViewMode === 'monitor' ? serialPaused : plotterPaused) ? '▶ Resume' : '⏸ Pause'}
                     </button>
+                    {serialViewMode === 'monitor' && (
+                      <select
+                        value={serialLineEnding || 'nl'}
+                        onChange={(e) => setSerialLineEnding(e.target.value)}
+                        title="Serial line ending"
+                        style={{
+                          background: 'var(--card)',
+                          border: '1px solid var(--border)',
+                          color: 'var(--text2)',
+                          borderRadius: 6,
+                          padding: '2px 6px',
+                          fontSize: 11,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="nl">\\n</option>
+                        <option value="crlf">\\r\\n</option>
+                        <option value="cr">\\r</option>
+                        <option value="none">None</option>
+                      </select>
+                    )}
                     <button
                       className="bg-transparent border border-[var(--border)] text-[var(--text2)] rounded-md px-2 py-0.5 text-[11px] cursor-pointer font-inherit whitespace-nowrap" style={{ color: 'var(--red)', borderColor: 'rgba(255,68,68,0.3)' }}
-                      onClick={() => serialViewMode === 'monitor' ? setSerialHistory([]) : setPlotData([])}
+                      onClick={() => serialViewMode === 'monitor' ? (clearSerialMonitor ? clearSerialMonitor() : setSerialHistory([])) : setPlotData([])}
                       title={serialViewMode === 'monitor' ? 'Clear all output' : 'Clear plot'}
                     >
                       🗑 Clear
                     </button>
+                    {serialViewMode === 'monitor' && (
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text3)', cursor: 'pointer' }} title="RP2040 debug telemetry">
+                        <input
+                          type="checkbox"
+                          checked={!!rp2040DebugTelemetryEnabled}
+                          onChange={(e) => setRp2040DebugTelemetryEnabled(e.target.checked)}
+                          style={{ margin: 0 }}
+                        />
+                        RP2040 dbg
+                      </label>
+                    )}
                   </div>
                 </div>
                 {serialViewMode === 'monitor' ? (

@@ -2,7 +2,7 @@ import { BoardRunner, createRunnerForBoard, LOGIC_REGISTRY, COMPONENT_PINS } fro
 import { BaseComponent } from '@openhw/emulator/src/components/BaseComponent.ts';
 import {
     isProgrammableBoardType,
-    areBoardsUartConnected,
+    resolveUartRoute,
     areBoardsSoftSerialConnected,
 } from './protocol-routing.js';
 
@@ -251,6 +251,14 @@ function areConnected(pinA: string, pinB: string): boolean {
     return netA !== undefined && netA === netB;
 }
 
+function resolveRp2040ExecutableRanges(boardComp: any, boardExecutableRangesMap: any): any[] | undefined {
+    const boardId = String(boardComp?.id || '').trim();
+    const fromMap = boardId ? boardExecutableRangesMap?.[boardId] : undefined;
+    const fromAttrs = boardComp?.attrs?.rp2040ExecutableRanges;
+    const candidate = fromMap ?? fromAttrs;
+    return Array.isArray(candidate) ? candidate : undefined;
+}
+
 function postRunnerState(stateObj: any, boardId: string) {
     if (mode === 'single') {
         postMessage(stateObj);
@@ -271,21 +279,35 @@ function postRunnerState(stateObj: any, boardId: string) {
     postMessage(msg);
 }
 
-function routeUartByte(sourceBoardId: string, value: number) {
+function isSoftSerialLabel(label: string): boolean {
+    const key = String(label || '').trim().toLowerCase();
+    return key === 'softserial' || key === 'soft-serial' || key === 'soft_uart' || key === 'soft-uart' || key === 'softuart';
+}
+
+function routeUartByte(sourceBoardId: string, value: number, sourceLabel = 'uart0') {
     const sourceRunner = boardRunners.get(sourceBoardId);
     const sourceType = boardTypes.get(sourceBoardId) || '';
     const sourceBaud = sourceRunner?.getSerialBaudRate?.() ?? 9600;
+    const fromSoftSerial = isSoftSerialLabel(sourceLabel);
 
     for (const [targetBoardId, targetRunner] of boardRunners.entries()) {
         if (targetBoardId === sourceBoardId) continue;
 
         const targetType = boardTypes.get(targetBoardId) || '';
-        const uartLinked = areBoardsUartConnected(sourceBoardId, sourceType, targetBoardId, targetType, areConnected);
+        const uartRoute = fromSoftSerial
+            ? { connected: false, targetSource: null }
+            : resolveUartRoute(sourceBoardId, sourceType, targetBoardId, targetType, areConnected, sourceLabel);
         const softLinked = areBoardsSoftSerialConnected(sourceBoardId, sourceType, targetBoardId, targetType, areConnected);
 
-        if (uartLinked || softLinked) {
+        if (uartRoute.connected || softLinked) {
             targetRunner.setSerialBaudRate(sourceBaud);
-            targetRunner.serialRxByte(value);
+            if (uartRoute.connected && typeof (targetRunner as any).serialRxByteFromSource === 'function') {
+                (targetRunner as any).serialRxByteFromSource(value, uartRoute.targetSource || 'uart0');
+            } else if (softLinked && typeof (targetRunner as any).softSerialRxByte === 'function') {
+                (targetRunner as any).softSerialRxByte(value);
+            } else {
+                targetRunner.serialRxByte(value);
+            }
         }
     }
 }
@@ -294,7 +316,8 @@ self.onmessage = async (e) => {
     const data = e.data;
 
     if (data.type === 'START') {
-        const { hex, components, wires, customLogics, boardHexMap, boardPythonMap, baudRate, boardBaudMap, boardRuntimeMap } = data;
+        const { hex, components, wires, customLogics, boardHexMap, boardPythonMap, baudRate, boardBaudMap, boardRuntimeMap, boardExecutableRangesMap, debugRp2040 } = data;
+        const rp2040DebugEnabled = !!debugRp2040;
 
         stopAllRunners();
 
@@ -331,6 +354,7 @@ self.onmessage = async (e) => {
             const singleBoardId = programmableBoards[0]?.id;
             const pyScript = singleBoardId ? (boardPythonMap?.[singleBoardId] || '') : '';
             const singleBoardIsRp2040 = /(rp2040|pico)/i.test(singleBoardType);
+            const singleBoardExecutableRanges = resolveRp2040ExecutableRanges(programmableBoards[0], boardExecutableRangesMap);
 
             runner = createRunnerForBoard(
                 singleBoardType,
@@ -341,14 +365,15 @@ self.onmessage = async (e) => {
                 {
                     boardId: singleBoardId,
                     serialBaudRate: Number(boardBaudMap?.[singleBoardId] ?? baudRate ?? 9600),
-                    debugEnabled: singleBoardIsRp2040,
-                    debugIntervalMs: singleBoardIsRp2040 ? 800 : 0,
+                    debugEnabled: singleBoardIsRp2040 && rp2040DebugEnabled,
+                    debugIntervalMs: singleBoardIsRp2040 && rp2040DebugEnabled ? 1200 : 0,
                     // Pass pyScript metadata so the worker can inject over UART0 after boot.
                     pyScript: typeof pyScript === 'string' ? pyScript : '',
                     onByteTransmit: ({ boardId, value, char, source }) => {
                         postMessage({ type: 'serial', data: char, boardId, value, source });
                     },
                     forceMicroPythonJsRunner: !!singleBoardId && boardRuntimeMap?.[singleBoardId] === 'micropython-js',
+                    rp2040ExecutableRanges: singleBoardIsRp2040 ? singleBoardExecutableRanges : undefined,
                 }
             );
 
@@ -372,6 +397,7 @@ self.onmessage = async (e) => {
         programmableBoards.forEach((boardComp: any) => {
             const forceMicroPythonJsRunner = boardRuntimeMap?.[boardComp.id] === 'micropython-js';
             const fwHex = boardHexMap?.[boardComp.id] || boardComp?.attrs?.firmwareHex || boardComp?.attrs?.hex;
+            const executableRanges = resolveRp2040ExecutableRanges(boardComp, boardExecutableRangesMap);
             if (!forceMicroPythonJsRunner && (typeof fwHex !== 'string' || !fwHex.trim())) {
                 console.warn(`[Worker] Skipping board ${boardComp.id}: no board-specific firmware available.`);
                 return;
@@ -388,14 +414,15 @@ self.onmessage = async (e) => {
                 {
                     boardId: boardComp.id,
                     serialBaudRate: Number(boardBaudMap?.[boardComp.id] ?? baudRate ?? 9600),
-                    debugEnabled: /(rp2040|pico)/i.test(String(boardComp.type || '')),
-                    debugIntervalMs: /(rp2040|pico)/i.test(String(boardComp.type || '')) ? 800 : 0,
+                    debugEnabled: /(rp2040|pico)/i.test(String(boardComp.type || '')) && rp2040DebugEnabled,
+                    debugIntervalMs: /(rp2040|pico)/i.test(String(boardComp.type || '')) && rp2040DebugEnabled ? 1200 : 0,
                     pyScript: typeof pyScript === 'string' ? pyScript : '',
                     onByteTransmit: ({ boardId, value, char, source }) => {
                         postMessage({ type: 'serial', data: char, boardId, value, source });
-                        routeUartByte(boardId, value);
+                        routeUartByte(boardId, value, source || 'uart0');
                     },
                     forceMicroPythonJsRunner,
+                    rp2040ExecutableRanges: /(rp2040|pico)/i.test(String(boardComp.type || '')) ? executableRanges : undefined,
                 }
             );
 

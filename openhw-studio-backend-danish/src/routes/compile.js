@@ -7,6 +7,7 @@ const router = Router();
 
 // Compile Arduino code
 router.post('/', compileArduinoCode);
+router.post('/diagnostics', compileArduinoCode);
 router.post('/flash', flashFirmware);
 router.get('/ports', listSerialPorts);
 router.get('/pico/micropython-uf2', getDefaultPicoMicroPythonUf2);

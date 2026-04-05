@@ -1,0 +1,21 @@
+{
+  "name": "openhw-studio-cli-danish",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Terminal CLI for OpenHW Studio simulation workflows",
+  "scripts": {
+    "cli": "tsx src/cli.ts",
+    "dev": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "serialport": "^12.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

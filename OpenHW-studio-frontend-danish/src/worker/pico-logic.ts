@@ -24,14 +24,14 @@ export class PicoLogic extends BaseComponent {
 
   onPinStateChange(pinId: string, isHigh: boolean, cpuCycles: number) {
     const pin = normalizePicoPin(pinId);
-    if (pin === 'GP1') {
+    if (pin === 'GP1' || pin === 'GP5') {
       this.setState({ rxActive: true });
       if (this.rxTimeout) clearTimeout(this.rxTimeout);
       this.rxTimeout = setTimeout(() => {
         this.setState({ rxActive: false });
         this.rxTimeout = null;
       }, 100);
-    } else if (pin === 'GP0') {
+    } else if (pin === 'GP0' || pin === 'GP4') {
       this.setState({ txActive: true });
       if (this.txTimeout) clearTimeout(this.txTimeout);
       this.txTimeout = setTimeout(() => {

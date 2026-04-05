@@ -1,6 +1,6 @@
 import {
   PICO_SOFTSERIAL_PINS,
-  PICO_UART_PINS,
+  PICO_UART_SOURCE_PINS,
   UNO_SOFTSERIAL_PINS,
   UNO_UART_PINS,
 } from './board-profiles';
@@ -31,7 +31,22 @@ function withAliases(boardId, pins) {
   return Array.from(new Set(out));
 }
 
-export function getUartPinCandidates(boardType) {
+function normalizeUartSource(source) {
+  const s = String(source || 'uart0').toLowerCase();
+  if (s === 'uart1' || s === 'serial1' || s === '1') return 'uart1';
+  if (s === 'usb' || s === 'cdc' || s === 'serialusb') return 'usb';
+  return 'uart0';
+}
+
+export function getUartSources(boardType) {
+  const t = String(boardType || '').toLowerCase();
+  if (t.includes('rp2040') || t.includes('pico')) {
+    return ['uart0', 'uart1'];
+  }
+  return ['uart0'];
+}
+
+export function getUartPinCandidates(boardType, source = 'uart0') {
   const t = String(boardType || '').toLowerCase();
 
   if (t.includes('esp32')) {
@@ -42,7 +57,14 @@ export function getUartPinCandidates(boardType) {
   }
 
   if (t.includes('rp2040') || t.includes('pico')) {
-    return PICO_UART_PINS;
+    const selectedSource = normalizeUartSource(source);
+    if (selectedSource === 'uart1') return PICO_UART_SOURCE_PINS.uart1;
+    if (selectedSource === 'usb') {
+      // USB CDC is not tied to board pin endpoints, so use UART0 pins as a
+      // conservative compatibility fallback for wiring checks.
+      return PICO_UART_SOURCE_PINS.uart0;
+    }
+    return PICO_UART_SOURCE_PINS.uart0;
   }
 
   if (t.includes('stm32')) {
@@ -81,21 +103,28 @@ export function getSoftwareSerialPinCandidates(boardType) {
   return UNO_SOFTSERIAL_PINS;
 }
 
-export function areBoardsUartConnected(sourceBoardId, sourceType, targetBoardId, targetType, areConnected) {
-  const source = getUartPinCandidates(sourceType);
-  const target = getUartPinCandidates(targetType);
+export function resolveUartRoute(sourceBoardId, sourceType, targetBoardId, targetType, areConnected, source = 'uart0') {
+  const sourcePins = getUartPinCandidates(sourceType, source);
+  const sourceEndpoints = withAliases(sourceBoardId, sourcePins.tx);
 
-  const sourceEndpoints = withAliases(sourceBoardId, source.tx);
-  const targetEndpoints = withAliases(targetBoardId, target.rx);
+  for (const targetSource of getUartSources(targetType)) {
+    const targetPins = getUartPinCandidates(targetType, targetSource);
+    const targetEndpoints = withAliases(targetBoardId, targetPins.rx);
 
-  for (const src of sourceEndpoints) {
-    for (const dst of targetEndpoints) {
-      if (areConnected(src, dst)) {
-        return true;
+    for (const src of sourceEndpoints) {
+      for (const dst of targetEndpoints) {
+        if (areConnected(src, dst)) {
+          return { connected: true, targetSource };
+        }
       }
     }
   }
-  return false;
+
+  return { connected: false, targetSource: null };
+}
+
+export function areBoardsUartConnected(sourceBoardId, sourceType, targetBoardId, targetType, areConnected, source = 'uart0') {
+  return resolveUartRoute(sourceBoardId, sourceType, targetBoardId, targetType, areConnected, source).connected;
 }
 
 export function areBoardsSoftSerialConnected(sourceBoardId, sourceType, targetBoardId, targetType, areConnected) {

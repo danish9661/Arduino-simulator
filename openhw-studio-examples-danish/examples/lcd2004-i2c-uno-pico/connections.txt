@@ -1,0 +1,15 @@
+LCD2004 I2C wiring
+
+UNO:
+- LCD GND -> UNO GND
+- LCD VCC -> UNO 5V
+- LCD SDA -> UNO A4
+- LCD SCL -> UNO A5
+
+Pico:
+- LCD GND -> Pico GND
+- LCD VCC -> Pico 3V3
+- LCD SDA -> Pico GP4
+- LCD SCL -> Pico GP5
+
+Address used in sketch: 0x27

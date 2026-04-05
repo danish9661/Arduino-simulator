@@ -51,6 +51,22 @@ Object.entries(EmulatorComponents).forEach(([key, module]) => {
   }
 });
 
+// Compatibility aliases: accept WS2812 naming variants used in imported diagrams.
+const neopixelBaseModule = COMPONENT_REGISTRY['wokwi-neopixel-matrix'];
+if (neopixelBaseModule?.manifest) {
+  ['wokwi-ws2812b', 'wokwi-ws2821b'].forEach((aliasType) => {
+    if (COMPONENT_REGISTRY[aliasType]) return;
+    COMPONENT_REGISTRY[aliasType] = {
+      ...neopixelBaseModule,
+      manifest: {
+        ...neopixelBaseModule.manifest,
+        type: aliasType,
+        hiddenAlias: true,
+      },
+    };
+  });
+}
+
 const LOCAL_CATALOG = [];
 const LOCAL_PIN_DEFS = {};
 
@@ -206,6 +222,16 @@ function buildIndexSourceFromRegistry(registryInfo, fallbackType) {
 
 Object.values(COMPONENT_REGISTRY).forEach(module => {
   const manifest = module.manifest;
+  if (!manifest) return;
+
+  if (manifest.pins) {
+    LOCAL_PIN_DEFS[manifest.type] = manifest.pins;
+  }
+
+  if (manifest.hiddenAlias) {
+    return;
+  }
+
   const groupName = normalizeGroupName(manifest.group);
   let group = LOCAL_CATALOG.find(g => g.group === groupName);
   if (!group) {
@@ -213,12 +239,8 @@ Object.values(COMPONENT_REGISTRY).forEach(module => {
     LOCAL_CATALOG.push(group);
   }
 
-  const { pins, group: _, ...catalogItem } = manifest;
+  const { pins: _pins, group: _, ...catalogItem } = manifest;
   group.items.push(catalogItem);
-
-  if (pins) {
-    LOCAL_PIN_DEFS[manifest.type] = pins;
-  }
 });
 
 sortCatalog(LOCAL_CATALOG);
@@ -280,6 +302,13 @@ const BOARD_DEFAULT_BAUD = {
   rp2040: '115200',
 };
 
+const SERIAL_LINE_ENDINGS = {
+  none: '',
+  nl: '\n',
+  crlf: '\r\n',
+  cr: '\r',
+};
+
 const BOARD_FQBN = {
   arduino_uno: 'arduino:avr:uno',
   esp32: 'esp32:esp32:esp32',
@@ -304,6 +333,14 @@ function normalizeBoardKind(source) {
   if (s.includes('stm32')) return 'stm32';
   if (s.includes('rp2040') || s.includes('pico')) return 'rp2040';
   return 'arduino_uno';
+}
+
+function resolveBoardFqbnForComponent(boardComp, boardKind) {
+  const type = String(boardComp?.type || '').toLowerCase();
+  if (type.includes('pico-w') || type.includes('picow')) {
+    return 'rp2040:rp2040:rpipicow';
+  }
+  return BOARD_FQBN[boardKind] || BOARD_FQBN.arduino_uno;
 }
 
 function createDefaultMainCode(boardKind, boardId) {
@@ -478,21 +515,42 @@ function prepareRp2040SketchForSimulation(sourceCode) {
   if (!/\bSerial1?\b/.test(source)) return source;
   if (/OPENHW_SIM_SERIAL_REWRITE/.test(source)) return source;
 
+  const hasBlockingSerialWaitCondition = (condition) => {
+    const cond = String(condition || '');
+    if (!/!\s*Serial1?\b/.test(cond)) return false;
+    // Keep loops like !Serial1.available() intact; only strip plain readiness waits.
+    if (/!\s*Serial1?\s*(?:\.|\[)/.test(cond)) return false;
+    return true;
+  };
+
   const stripBlockingSerialWaits = (text) => String(text || '')
     // Many Arduino RP2040 sketches block forever in simulation with
     // while (!Serial) { ... } because USB CDC is not attached.
-    .replace(
-      /\bwhile\s*\(\s*[^)]*!\s*Serial1?[^)]*\)\s*;/g,
-      '/* OPENHW_SIM_SERIAL_WAIT_REMOVED: skip blocking serial wait in simulator. */'
-    )
-    .replace(
-      /\bwhile\s*\(\s*[^)]*!\s*Serial1?[^)]*\)\s*\{/g,
-      'if (false) { /* OPENHW_SIM_SERIAL_WAIT_REMOVED */'
-    )
-    .replace(
-      /\bwhile\s*\(\s*[^)]*!\s*Serial1?[^)]*\)\s*(?!\{|;)[^;\n]*;/g,
-      '/* OPENHW_SIM_SERIAL_WAIT_REMOVED: skip blocking serial wait in simulator. */'
-    );
+    .replace(/\bwhile\s*\(([^)]*)\)\s*;/g, (match, condition) => (
+      hasBlockingSerialWaitCondition(condition)
+        ? '/* OPENHW_SIM_SERIAL_WAIT_REMOVED: skip blocking serial wait in simulator. */'
+        : match
+    ))
+    .replace(/\bwhile\s*\(([^)]*)\)\s*\{/g, (match, condition) => (
+      hasBlockingSerialWaitCondition(condition)
+        ? 'if (false) { /* OPENHW_SIM_SERIAL_WAIT_REMOVED */'
+        : match
+    ))
+    .replace(/\bwhile\s*\(([^)]*)\)\s*(?!\{|;)[^;\n]*;/g, (match, condition) => (
+      hasBlockingSerialWaitCondition(condition)
+        ? '/* OPENHW_SIM_SERIAL_WAIT_REMOVED: skip blocking serial wait in simulator. */'
+        : match
+    ))
+    .replace(/\bfor\s*\(\s*;\s*([^;]*?)\s*;\s*\)\s*\{/g, (match, condition) => (
+      hasBlockingSerialWaitCondition(condition)
+        ? 'if (false) { /* OPENHW_SIM_SERIAL_WAIT_REMOVED */'
+        : match
+    ))
+    .replace(/\bfor\s*\(\s*;\s*([^;]*?)\s*;\s*\)\s*;/g, (match, condition) => (
+      hasBlockingSerialWaitCondition(condition)
+        ? '/* OPENHW_SIM_SERIAL_WAIT_REMOVED: skip blocking serial wait in simulator. */'
+        : match
+    ));
 
   const rewritten = stripBlockingSerialWaits(source.replace(/\bSerial\b(?!1)/g, 'Serial1'));
   if (rewritten === source) return source;
@@ -516,16 +574,24 @@ function resolveRp2040SourceMode({
   activePrefersPy,
   hasNativeSketch,
   hasPythonSource,
+  prefersNativeFromSyntax = false,
 }) {
   const mode = String(configuredMode || 'auto').toLowerCase();
-  if (mode === 'ino' || mode === 'native') return 'ino';
-  if (mode === 'py' || mode === 'python' || mode === 'micropython') return 'py';
 
   if (activePrefersIno) return 'ino';
   if (activePrefersPy) return 'py';
+
+  if (mode === 'py' || mode === 'python' || mode === 'micropython') {
+    // If user source is clearly Arduino/C++, avoid forcing it into MicroPython.
+    if (hasNativeSketch || prefersNativeFromSyntax) return 'ino';
+    return 'py';
+  }
+
+  if (mode === 'ino' || mode === 'native') return 'ino';
+
+  if (hasNativeSketch || prefersNativeFromSyntax) return 'ino';
   if (hasPythonSource) return 'py';
-  if (hasNativeSketch) return 'ino';
-  return 'py';
+  return 'ino';
 }
 
 function resolveComponentAttrString(attrs, key, fallback = '') {
@@ -861,6 +927,22 @@ export default function SimulatorPage({ gamificationMode = false }) {
   const [serialViewMode, setSerialViewMode] = useState('monitor'); // 'monitor' | 'plotter'
   const [serialBoardFilter, setSerialBoardFilter] = useState('all');
   const [serialBaudRate, setSerialBaudRate] = useState('9600');
+  const [serialLineEnding, setSerialLineEnding] = useState(() => {
+    try {
+      const saved = String(localStorage.getItem('openhw.serial.lineEnding') || '').toLowerCase();
+      return Object.prototype.hasOwnProperty.call(SERIAL_LINE_ENDINGS, saved) ? saved : 'nl';
+    } catch {
+      return 'nl';
+    }
+  });
+  const [rp2040DebugTelemetryEnabled, setRp2040DebugTelemetryEnabled] = useState(() => {
+    try {
+      const saved = String(localStorage.getItem('openhw.rp2040.debugTelemetry') || '').toLowerCase();
+      return saved === '1' || saved === 'true' || saved === 'on';
+    } catch {
+      return false;
+    }
+  });
   const [hardwareBoardId, setHardwareBoardId] = useState('');
   const [hardwareSerialTargetId, setHardwareSerialTargetId] = useState(null);
   const [hardwareStatus, setHardwareStatus] = useState('Not connected');
@@ -971,6 +1053,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
   const lastCompiledRef = useRef(null)
   const micropythonUf2PayloadRef = useRef(null)
   const rp2040DebugLastLogRef = useRef(new Map())
+  const rp2040WirelessLastLogRef = useRef(new Map())
+  const rp2040GdbLastLogRef = useRef(new Map())
   const rp2040UartMicroPythonBoardsRef = useRef(new Set())
   const rp2040UartSilentWarnedBoardsRef = useRef(new Set())
   const runStartGuardRef = useRef(false)
@@ -980,6 +1064,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
   const serialPlotLabelsRef = useRef([]);
   const latestParsedSerialRef = useRef([]);
   const serialIngressArbitrationRef = useRef(new Map());
+  const serialPausedRef = useRef(false);
+  const serialPausedQueueRef = useRef([]);
 
   const canvasRef = useRef(null)
   const svgRef = useRef(null)
@@ -997,6 +1083,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
   const [currentProjectId, setCurrentProjectId] = useState(null);
   const [currentProjectName, setCurrentProjectName] = useState('Untitled');
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showF1Menu, setShowF1Menu] = useState(false);
   const [saveDialogName, setSaveDialogName] = useState('');
   const [myProjects, setMyProjects] = useState([]);
   const currentProjectIdRef = useRef(null);   // mirror for use inside async callbacks
@@ -1755,6 +1842,26 @@ export default function SimulatorPage({ gamificationMode = false }) {
       serialOutputRef.current.scrollTop = serialOutputRef.current.scrollHeight;
     }
   }, [serialHistory, serialPaused]);
+
+  useEffect(() => {
+    serialPausedRef.current = serialPaused;
+  }, [serialPaused]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('openhw.serial.lineEnding', serialLineEnding);
+    } catch {
+      // no-op: storage may be unavailable in restricted contexts
+    }
+  }, [serialLineEnding]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('openhw.rp2040.debugTelemetry', rp2040DebugTelemetryEnabled ? '1' : '0');
+    } catch {
+      // no-op: storage may be unavailable in restricted contexts
+    }
+  }, [rp2040DebugTelemetryEnabled]);
 
   useEffect(() => {
     if (serialBoardFilter === 'all') return;
@@ -2527,6 +2634,11 @@ export default function SimulatorPage({ gamificationMode = false }) {
   // Cancel wire on Escape / delete selected
   useEffect(() => {
     const onKey = (e) => {
+      if (e.key === 'F1') {
+        e.preventDefault();
+        setShowF1Menu(prev => !prev);
+        return;
+      }
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
 
       if (e.key === 'Escape') { setWireStart(null); setSelected(null); setWireClickPos(null); }
@@ -2855,6 +2967,59 @@ export default function SimulatorPage({ gamificationMode = false }) {
 
   // ─── Project Save / Load Handlers ───────────────────────────────────────────
 
+  const handleDownloadFirmware = async () => {
+    try {
+      let firmware = lastCompiledRef.current?.result?.hex;
+      let artifactName = lastCompiledRef.current?.result?.artifactName || 'firmware.hex';
+
+      if (!firmware) {
+        const stored = JSON.parse(localStorage.getItem(`openhw_gdb_artifact_${board.id}`) || 'null');
+        firmware = stored?.firmware;
+        artifactName = stored?.artifactName || artifactName;
+      }
+
+      if (!firmware) {
+        const lastArtifact = JSON.parse(localStorage.getItem('openhw_gdb_last_artifact') || 'null');
+        firmware = lastArtifact?.firmware;
+        artifactName = lastArtifact?.artifactName || artifactName;
+      }
+
+      if (!firmware) {
+        appendConsoleEntry('error', 'No firmware available. Please compile the project first.', 'simulator');
+        return;
+      }
+
+      let content = firmware;
+      let mimeType = 'text/plain';
+
+      if (typeof firmware === 'string' && firmware.startsWith('UF2BASE64:')) {
+        const base64 = firmware.substring('UF2BASE64:'.length);
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        content = bytes;
+        mimeType = 'application/octet-stream';
+      }
+
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = artifactName;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      appendConsoleEntry('error', `Download failed: ${err.message}`, 'simulator');
+    }
+  };
+
+  const handleStartGDB = () => {
+    appendConsoleEntry('info', 'Connecting to GDB Session...', 'simulator');
+    // Note: requires backend running wokwi-gdbserver (e.g. gdbserver.js) on port 3333
+    appendConsoleEntry('info', 'Opening local GDB session on http://localhost:3333...', 'simulator');
+    window.open('http://localhost:3333', '_blank');
+  };
+
   /** Open the save dialog. Pre-fills with the current project name. */
   const handleSave = () => {
     setSaveDialogName(currentProjectName || 'Untitled');
@@ -3113,7 +3278,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
     });
   }, []);
 
-  const pushSerialRxChunk = useCallback((chunk, boardId = 'default', source = 'sim') => {
+  const appendSerialRxChunk = useCallback((chunk, boardId = 'default', source = 'sim') => {
     const normalizedBoardId = String(boardId || 'default');
     const normalizedSource = String(source || 'sim');
     const nowMs = Date.now();
@@ -3149,8 +3314,40 @@ export default function SimulatorPage({ gamificationMode = false }) {
     });
   }, [parseSerialForPlotter]);
 
+  const pushSerialRxChunk = useCallback((chunk, boardId = 'default', source = 'sim') => {
+    if (serialPausedRef.current) {
+      const queue = serialPausedQueueRef.current;
+      queue.push({ chunk, boardId, source });
+      if (queue.length > 1000) {
+        queue.splice(0, queue.length - 1000);
+      }
+      return;
+    }
+    appendSerialRxChunk(chunk, boardId, source);
+  }, [appendSerialRxChunk]);
+
+  useEffect(() => {
+    if (serialPaused) return;
+    const queue = serialPausedQueueRef.current;
+    if (!queue.length) return;
+
+    const pending = queue.splice(0, queue.length);
+    pending.forEach((entry) => {
+      appendSerialRxChunk(entry.chunk, entry.boardId, entry.source);
+    });
+  }, [serialPaused, appendSerialRxChunk]);
+
   const pushSerialTxLine = useCallback((text, boardId = 'all', source = 'sim') => {
     setSerialHistory((prev) => [...prev, { dir: 'tx', text, ts: getSerialTimestamp(), boardId, source }]);
+  }, []);
+
+  const clearSerialMonitor = useCallback(() => {
+    setSerialHistory([]);
+    serialPlotBufferRef.current = '';
+    serialPlotLabelsRef.current = [];
+    latestParsedSerialRef.current = [];
+    serialIngressArbitrationRef.current.clear();
+    serialPausedQueueRef.current = [];
   }, []);
 
   const handleHardwareBoardChange = useCallback((nextBoardId) => {
@@ -3161,6 +3358,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
   const resolveBoardHex = useCallback(async (boardComp) => {
     if (!boardComp) throw new Error('No board selected for upload.');
     const kind = normalizeBoardKind(boardComp.type);
+    const fqbn = resolveBoardFqbnForComponent(boardComp, kind);
     const boardHex = boardComp?.attrs?.firmwareHex || boardComp?.attrs?.hex;
     if (typeof boardHex === 'string' && boardHex.trim()) return boardHex;
 
@@ -3175,7 +3373,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
     const cacheSource = [
       sourceCode,
       ...compileUnit.files.map((f) => `${f.name}\n${f.content || ''}`),
-      BOARD_FQBN[kind] || BOARD_FQBN.arduino_uno,
+      fqbn,
       buildEngine,
     ].join('\n/*__SPLIT__*/\n');
 
@@ -3185,7 +3383,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
         code: sourceCode,
         files: compileUnit.files,
         sketchName: compileUnit.sketchName,
-        fqbn: BOARD_FQBN[kind] || BOARD_FQBN.arduino_uno,
+        fqbn,
         ...(kind === 'rp2040' ? { builder: rp2040Builder } : {}),
       });
       setCachedHex(cacheSource, cacheKeyBoard, compiled);
@@ -3213,6 +3411,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
     boardComponents,
     resolveBoardHex,
     normalizeBoardKind,
+    resolveBoardFqbn: resolveBoardFqbnForComponent,
     boardFqbn: BOARD_FQBN,
     flashFirmware,
     pushSerialTxLine,
@@ -3276,9 +3475,12 @@ export default function SimulatorPage({ gamificationMode = false }) {
 
       runStartGuardRef.current = true;
       appendConsoleEntry('info', 'Run requested.', 'simulator');
+      rp2040GdbLastLogRef.current.clear();
+      rp2040WirelessLastLogRef.current.clear();
       rp2040UartMicroPythonBoardsRef.current.clear();
       rp2040UartSilentWarnedBoardsRef.current.clear();
       serialIngressArbitrationRef.current.clear();
+      serialPausedQueueRef.current = [];
 
       if (!runCircuitValidation()) {
         appendConsoleEntry('warn', 'Run blocked: validation errors found.', 'simulator');
@@ -3307,6 +3509,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
       if (programmableBoards.length > 0) {
         for (const boardComp of programmableBoards) {
           const kind = normalizeBoardKind(boardComp.type);
+          const targetFqbn = resolveBoardFqbnForComponent(boardComp, kind);
           const defaultBaud = Number(BOARD_DEFAULT_BAUD[kind] || BOARD_DEFAULT_BAUD.arduino_uno);
           boardBaudMap[boardComp.id] = selectedRunBoardId
             ? (boardComp.id === selectedRunBoardId ? selectedRunBaud : defaultBaud)
@@ -3354,12 +3557,14 @@ export default function SimulatorPage({ gamificationMode = false }) {
             const configuredBuilder = resolveComponentAttrString(boardComp?.attrs, 'builder', 'arduino-pico') || 'arduino-pico';
             const hasNativeSketch = compileUnit.hasMainFile || (activePrefersIno && !!compileSource.trim());
             const hasExplicitPython = activePrefersPy || hasPythonSource;
+            const prefersNativeFromSyntax = /\bvoid\s+setup\s*\(|\bvoid\s+loop\s*\(|#include\s*</.test(String(compileSource || ''));
             const selectedSourceMode = resolveRp2040SourceMode({
               configuredMode,
               activePrefersIno,
               activePrefersPy,
               hasNativeSketch,
               hasPythonSource: hasExplicitPython,
+              prefersNativeFromSyntax,
             });
             const useMicroPythonPath = selectedSourceMode === 'py';
 
@@ -3419,6 +3624,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
               RP2040_SIM_PROTOCOL_VERSION,
               builder,
               configuredMode,
+              targetFqbn,
               nativeCompileSource,
               ...compileUnit.files.map((f) => `${f.name}\n${f.content || ''}`),
             ].join('\n/*__SPLIT__*/\n');
@@ -3433,7 +3639,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
                   code: nativeCompileSource,
                   files: compileUnit.files,
                   sketchName: compileUnit.sketchName,
-                  fqbn: BOARD_FQBN[kind] || BOARD_FQBN.arduino_uno,
+                  fqbn: targetFqbn,
                   builder,
                 });
                 setCachedHex(cacheSource, cacheKeyBoard, compiled);
@@ -3455,6 +3661,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
           const cacheKeyBoard = `${kind}:${boardComp.id}`;
           const cacheSource = [
             compileSource,
+            targetFqbn,
             ...compileUnit.files.map((f) => `${f.name}\n${f.content || ''}`),
           ].join('\n/*__SPLIT__*/\n');
 
@@ -3468,7 +3675,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
                 code: compileSource,
                 files: compileUnit.files,
                 sketchName: compileUnit.sketchName,
-                fqbn: BOARD_FQBN[kind] || BOARD_FQBN.arduino_uno,
+                fqbn: targetFqbn,
               });
               setCachedHex(cacheSource, cacheKeyBoard, compiled);
             } catch (compileErr) {
@@ -3553,6 +3760,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
           const ledAnodeV = Number.isFinite(Number(metrics.ledAnodeV)) ? Number(metrics.ledAnodeV) : null;
           const ledCathodeV = Number.isFinite(Number(metrics.ledCathodeV)) ? Number(metrics.ledCathodeV) : null;
           const ledDeltaV = Number.isFinite(Number(metrics.ledDeltaV)) ? Number(metrics.ledDeltaV) : null;
+          const primask = !!metrics.primask;
+          const stepsSinceLastEmit = Number(metrics.stepsSinceLastEmit || 0);
 
           const pcHex = Number.isFinite(pc) ? `0x${(pc >>> 0).toString(16)}` : 'n/a';
           const spHex = Number.isFinite(sp) ? `0x${(sp >>> 0).toString(16)}` : 'n/a';
@@ -3631,6 +3840,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
               `rx=${rx}`,
               `inq=${inq}`,
               `stall=${stall}`,
+              `pri=${primask ? '1' : '0'}`,
+              `dSteps=${stepsSinceLastEmit}`,
               `high=${highPinsLabel}`,
               pinBitmap ? `pins=${pinBitmap}` : '',
               entry ? `entry=${entryVectorHex}->${entryResolvedHex}${entry.usedFallback ? ':fallback' : ''}${entry.strategy ? `:${entry.strategy}` : ''}` : '',
@@ -3661,6 +3872,81 @@ export default function SimulatorPage({ gamificationMode = false }) {
             });
           }
 
+          return;
+        }
+        if (msg.type === 'debug' && msg.category === 'rp2040-wireless-stub') {
+          const incomingBoardId = String(msg.boardId || '').trim();
+          const hasKnownBoard = incomingBoardId && boardComponents.some((b) => b.id === incomingBoardId);
+          const singleBoardFallback = boardComponents.length === 1 ? boardComponents[0]?.id : '';
+          const resolvedBoardId = hasKnownBoard
+            ? incomingBoardId
+            : (singleBoardFallback || incomingBoardId || 'default');
+
+          const wireless = msg.wireless && typeof msg.wireless === 'object' ? msg.wireless : {};
+          const mode = String(wireless.mode || 'compat-stub');
+          const status = String(wireless.status || (mode === 'off' ? 'off' : 'booting'));
+          const connected = !!wireless.connected;
+          const ssid = String(wireless.ssid || '');
+          const ip = String(wireless.ip || '');
+          const note = String(wireless.note || '');
+
+          setOopStates((prev) => ({
+            ...prev,
+            [resolvedBoardId]: {
+              ...(prev[resolvedBoardId] || {}),
+              wirelessMode: mode,
+              wirelessStatus: status,
+              wirelessConnected: connected,
+              wirelessSsid: ssid,
+              wirelessIp: ip,
+              wirelessNote: note,
+            },
+          }));
+
+          const signature = `${mode}:${status}:${connected ? '1' : '0'}:${ssid}:${ip}`;
+          const lastSignature = rp2040WirelessLastLogRef.current.get(resolvedBoardId);
+          if (lastSignature !== signature) {
+            const line = [
+              `Pico W wireless ${resolvedBoardId}`,
+              `mode=${mode}`,
+              `status=${status}`,
+              `connected=${connected ? '1' : '0'}`,
+              `ssid=${ssid || '-'}`,
+              `ip=${ip || '-'}`,
+              note,
+            ].filter(Boolean).join(' | ');
+            appendConsoleEntry(connected || status === 'off' ? 'info' : 'warn', line, 'debug');
+            rp2040WirelessLastLogRef.current.set(resolvedBoardId, signature);
+          }
+          return;
+        }
+        if (msg.type === 'debug' && msg.category === 'rp2040-gdb') {
+          const incomingBoardId = String(msg.boardId || '').trim();
+          const hasKnownBoard = incomingBoardId && boardComponents.some((b) => b.id === incomingBoardId);
+          const singleBoardFallback = boardComponents.length === 1 ? boardComponents[0]?.id : '';
+          const resolvedBoardId = hasKnownBoard
+            ? incomingBoardId
+            : (singleBoardFallback || incomingBoardId || 'default');
+
+          const gdb = msg.gdb && typeof msg.gdb === 'object' ? msg.gdb : {};
+          const status = String(gdb.status || 'unknown');
+          const reason = String(msg.reason || status);
+          const detail = String(gdb.detail || gdb.lastError || '').trim();
+          const signature = `${reason}:${status}:${detail}`;
+          const lastSignature = rp2040GdbLastLogRef.current.get(resolvedBoardId);
+
+          if (lastSignature !== signature) {
+            const line = [
+              `RP2040 GDB ${resolvedBoardId}`,
+              `status=${status}`,
+              `reason=${reason}`,
+              detail,
+            ].filter(Boolean).join(' | ');
+
+            const level = (status === 'error' || status === 'closed') ? 'warn' : 'info';
+            appendConsoleEntry(level, line, 'debug');
+            rp2040GdbLastLogRef.current.set(resolvedBoardId, signature);
+          }
           return;
         }
         if (msg.type === 'fault') {
@@ -3753,11 +4039,14 @@ export default function SimulatorPage({ gamificationMode = false }) {
         boardBaudMap: Object.keys(boardBaudMap).length > 0 ? boardBaudMap : undefined,
         boardRuntimeMap: Object.keys(boardRuntimeMap).length > 0 ? boardRuntimeMap : undefined,
         baudRate: selectedRunBaud,
+        debugRp2040: rp2040DebugTelemetryEnabled,
       });
 
       runStartGuardRef.current = false;
     } catch (err) {
       runStartGuardRef.current = false;
+      rp2040GdbLastLogRef.current.clear();
+      rp2040WirelessLastLogRef.current.clear();
       rp2040UartMicroPythonBoardsRef.current.clear();
       rp2040UartSilentWarnedBoardsRef.current.clear();
       setIsRunning(false);
@@ -3770,6 +4059,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
 
   const handleStop = () => {
     runStartGuardRef.current = false;
+    rp2040GdbLastLogRef.current.clear();
+    rp2040WirelessLastLogRef.current.clear();
     rp2040UartMicroPythonBoardsRef.current.clear();
     rp2040UartSilentWarnedBoardsRef.current.clear();
     if (workerRef.current) {
@@ -3791,6 +4082,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
     serialPlotLabelsRef.current = [];
     latestParsedSerialRef.current = [];
     serialIngressArbitrationRef.current.clear();
+    serialPausedQueueRef.current = [];
     appendConsoleEntry('info', 'Simulation stopped.', 'simulator');
   };
 
@@ -3824,8 +4116,10 @@ export default function SimulatorPage({ gamificationMode = false }) {
   };
 
   const sendSerialInput = useCallback((targetBoardOverride) => {
-    const txt = serialInput.trim();
-    if (!txt) return;
+    const txt = String(serialInput || '');
+    if (!txt.trim()) return;
+    const lineEnding = SERIAL_LINE_ENDINGS[serialLineEnding] ?? '\n';
+    const payload = txt + lineEnding;
 
     const requestedBoard = targetBoardOverride || serialBoardFilter;
     const targetBoardId = requestedBoard !== 'all' ? requestedBoard : undefined;
@@ -3833,7 +4127,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
     if (workerRef.current && isRunning) {
       workerRef.current.postMessage({
         type: 'SERIAL_INPUT',
-        data: txt + '\n',
+        data: payload,
         targetBoardId,
         baudRate: serialBaudRate,
       });
@@ -3846,7 +4140,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
       const targetBoard = targetBoardId
         ? targetBoardId
         : (hardwareSerialTargetRef.current || hardwareBoardId || 'hardware');
-      sendHardwareSerialLine(txt, targetBoard)
+      sendHardwareSerialLine(payload, targetBoard, txt)
         .then(() => setSerialInput(''))
         .catch((err) => {
           console.error('[WebSerial] TX failed:', err);
@@ -3856,7 +4150,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
     }
 
     alert('Run simulator or connect hardware serial before sending data.');
-  }, [serialInput, workerRef, isRunning, serialBoardFilter, serialBaudRate, pushSerialTxLine, hardwareConnected, hardwareBoardId, sendHardwareSerialLine]);
+  }, [serialInput, serialLineEnding, workerRef, isRunning, serialBoardFilter, serialBaudRate, pushSerialTxLine, hardwareConnected, hardwareBoardId, sendHardwareSerialLine]);
 
   const openComponentEditor = useCallback(() => {
     try {
@@ -5999,8 +6293,9 @@ export default function SimulatorPage({ gamificationMode = false }) {
           onToggleCodeFileDisabled={toggleCodeFileDisabled}
           onCreateCodeFile={createCodeFile} onCreateCodeTab={createCodeTab} onUploadCodeFile={uploadCodeFile}
           libQuery={libQuery} setLibQuery={setLibQuery} handleSearchLibraries={handleSearchLibraries} isSearchingLib={isSearchingLib} libMessage={libMessage} libInstalled={libInstalled} libResults={libResults} handleInstallLibrary={handleInstallLibrary} installingLib={installingLib}
-          serialPaused={serialPaused} setSerialPaused={setSerialPaused} isRunning={isRunning} serialHistory={serialHistory} setSerialHistory={setSerialHistory} serialOutputRef={serialOutputRef} serialInput={serialInput} setSerialInput={setSerialInput} sendSerialInput={sendSerialInput}
-          serialViewMode={serialViewMode} setSerialViewMode={setSerialViewMode} serialBoardFilter={serialBoardFilter} setSerialBoardFilter={setSerialBoardFilter} serialBoardOptions={serialBoardOptions} serialBoardLabels={serialBoardLabels} serialBoardKinds={serialBoardKinds} serialBaudRate={serialBaudRate} setSerialBaudRate={setSerialBaudRate} serialBaudOptions={serialBaudOptions}
+          serialPaused={serialPaused} setSerialPaused={setSerialPaused} isRunning={isRunning} serialHistory={serialHistory} setSerialHistory={setSerialHistory} serialOutputRef={serialOutputRef} serialInput={serialInput} setSerialInput={setSerialInput} sendSerialInput={sendSerialInput} clearSerialMonitor={clearSerialMonitor}
+          serialViewMode={serialViewMode} setSerialViewMode={setSerialViewMode} serialBoardFilter={serialBoardFilter} setSerialBoardFilter={setSerialBoardFilter} serialBoardOptions={serialBoardOptions} serialBoardLabels={serialBoardLabels} serialBoardKinds={serialBoardKinds} serialBaudRate={serialBaudRate} setSerialBaudRate={setSerialBaudRate} serialBaudOptions={serialBaudOptions} serialLineEnding={serialLineEnding} setSerialLineEnding={setSerialLineEnding}
+          rp2040DebugTelemetryEnabled={rp2040DebugTelemetryEnabled} setRp2040DebugTelemetryEnabled={setRp2040DebugTelemetryEnabled}
           hardwareConnected={hardwareConnected}
           plotterPaused={plotterPaused} setPlotterPaused={setPlotterPaused} plotData={plotData} setPlotData={setPlotData} selectedPlotPins={selectedPlotPins} setSelectedPlotPins={setSelectedPlotPins} plotterCanvasRef={plotterCanvasRef} serialPlotLabelsRef={serialPlotLabelsRef}
           showConnectionsPanel={showConnectionsPanel} wires={wires} updateWireColor={updateWireColor} deleteWire={deleteWire}
@@ -6375,6 +6670,47 @@ export default function SimulatorPage({ gamificationMode = false }) {
               <Btn onClick={() => setShowSaveDialog(false)}>Cancel</Btn>
               <Btn color="var(--accent)" onClick={handleConfirmSave}>Save</Btn>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* F1 MENU */}
+      {showF1Menu && (
+        <div 
+          className="fixed inset-0 bg-[rgba(0,0,0,.55)] flex items-center justify-center z-[9999]"
+          onClick={() => setShowF1Menu(false)}
+        >
+          <div 
+            className="bg-[var(--bg2)] border border-[var(--border)] rounded-xl p-6 w-[380px] shadow-[0_8px_40px_rgba(0,0,0,.4)]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="text-base font-bold mb-4 text-[var(--text)]">Quick Actions (F1)</div>
+            <div className="flex flex-col gap-2">
+              <button 
+                className="w-full px-4 py-3 text-left text-sm font-medium rounded-lg border border-[var(--border)] hover:bg-[var(--card)] transition-colors text-[var(--text2)] hover:text-[var(--text)]"
+                onClick={() => {
+                  handleDownloadFirmware();
+                  setShowF1Menu(false);
+                }}
+              >
+                📥 Download Firmware
+              </button>
+              <button 
+                className="w-full px-4 py-3 text-left text-sm font-medium rounded-lg border border-[var(--border)] hover:bg-[var(--card)] transition-colors text-[var(--text2)] hover:text-[var(--text)]"
+                onClick={() => {
+                  handleStartGDB();
+                  setShowF1Menu(false);
+                }}
+              >
+                🐛 Start GDB Session
+              </button>
+            </div>
+            <button 
+              className="mt-4 w-full px-3 py-2 text-xs text-[var(--text3)] hover:text-[var(--text)] transition-colors"
+              onClick={() => setShowF1Menu(false)}
+            >
+              Close (Esc)
+            </button>
           </div>
         </div>
       )}

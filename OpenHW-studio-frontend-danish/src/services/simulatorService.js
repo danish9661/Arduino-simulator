@@ -16,6 +16,18 @@ export async function compileCode(input) {
         }
         throw new Error('No hex returned from compiler');
     } catch (error) {
+        if (error.response && error.response.data && error.response.data.diagnostics) {
+            const diagnostics = error.response.data.diagnostics || {};
+            const stage = diagnostics.stage ? ` stage=${diagnostics.stage}` : '';
+            const category = diagnostics.category ? ` category=${diagnostics.category}` : '';
+            const highlights = Array.isArray(diagnostics.highlights)
+                ? diagnostics.highlights.slice(0, 6).join('\n')
+                : '';
+            const hint = diagnostics.hint ? `\nHint: ${diagnostics.hint}` : '';
+            const details = (error.response.data.details || '').trim();
+            const body = highlights || details || error.response.data.error || 'Unknown compile failure';
+            throw new Error(`Compilation Failed:${stage}${category}\n${body}${hint}`);
+        }
         if (error.response && error.response.data && error.response.data.details) {
             throw new Error(`Compilation Failed:\n${error.response.data.details}`);
         }

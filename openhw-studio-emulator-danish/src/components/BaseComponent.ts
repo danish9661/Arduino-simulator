@@ -53,6 +53,22 @@ export class BaseComponent {
 
     onSPIByte?(data: number): number | void;
 
+    onPWM?(pinId: string, payload: any): void;
+    onPwm?(pinId: string, payload: any): void;
+    onPWMSignal?(pinId: string, payload: any): void;
+
+    onPIOPinChange?(pinId: string, isHigh: boolean, payload: any): void;
+    onPioPinChange?(pinId: string, isHigh: boolean, payload: any): void;
+    onPIO?(pinId: string, isHigh: boolean, payload: any): void;
+    onPio?(pinId: string, isHigh: boolean, payload: any): void;
+
+    onOneWireReset?(pinId: string, payload: any): void;
+    onOnewireReset?(pinId: string, payload: any): void;
+    onOneWireWriteBit?(pinId: string, bit: number, payload: any): void;
+    onOnewireWriteBit?(pinId: string, bit: number, payload: any): void;
+    onOneWireSlot?(pinId: string, payload: any): void;
+    onOnewireSlot?(pinId: string, payload: any): void;
+
     /**
      * Called by the I2S bit-bang assembler in execute.ts once a full audio
      * frame (bitsPerFrame bits) has been clocked in on one channel.

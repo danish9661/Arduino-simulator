@@ -1,0 +1,13 @@
+OLED SSD1306 (I2C) wiring
+
+UNO:
+- OLED VCC -> UNO 5V
+- OLED GND -> UNO GND
+- OLED SDA -> UNO A4
+- OLED SCL -> UNO A5
+
+Pico:
+- OLED VCC -> Pico 3V3
+- OLED GND -> Pico GND
+- OLED SDA -> Pico GP4
+- OLED SCL -> Pico GP5

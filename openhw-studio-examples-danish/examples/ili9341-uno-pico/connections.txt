@@ -1,0 +1,27 @@
+ILI9341 2.8 inch TFT wiring
+
+UNO (hardware SPI):
+- TFT VCC   -> UNO 5V
+- TFT GND   -> UNO GND
+- TFT CS    -> UNO D10
+- TFT DC    -> UNO D9
+- TFT RESET -> UNO D8
+- TFT MOSI  -> UNO D11
+- TFT MISO  -> UNO D12
+- TFT SCK   -> UNO D13
+- TFT LED   -> UNO 5V (or PWM pin if you want brightness control)
+
+Pico (SPI0 in this sketch):
+- TFT VCC   -> Pico 3V3
+- TFT GND   -> Pico GND
+- TFT CS    -> Pico GP17
+- TFT DC    -> Pico GP20
+- TFT RESET -> Pico GP21
+- TFT MOSI  -> Pico GP19
+- TFT MISO  -> Pico GP16
+- TFT SCK   -> Pico GP18
+- TFT LED   -> Pico 3V3
+
+Important:
+- Use Pico 3V3 for TFT VCC (and LED).
+- Do NOT use Pico 3V3_EN as a power output pin.

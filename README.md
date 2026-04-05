@@ -6,13 +6,14 @@ A full-stack browser-based Arduino simulator built on top of **avr8js** and **Wo
 
 ## Architecture
 
-This monorepo contains three packages that work together:
+This monorepo contains four packages that work together:
 
 ```
 Arduino-simulator/
 ├── OpenHW-studio-frontend-danish/   # React + Vite web app (Hub, User & Admin UI)
 ├── openhw-studio-backend-danish/    # Express.js REST API (Compiler & Asset Registry)
-└── openhw-studio-emulator-danish/   # Node.js Emulator & Circuit Validation Engine
+├── openhw-studio-emulator-danish/   # Node.js Emulator & Circuit Validation Engine
+└── openhw-studio-cli-danish/        # Terminal CLI (project/sim/serial/lib workflows)
 ```
 
 ```
@@ -53,6 +54,11 @@ Express.js REST API. Accepts C++ code, invokes `arduino-cli` to compile it, and 
 Shared component definitions library and AVR simulation engine (runs as a Web Worker inside the browser). Exports all component manifests, UI renderers, and logic classes consumed by the frontend.
 
 - **Key libs:** avr8js, intel-hex, TypeScript
+
+### CLI — `openhw-studio-cli-danish/`
+Node.js terminal tooling for JSON import/export, project editing, simulation control, serial monitoring, and backend library management.
+
+- **Key libs:** Commander, SerialPort, TypeScript/tsx
 
 ---
 
@@ -123,7 +129,7 @@ Because the frontend, backend, and emulator are now decoupled, you must install 
   ```
 
 ### Install Dependencies
-Run `npm install` inside each of the three directories:
+Run `npm install` inside each package directory:
 ```bash
 # 1. Install Frontend Dependencies
 cd OpenHW-studio-frontend-danish
@@ -139,6 +145,23 @@ cd ..
 cd openhw-studio-emulator-danish
 npm install
 cd ..
+
+# 4. Install CLI Dependencies
+cd openhw-studio-cli-danish
+npm install
+cd ..
+```
+
+### CLI Quick Start
+
+```bash
+cd openhw-studio-cli-danish
+npm run cli -- --help
+
+# Example: create a project, validate, and run simulation
+npm run cli -- project init temp/demo.json --name demo --board arduino_uno
+npm run cli -- project validate temp/demo.json
+npm run cli -- sim run temp/demo.json --duration-ms 3000 --debug text
 ```
 
 ### Local Development & NPM Linking
@@ -204,6 +227,7 @@ JWT_SECRET=your_secret_key_here
 | [OpenHW-studio-frontend-danish/README.md](./OpenHW-studio-frontend-danish/README.md) | Frontend structure, pages, and features |
 | [openhw-studio-backend-danish/README.md](./openhw-studio-backend-danish/README.md) | Backend API endpoints and compilation pipeline |
 | [openhw-studio-emulator-danish/README.md](./openhw-studio-emulator-danish/README.md) | Emulator CPU simulation and WebSocket protocol |
+| [openhw-studio-cli-danish/README.md](./openhw-studio-cli-danish/README.md) | Terminal command reference for project/sim/serial/lib workflows |
 
 ---
 
