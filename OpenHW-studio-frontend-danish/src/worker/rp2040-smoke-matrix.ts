@@ -462,7 +462,6 @@ async function runRunnerCase(
     injectMicroPythonScript?: string;
     forceFaultAfterMs?: number;
     forceFaultPc?: number;
-    forceMicroPythonJsRunner?: boolean;
     pyScript?: string;
   }
 ): Promise<{ report: CaseReport; events: WorkerEvent[]; serialText: string }> {
@@ -535,7 +534,6 @@ async function runRunnerCase(
       serialBaudRate: 115200,
       debugEnabled: true,
       debugIntervalMs: 300,
-      forceMicroPythonJsRunner: !!options?.forceMicroPythonJsRunner,
       pyScript: options?.pyScript,
     }
   );
@@ -833,52 +831,12 @@ async function main() {
       13000,
       { injectMicroPythonScript: micropythonScript }
     );
-    const case3PrimaryPass = case3.report.details.faultCount === 0
+    case3.report.pass = case3.report.details.faultCount === 0
       && case3.report.details.changedPins.some((s: string) => s.startsWith('GP15:'))
       && /MP_(BOOT_OK|TICK|DONE)/.test(case3.serialText);
-
-    let case3Final = case3;
-    let case3UsedFallback = false;
-
-    if (!case3PrimaryPass) {
-      const case3Fallback = await runRunnerCase(
-        'case3-micropython-mainpy-default-uf2-fallback-js',
-        'micropython',
-        defaultUf2Payload,
-        3200,
-        {
-          forceMicroPythonJsRunner: true,
-          pyScript: micropythonScript,
-        }
-      );
-
-      const case3FallbackPass = case3Fallback.report.details.faultCount === 0
-        && case3Fallback.report.details.changedPins.some((s: string) => s.startsWith('GP15:'))
-        && /MP_(BOOT_OK|TICK|DONE)/.test(case3Fallback.serialText);
-
-      if (case3FallbackPass) {
-        case3UsedFallback = true;
-        case3Final = {
-          ...case3Fallback,
-          report: {
-            ...case3Fallback.report,
-            caseId: 'case3-micropython-mainpy-default-uf2',
-            summary: `${case3Fallback.report.summary} | fallback=micropython-js`,
-            details: {
-              ...case3Fallback.report.details,
-              usedFallback: true,
-              primarySummary: case3.report.summary,
-              primarySerialPreview: case3.report.details?.serialPreview || '',
-            },
-          },
-        };
-      }
-    }
-
-    case3Final.report.pass = case3PrimaryPass || case3UsedFallback;
-    reports.push(case3Final.report);
-    rawEvents[case3Final.report.caseId] = case3Final.events;
-    serialDump[case3Final.report.caseId] = case3Final.serialText;
+    reports.push(case3.report);
+    rawEvents[case3.report.caseId] = case3.events;
+    serialDump[case3.report.caseId] = case3.serialText;
   }
 
   // Case 4: Forced fault path (confirm deterministic stop behavior)

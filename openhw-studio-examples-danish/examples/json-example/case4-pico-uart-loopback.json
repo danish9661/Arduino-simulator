@@ -1,0 +1,83 @@
+{
+  "caseId": "case4-pico-uart-loopback",
+  "name": "Pico UART Loopback",
+  "board": "pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "ino",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 90,
+      "y": 90
+    },
+    {
+      "id": "led1",
+      "type": "wokwi-led",
+      "attrs": {
+        "color": "green"
+      },
+      "w": 56,
+      "h": 50,
+      "rotation": 0,
+      "label": "LED",
+      "x": 430,
+      "y": 180
+    }
+  ],
+  "connections": [
+    {
+      "from": "pico1:GP0",
+      "to": "pico1:GP1",
+      "id": "w1",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GP0",
+      "toLabel": "GP1"
+    },
+    {
+      "from": "pico1:GP15",
+      "to": "led1:A",
+      "id": "w2",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GP15",
+      "toLabel": "A"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "led1:K",
+      "id": "w3",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GND",
+      "toLabel": "K"
+    }
+  ],
+  "code": "#include <Arduino.h>\n\nvoid setup() {\n  pinMode(15, OUTPUT);\n  digitalWrite(15, LOW);\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(9600);\n  Serial1.println(\"PICO_LOOP_BOOT\");\n}\n\nvoid loop() {\n  Serial1.write('A');\n  delay(5);\n  while (Serial1.available() > 0) {\n    const int c = Serial1.read();\n    if (c == 'A') {\n      digitalWrite(15, !digitalRead(15));\n      Serial1.println(\"PICO_LOOP_RX_OK\");\n    }\n  }\n  delay(40);\n}\n",
+  "projectFiles": [
+    {
+      "id": "project/pico1/pico1.ino",
+      "path": "project/pico1/pico1.ino",
+      "name": "pico1.ino",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "#include <Arduino.h>\n\nvoid setup() {\n  pinMode(15, OUTPUT);\n  digitalWrite(15, LOW);\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(9600);\n  Serial1.println(\"PICO_LOOP_BOOT\");\n}\n\nvoid loop() {\n  Serial1.write('A');\n  delay(5);\n  while (Serial1.available() > 0) {\n    const int c = Serial1.read();\n    if (c == 'A') {\n      digitalWrite(15, !digitalRead(15));\n      Serial1.println(\"PICO_LOOP_RX_OK\");\n    }\n  }\n  delay(40);\n}\n",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/pico1/pico1.ino"
+  ],
+  "activeCodeFileId": "project/pico1/pico1.ino"
+}

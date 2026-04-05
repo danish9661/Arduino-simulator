@@ -1,0 +1,114 @@
+{
+  "name": "pico-micropython-mixed-components",
+  "title": "Pico MicroPython Mixed Components",
+  "description": "Raspberry Pi Pico running MicroPython with OLED display, LED, potentiometer, servo, and WS2812B.",
+  "runtime": "micropython",
+  "board": "wokwi-raspberry-pi-pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "micropython"
+      }
+    },
+    {
+      "id": "led1",
+      "type": "wokwi-led",
+      "attrs": {
+        "color": "red"
+      }
+    },
+    {
+      "id": "pot1",
+      "type": "wokwi-slide-potentiometer",
+      "attrs": {
+        "value": 64
+      }
+    },
+    {
+      "id": "servo1",
+      "type": "wokwi-servo",
+      "attrs": {}
+    },
+    {
+      "id": "ws1",
+      "type": "wokwi-ws2812b",
+      "attrs": {}
+    },
+    {
+      "id": "oled1",
+      "type": "wokwi-ssd1306-oled",
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    {
+      "from": "pico1:GP16",
+      "to": "led1:A"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "led1:K"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "pot1:GND"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "pot1:VCC"
+    },
+    {
+      "from": "pico1:GP26",
+      "to": "pot1:SIG"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "servo1:GND"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "servo1:V+"
+    },
+    {
+      "from": "pico1:GP15",
+      "to": "servo1:PWM"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "ws1:GND"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "ws1:VCC"
+    },
+    {
+      "from": "pico1:GP2",
+      "to": "ws1:DIN"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "oled1:GND"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "oled1:VCC"
+    },
+    {
+      "from": "pico1:GP5",
+      "to": "oled1:SCL"
+    },
+    {
+      "from": "pico1:GP4",
+      "to": "oled1:SDA"
+    }
+  ],
+  "files": [
+    {
+      "path": "project/pico1/main.py",
+      "language": "python",
+      "content": "from machine import Pin\nfrom time import sleep_ms\n\nprint(\"MP_MIX_BOOT\")\nled = Pin(16, Pin.OUT, value=0)\nservo = Pin(15, Pin.OUT, value=0)\nneo = Pin(2, Pin.OUT, value=0)\nsda = Pin(4, Pin.OUT, value=0)\nscl = Pin(5, Pin.OUT, value=0)\n\nfor i in range(8):\n    if i % 2 == 0:\n        led.on()\n        servo.on()\n        neo.on()\n        sda.on()\n        scl.off()\n    else:\n        led.off()\n        servo.off()\n        neo.off()\n        sda.off()\n        scl.on()\n    print(\"MP_MIX_STEP\", i)\n    sleep_ms(30)\n\nprint(\"MP_MIX_DONE\")\n"
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "caseId": "case6-uno2uno-uart",
+  "name": "UNO to UNO UART",
+  "board": "arduino_uno",
+  "components": [
+    {
+      "id": "u1",
+      "type": "wokwi-arduino-uno",
+      "attrs": {},
+      "w": 220,
+      "h": 300,
+      "rotation": 0,
+      "label": "Arduino Uno",
+      "x": 80,
+      "y": 90
+    },
+    {
+      "id": "u2",
+      "type": "wokwi-arduino-uno",
+      "attrs": {},
+      "w": 220,
+      "h": 300,
+      "rotation": 0,
+      "label": "Arduino Uno",
+      "x": 420,
+      "y": 90
+    }
+  ],
+  "connections": [
+    {
+      "from": "u1:1",
+      "to": "u2:0",
+      "id": "w1",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "1",
+      "toLabel": "0"
+    },
+    {
+      "from": "u2:1",
+      "to": "u1:0",
+      "id": "w2",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "1",
+      "toLabel": "0"
+    },
+    {
+      "from": "u1:gnd_2",
+      "to": "u2:gnd_2",
+      "id": "w3",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "gnd_2",
+      "toLabel": "gnd_2"
+    }
+  ],
+  "code": "#include <Arduino.h>\n\nunsigned long lastSend = 0;\n\nvoid setup() {\n  pinMode(13, OUTPUT);\n  digitalWrite(13, LOW);\n  Serial.begin(9600);\n  Serial.println(\"UNO_TX_BOOT\");\n}\n\nvoid loop() {\n  if (millis() - lastSend >= 120) {\n    lastSend = millis();\n    Serial.write('1');\n  }\n\n  while (Serial.available() > 0) {\n    const int c = Serial.read();\n    if (c == 'K') {\n      digitalWrite(13, HIGH);\n      Serial.println(\"UU1_ACK\");\n    }\n  }\n}\n",
+  "projectFiles": [
+    {
+      "id": "project/u1/u1.ino",
+      "path": "project/u1/u1.ino",
+      "name": "u1.ino",
+      "kind": "code",
+      "boardId": "u1",
+      "boardKind": "arduino_uno",
+      "content": "#include <Arduino.h>\n\nunsigned long lastSend = 0;\n\nvoid setup() {\n  pinMode(13, OUTPUT);\n  digitalWrite(13, LOW);\n  Serial.begin(9600);\n  Serial.println(\"UNO_TX_BOOT\");\n}\n\nvoid loop() {\n  if (millis() - lastSend >= 120) {\n    lastSend = millis();\n    Serial.write('1');\n  }\n\n  while (Serial.available() > 0) {\n    const int c = Serial.read();\n    if (c == 'K') {\n      digitalWrite(13, HIGH);\n      Serial.println(\"UU1_ACK\");\n    }\n  }\n}\n",
+      "dirty": false
+    },
+    {
+      "id": "project/u2/u2.ino",
+      "path": "project/u2/u2.ino",
+      "name": "u2.ino",
+      "kind": "code",
+      "boardId": "u2",
+      "boardKind": "arduino_uno",
+      "content": "#include <Arduino.h>\n\nvoid setup() {\n  pinMode(13, OUTPUT);\n  digitalWrite(13, LOW);\n  Serial.begin(9600);\n  Serial.println(\"UNO_RX_BOOT\");\n}\n\nvoid loop() {\n  while (Serial.available() > 0) {\n    const int c = Serial.read();\n    if (c == '1') {\n      digitalWrite(13, !digitalRead(13));\n      Serial.write('K');\n      Serial.println(\"UU2_RX\");\n    }\n  }\n}\n",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/u1/u1.ino",
+    "project/u2/u2.ino"
+  ],
+  "activeCodeFileId": "project/u1/u1.ino"
+}

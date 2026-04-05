@@ -1,0 +1,124 @@
+{
+  "caseId": "case2-pico-servo-potentiometer",
+  "name": "Pico Servo + Potentiometer",
+  "board": "pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "ino",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 90,
+      "y": 90
+    },
+    {
+      "id": "servo1",
+      "type": "wokwi-servo",
+      "attrs": {},
+      "w": 96,
+      "h": 64,
+      "rotation": 0,
+      "label": "Servo Motor",
+      "x": 420,
+      "y": 90
+    },
+    {
+      "id": "pot1",
+      "type": "wokwi-slide-potentiometer",
+      "attrs": {
+        "value": 72
+      },
+      "w": 90,
+      "h": 74,
+      "rotation": 0,
+      "label": "Slide Potentiometer",
+      "x": 430,
+      "y": 250
+    }
+  ],
+  "connections": [
+    {
+      "from": "pico1:GND",
+      "to": "servo1:GND",
+      "id": "w1",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GND",
+      "toLabel": "GND"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "servo1:V+",
+      "id": "w2",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "3V3",
+      "toLabel": "V+"
+    },
+    {
+      "from": "pico1:GP15",
+      "to": "servo1:PWM",
+      "id": "w3",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GP15",
+      "toLabel": "PWM"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "pot1:GND",
+      "id": "w4",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GND",
+      "toLabel": "GND"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "pot1:VCC",
+      "id": "w5",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "3V3",
+      "toLabel": "VCC"
+    },
+    {
+      "from": "pico1:GP26",
+      "to": "pot1:SIG",
+      "id": "w6",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GP26",
+      "toLabel": "SIG"
+    }
+  ],
+  "code": "#include <Arduino.h>\n\nstatic const int SERVO_PIN = 15;\nstatic const int POT_PIN = A0;\nstatic uint32_t loops = 0;\n\nvoid pulseServo(int pulseUs) {\n  pulseUs = constrain(pulseUs, 544, 2400);\n  digitalWrite(SERVO_PIN, HIGH);\n  delayMicroseconds(pulseUs);\n  digitalWrite(SERVO_PIN, LOW);\n  const int restUs = 20000 - pulseUs;\n  if (restUs > 0) delayMicroseconds(restUs);\n}\n\nvoid setup() {\n  pinMode(SERVO_PIN, OUTPUT);\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(115200);\n  Serial1.println(\"SERVO_POT_BOOT\");\n}\n\nvoid loop() {\n  const int raw = analogRead(POT_PIN);\n  const int angle = (int)((loops * 7u) % 181u);\n  const int pulseUs = map(angle, 0, 180, 544, 2400);\n  pulseServo(pulseUs);\n  if ((loops++ & 0x7u) == 0u) {\n    Serial1.print(\"SERVO_RAW=\");\n    Serial1.print(raw);\n    Serial1.print(\" ANG=\");\n    Serial1.println(angle);\n  }\n}\n",
+  "projectFiles": [
+    {
+      "id": "project/pico1/pico1.ino",
+      "path": "project/pico1/pico1.ino",
+      "name": "pico1.ino",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "#include <Arduino.h>\n\nstatic const int SERVO_PIN = 15;\nstatic const int POT_PIN = A0;\nstatic uint32_t loops = 0;\n\nvoid pulseServo(int pulseUs) {\n  pulseUs = constrain(pulseUs, 544, 2400);\n  digitalWrite(SERVO_PIN, HIGH);\n  delayMicroseconds(pulseUs);\n  digitalWrite(SERVO_PIN, LOW);\n  const int restUs = 20000 - pulseUs;\n  if (restUs > 0) delayMicroseconds(restUs);\n}\n\nvoid setup() {\n  pinMode(SERVO_PIN, OUTPUT);\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(115200);\n  Serial1.println(\"SERVO_POT_BOOT\");\n}\n\nvoid loop() {\n  const int raw = analogRead(POT_PIN);\n  const int angle = (int)((loops * 7u) % 181u);\n  const int pulseUs = map(angle, 0, 180, 544, 2400);\n  pulseServo(pulseUs);\n  if ((loops++ & 0x7u) == 0u) {\n    Serial1.print(\"SERVO_RAW=\");\n    Serial1.print(raw);\n    Serial1.print(\" ANG=\");\n    Serial1.println(angle);\n  }\n}\n",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/pico1/pico1.ino"
+  ],
+  "activeCodeFileId": "project/pico1/pico1.ino"
+}

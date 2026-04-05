@@ -1,0 +1,45 @@
+{
+  "caseId": "case1-pico-ws2812b-matrix8x8-neopixel",
+  "name": "Pico 8x8 Matrix NeoPixel",
+  "board": "pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": { "env": "ino", "builder": "arduino-pico" },
+      "w": 220, "h": 320, "rotation": 0, "x": 110, "y": 110
+    },
+    {
+      "id": "ws1",
+      "type": "wokwi-neopixel-matrix",
+      "attrs": { "cols": "8", "rows": "8" },
+      "w": 184, "h": 164, "rotation": 0, "label": "8x8 Matrix", "x": 450, "y": 170
+    }
+  ],
+  "connections": [
+    { "from": "pico1:GND", "to": "ws1:GND", "id": "w1" },
+    { "from": "pico1:3V3", "to": "ws1:VCC", "id": "w2" },
+    { "from": "pico1:GP2", "to": "ws1:DIN", "id": "w3" }
+  ],
+  "code": "#include <Adafruit_NeoPixel.h>\n\n#define DATA_PIN 2\n#define NUM_PIXELS 64\n\nAdafruit_NeoPixel pixels(NUM_PIXELS, DATA_PIN, NEO_GRB + NEO_KHZ800);\n\nvoid setup() {\n  pixels.begin();\n  pixels.setBrightness(50);\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(115200);\n  Serial1.println(\"8X8_NEOPIXEL_BOOT\");\n}\n\nvoid loop() {\n  static int pos = 0;\n  pixels.clear();\n  pixels.setPixelColor(pos, pixels.Color(0, 255, 0)); // Scanning Green dot\n  pixels.show();\n  \n  Serial1.print(\"NEO_POS: \");\n  Serial1.println(pos);\n  \n  pos = (pos + 1) % NUM_PIXELS;\n  delay(20);\n}\n",
+  "projectFiles": [
+    {
+      "id": "project/pico1/pico1.ino",
+      "path": "project/pico1/pico1.ino",
+      "name": "pico1.ino",
+      "kind": "code",
+      "boardId": "pico1",
+      "content": "#include <Adafruit_NeoPixel.h>\n\n#define DATA_PIN 2\n#define NUM_PIXELS 64\n\nAdafruit_NeoPixel pixels(NUM_PIXELS, DATA_PIN, NEO_GRB + NEO_KHZ800);\n\nvoid setup() {\n  pixels.begin();\n  pixels.setBrightness(50);\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(115200);\n  Serial1.println(\"8X8_NEOPIXEL_BOOT\");\n}\n\nvoid loop() {\n  static int pos = 0;\n  pixels.clear();\n  pixels.setPixelColor(pos, pixels.Color(0, 255, 0)); // Scanning Green dot\n  pixels.show();\n  \n  Serial1.print(\"NEO_POS: \");\n  Serial1.println(pos);\n  \n  pos = (pos + 1) % NUM_PIXELS;\n  delay(20);\n}\n",
+      "dirty": false
+    },
+    {
+      "id": "project/pico1/library.txt",
+      "path": "project/pico1/library.txt",
+      "name": "library.txt",
+      "kind": "text",
+      "boardId": "pico1",
+      "content": "Adafruit NeoPixel\n",
+      "dirty": false
+    }
+  ]
+}

@@ -249,18 +249,10 @@ sortCatalog(LOCAL_CATALOG);
 // Used by the polling loop to detect deletions and purge them from the registry.
 const BACKEND_INJECTED_TYPES = new Set();
 
-let nextId = 1
 let nextWireId = 1
 
-// ─── SYNC ID COUNTERS AFTER LOADING EXTERNAL DATA ──────────────────────────
-// Prevents duplicate keys when a saved project has IDs higher than the
-// current module-level counter (e.g. loading "wokwi-ili9341_2" with nextId=1
-// would let a subsequent add generate the same key again).
-function syncNextIds(comps, ws) {
-  for (const c of (comps || [])) {
-    const m = c.id && c.id.match(/_(\d+)$/);
-    if (m) nextId = Math.max(nextId, parseInt(m[1]) + 1);
-  }
+// ─── SYNC WIRE ID COUNTER AFTER LOADING EXTERNAL DATA ──────────────────────
+function syncNextIds(_comps, ws) {
   for (const w of (ws || [])) {
     const m = w.id && w.id.match(/^w(\d+)$/);
     if (m) nextWireId = Math.max(nextWireId, parseInt(m[1]) + 1);
@@ -316,15 +308,145 @@ const BOARD_FQBN = {
   rp2040: 'rp2040:rp2040:rpipico',
 };
 
+const BOARD_DISPLAY_NAME = {
+  arduino_uno: 'Arduino Uno',
+  esp32: 'ESP32',
+  stm32: 'STM32',
+  rp2040: 'Raspberry Pi Pico',
+};
+
 const UF2_PAYLOAD_PREFIX = 'UF2BASE64:';
 const DEFAULT_PICO_MICROPYTHON_UF2_URL = `${API_BASE_URL}/compile/pico/micropython-uf2`;
 const DISABLED_FILE_SUFFIX = '.disabled';
+const GENERATED_ROOT_FILE_IDS = new Set(['project/diagram.png']);
+const ARDUINO_CODE_EXTENSIONS = new Set(['.ino', '.h', '.hpp', '.c', '.cpp']);
+const ROOT_UPLOADABLE_EXTENSIONS = new Set(['.ino', '.cpp', '.h', '.hpp', '.c', '.txt', '.json', '.xml', '.py', '.uf2']);
+const RP2040_NATIVE_ALLOWED_EXTENSIONS = new Set(['.ino', '.h', '.hpp', '.c', '.cpp', '.txt', '.json', '.xml', '.uf2']);
+const RP2040_MICROPYTHON_ALLOWED_EXTENSIONS = new Set(['.py', '.txt', '.json', '.xml', '.uf2']);
+
+function boardKindToDisplayName(kind) {
+  const normalized = normalizeBoardKind(kind);
+  return BOARD_DISPLAY_NAME[normalized] || BOARD_DISPLAY_NAME.arduino_uno;
+}
+
+function boardCompToDisplayName(boardComp, fallbackKind = 'arduino_uno') {
+  if (!boardComp || typeof boardComp !== 'object') {
+    return boardKindToDisplayName(fallbackKind);
+  }
+
+  const boardLabel = String(boardComp.label || '').trim();
+  if (boardLabel) return boardLabel;
+  const boardId = String(boardComp.id || '').trim();
+  const kindLabel = boardKindToDisplayName(boardComp.type || fallbackKind);
+  return boardId ? `${kindLabel} (${boardId})` : kindLabel;
+}
+
+function extractCompileSummaryLines(stdoutText) {
+  const text = String(stdoutText || '');
+  if (!text.trim()) return [];
+
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const summaryPatterns = [
+    /^Sketch uses\s+/i,
+    /^Global variables use\s+/i,
+    /^Program\s+size\s*:/i,
+    /^Flash\s*:/i,
+    /^RAM\s*:/i,
+    /\btext\s+data\s+bss\s+dec\s+hex\b/i,
+    /^\d+\s+\d+\s+\d+\s+\d+\s+[0-9a-f]+\s+/i,
+  ];
+
+  const dedup = new Set();
+  const out = [];
+  lines.forEach((line) => {
+    if (!summaryPatterns.some((pattern) => pattern.test(line))) return;
+    if (dedup.has(line)) return;
+    dedup.add(line);
+    out.push(line);
+  });
+
+  return out.slice(0, 8);
+}
+
+function formatRunDuration(secondsValue) {
+  const totalSeconds = Math.max(0, Math.floor(Number(secondsValue || 0)));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
 
 function arrayBufferToBase64(buffer) {
   const bytes = new Uint8Array(buffer);
   let binary = '';
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   return btoa(binary);
+}
+
+function normalizeRp2040Env(source) {
+  const value = String(source || '').trim().toLowerCase();
+  if (!value || value === 'none' || value === 'native' || value === 'ino') return 'native';
+  if (value === 'py' || value === 'python') return 'micropython';
+  if (value.startsWith('micropython')) return 'micropython';
+  return 'native';
+}
+
+function mapRp2040EnvForLegacyContextMenu(source) {
+  return normalizeRp2040Env(source) === 'micropython'
+    ? 'micropython-20241129-v1.24.1'
+    : '';
+}
+
+function resolveComponentIdFormat(type) {
+  const rawType = String(type || '').toLowerCase();
+
+  if (rawType.includes('arduino') && rawType.includes('uno')) {
+    return { prefix: 'uno', separator: '' };
+  }
+  if (rawType.includes('pico-w') || rawType.includes('picow')) {
+    return { prefix: 'picow', separator: '' };
+  }
+  if (rawType.includes('rp2040') || rawType.includes('pico')) {
+    return { prefix: 'pico', separator: '' };
+  }
+
+  const fallback = String(type || 'component')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase() || 'component';
+
+  return { prefix: fallback, separator: '_' };
+}
+
+function allocateComponentId(type, usedIdsInput) {
+  const usedIds = usedIdsInput instanceof Set
+    ? usedIdsInput
+    : new Set(Array.isArray(usedIdsInput) ? usedIdsInput : []);
+  const { prefix, separator } = resolveComponentIdFormat(type);
+  const pattern = new RegExp(`^${prefix}${separator}(\\d+)$`, 'i');
+
+  let maxIndex = 0;
+  usedIds.forEach((id) => {
+    const match = String(id || '').match(pattern);
+    if (!match) return;
+    const parsed = Number(match[1]);
+    if (Number.isFinite(parsed)) {
+      maxIndex = Math.max(maxIndex, parsed);
+    }
+  });
+
+  let index = Math.max(1, maxIndex + 1);
+  let candidate = `${prefix}${separator}${index}`;
+  while (usedIds.has(candidate)) {
+    index += 1;
+    candidate = `${prefix}${separator}${index}`;
+  }
+
+  usedIds.add(candidate);
+  return candidate;
 }
 
 function normalizeBoardKind(source) {
@@ -343,8 +465,10 @@ function resolveBoardFqbnForComponent(boardComp, boardKind) {
   return BOARD_FQBN[boardKind] || BOARD_FQBN.arduino_uno;
 }
 
-function createDefaultMainCode(boardKind, boardId) {
-  if (boardKind === 'rp2040') {
+function createDefaultMainCode(boardKind, boardId, options = {}) {
+  const rp2040Mode = normalizeRp2040Env(options?.rp2040Mode || 'native');
+
+  if (boardKind === 'rp2040' && rp2040Mode === 'micropython') {
     return `# ${boardId} MicroPython script\nfrom machine import Pin\nfrom time import sleep\n\nled = Pin('LED', Pin.OUT)\n\nwhile True:\n  led.toggle()\n  sleep(0.5)\n`;
   }
   if (boardKind === 'esp32' || boardKind === 'stm32' || boardKind === 'rp2040') {
@@ -353,8 +477,12 @@ function createDefaultMainCode(boardKind, boardId) {
   return `// ${boardId} main sketch\nvoid setup() {\n  pinMode(13, OUTPUT);\n  // Serial.begin(${BOARD_DEFAULT_BAUD.arduino_uno});\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(500);\n  digitalWrite(13, LOW);\n  delay(500);\n}\n`;
 }
 
-function getDefaultMainFileName(boardKind, boardId) {
-  if (boardKind === 'rp2040') return 'main.py';
+function getDefaultMainFileName(boardKind, boardId, options = {}) {
+  if (boardKind === 'rp2040') {
+    return normalizeRp2040Env(options?.rp2040Mode || 'native') === 'micropython'
+      ? 'main.py'
+      : `${boardId}.ino`;
+  }
   return `${boardId}.ino`;
 }
 
@@ -367,6 +495,13 @@ function isFileDisabled(pathLike) {
   return String(pathLike || '').toLowerCase().endsWith(DISABLED_FILE_SUFFIX);
 }
 
+function baseFileExt(pathLike) {
+  const normalized = isFileDisabled(pathLike)
+    ? String(pathLike || '').slice(0, -DISABLED_FILE_SUFFIX.length)
+    : String(pathLike || '');
+  return fileExt(normalized);
+}
+
 function normalizeProjectFiles(files) {
   const list = Array.isArray(files) ? files : [];
   const seen = new Set();
@@ -375,7 +510,7 @@ function normalizeProjectFiles(files) {
   list.forEach((entry) => {
     if (!entry || typeof entry !== 'object') return;
     const normalizedPath = String(entry.path || entry.id || '').trim();
-    if (!normalizedPath || seen.has(normalizedPath)) return;
+    if (!normalizedPath || GENERATED_ROOT_FILE_IDS.has(normalizedPath) || seen.has(normalizedPath)) return;
     seen.add(normalizedPath);
 
     out.push({
@@ -403,6 +538,195 @@ function normalizeOpenCodeTabs(tabs, projectFiles) {
   });
 
   return out;
+}
+
+function buildProjectPayload({
+  name = '',
+  board = 'arduino_uno',
+  components = [],
+  wires = [],
+  code = '',
+  includeCode = true,
+  blocklyXml = '',
+  blocklyGeneratedCode = '',
+  useBlocklyCode = false,
+  projectFiles = [],
+  openCodeTabs = [],
+  activeCodeFileId = '',
+  exportedAt = '',
+} = {}) {
+  const normalizedFiles = normalizeProjectFiles(projectFiles)
+    .filter((file) => file.id !== 'project/diagram.json')
+    .map((file) => ({
+      ...file,
+      content: typeof file.content === 'string' ? file.content : String(file.content ?? ''),
+    }));
+  const normalizedTabs = normalizeOpenCodeTabs(openCodeTabs, normalizedFiles);
+  const preferredActive = String(activeCodeFileId || '').trim();
+  const resolvedActiveId = normalizedFiles.some((file) => file.id === preferredActive)
+    ? preferredActive
+    : (normalizedTabs[0] || normalizedFiles[0]?.id || '');
+
+  const payload = {
+    schemaVersion: 'openhw-project-v2',
+    board: String(board || 'arduino_uno'),
+    components: (Array.isArray(components) ? components : []).map((component) => ({
+      id: String(component?.id || ''),
+      type: String(component?.type || ''),
+      label: String(component?.label || ''),
+      x: Number(component?.x ?? 0),
+      y: Number(component?.y ?? 0),
+      w: Number(component?.w ?? 0),
+      h: Number(component?.h ?? 0),
+      rotation: Number(component?.rotation ?? 0),
+      attrs: component?.attrs && typeof component.attrs === 'object' ? component.attrs : {},
+    })),
+    connections: (Array.isArray(wires) ? wires : []).map((wire) => ({
+      id: String(wire?.id || ''),
+      from: String(wire?.from || ''),
+      to: String(wire?.to || ''),
+      color: String(wire?.color || ''),
+      waypoints: Array.isArray(wire?.waypoints) ? wire.waypoints : [],
+      isBelow: wire?.isBelow === true,
+      fromLabel: String(wire?.fromLabel || ''),
+      toLabel: String(wire?.toLabel || ''),
+    })),
+    blocklyXml: String(blocklyXml || ''),
+    blocklyGeneratedCode: String(blocklyGeneratedCode || ''),
+    useBlocklyCode: !!useBlocklyCode,
+    projectFiles: normalizedFiles,
+    openCodeTabs: normalizedTabs,
+    activeCodeFileId: resolvedActiveId,
+  };
+
+  if (includeCode) {
+    payload.code = String(code || '');
+  }
+
+  if (name) payload.name = String(name);
+  if (exportedAt) payload.exportedAt = String(exportedAt);
+  return payload;
+}
+
+function normalizeImportedCircuitData(rawComponents, rawConnections) {
+  const componentsInput = Array.isArray(rawComponents) ? rawComponents : [];
+  const wiresInput = Array.isArray(rawConnections) ? rawConnections : [];
+
+  const usedComponentIds = new Set();
+  let layoutSlot = 0;
+
+  const normalizedComponents = componentsInput
+    .map((component) => {
+      if (!component || typeof component !== 'object') return null;
+      const type = String(component.type || '').trim();
+      if (!type) return null;
+
+      const regManifest = COMPONENT_REGISTRY[type]?.manifest || {};
+
+      const rawId = String(component.id || '').trim();
+      const id = rawId && !usedComponentIds.has(rawId)
+        ? (usedComponentIds.add(rawId), rawId)
+        : allocateComponentId(type, usedComponentIds);
+
+      const defaultW = Number(regManifest.w ?? 80);
+      const defaultH = Number(regManifest.h ?? 60);
+      const width = Number(component.w);
+      const height = Number(component.h);
+
+      const hasX = Number.isFinite(Number(component.x));
+      const hasY = Number.isFinite(Number(component.y));
+      let x = Number(component.x);
+      let y = Number(component.y);
+      if (!hasX || !hasY) {
+        const col = layoutSlot % 4;
+        const row = Math.floor(layoutSlot / 4);
+        x = 120 + col * 220;
+        y = 80 + row * 170;
+        layoutSlot += 1;
+      }
+
+      const attrs = component.attrs && typeof component.attrs === 'object'
+        ? { ...component.attrs }
+        : {};
+      if (normalizeBoardKind(type) === 'rp2040') {
+        attrs.env = normalizeRp2040Env(resolveComponentAttrString(attrs, 'env', 'native'));
+      }
+
+      return {
+        ...component,
+        id,
+        type,
+        label: String(component.label || regManifest.label || type),
+        x,
+        y,
+        w: Number.isFinite(width) && width > 0
+          ? width
+          : (Number.isFinite(defaultW) && defaultW > 0 ? defaultW : 80),
+        h: Number.isFinite(height) && height > 0
+          ? height
+          : (Number.isFinite(defaultH) && defaultH > 0 ? defaultH : 60),
+        rotation: Number.isFinite(Number(component.rotation))
+          ? ((Number(component.rotation) % 360) + 360) % 360
+          : 0,
+        attrs,
+      };
+    })
+    .filter(Boolean);
+
+  const endpointLabel = (endpoint) => {
+    const parts = String(endpoint || '').split(':');
+    return parts.length > 1 ? parts.slice(1).join(':') : '';
+  };
+
+  const normalizeWaypoint = (point) => {
+    if (!point || typeof point !== 'object') return null;
+    const x = Number(point.x);
+    const y = Number(point.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return { x, y, ...(point._corner ? { _corner: true } : {}) };
+  };
+
+  const usedWireIds = new Set();
+  const allocateWireId = () => {
+    let idx = 1;
+    let candidate = `w${idx}`;
+    while (usedWireIds.has(candidate)) {
+      idx += 1;
+      candidate = `w${idx}`;
+    }
+    usedWireIds.add(candidate);
+    return candidate;
+  };
+
+  const normalizedWires = wiresInput
+    .map((wire) => {
+      if (!wire || typeof wire !== 'object') return null;
+      const from = String(wire.from || '').trim();
+      const to = String(wire.to || '').trim();
+      if (!from || !to) return null;
+
+      const rawWireId = String(wire.id || '').trim();
+      const id = rawWireId && !usedWireIds.has(rawWireId)
+        ? (usedWireIds.add(rawWireId), rawWireId)
+        : allocateWireId();
+
+      return {
+        ...wire,
+        id,
+        from,
+        to,
+        color: typeof wire.color === 'string' && wire.color.trim() ? wire.color : wireColor(),
+        waypoints: Array.isArray(wire.waypoints)
+          ? wire.waypoints.map(normalizeWaypoint).filter(Boolean)
+          : [],
+        isBelow: wire.isBelow === true,
+        fromLabel: String(wire.fromLabel || endpointLabel(from) || ''),
+        toLabel: String(wire.toLabel || endpointLabel(to) || ''),
+      };
+    })
+    .filter(Boolean);
+
+  return { components: normalizedComponents, wires: normalizedWires };
 }
 
 function isRp2040CoreMissingError(err) {
@@ -578,16 +902,14 @@ function resolveRp2040SourceMode({
 }) {
   const mode = String(configuredMode || 'auto').toLowerCase();
 
-  if (activePrefersIno) return 'ino';
-  if (activePrefersPy) return 'py';
-
   if (mode === 'py' || mode === 'python' || mode === 'micropython') {
-    // If user source is clearly Arduino/C++, avoid forcing it into MicroPython.
-    if (hasNativeSketch || prefersNativeFromSyntax) return 'ino';
     return 'py';
   }
 
-  if (mode === 'ino' || mode === 'native') return 'ino';
+  if (mode === 'ino' || mode === 'native' || mode === 'none') return 'ino';
+
+  if (activePrefersIno) return 'ino';
+  if (activePrefersPy) return 'py';
 
   if (hasNativeSketch || prefersNativeFromSyntax) return 'ino';
   if (hasPythonSource) return 'py';
@@ -1029,6 +1351,29 @@ export default function SimulatorPage({ gamificationMode = false }) {
   const activeCodeFile = useMemo(() => projectFileMap.get(activeCodeFileId) || null, [projectFileMap, activeCodeFileId]);
 
   const boardComponents = useMemo(() => components.filter(c => /(arduino|esp32|stm32|rp2040|pico)/i.test(c.type)), [components]);
+  const boardComponentMap = useMemo(() => {
+    const map = new Map();
+    boardComponents.forEach((component) => {
+      map.set(component.id, component);
+    });
+    return map;
+  }, [boardComponents]);
+  const rp2040BoardSourceModes = useMemo(() => {
+    const modes = {};
+    boardComponents.forEach((component) => {
+      if (normalizeBoardKind(component.type) !== 'rp2040') return;
+      modes[component.id] = normalizeRp2040Env(resolveComponentAttrString(component?.attrs, 'env', 'native'));
+    });
+    return modes;
+  }, [boardComponents]);
+  const firmwareBoardOptions = useMemo(() => {
+    return boardComponents
+      .map((comp) => ({
+        id: comp.id,
+        label: boardCompToDisplayName(comp, normalizeBoardKind(comp.type)),
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+  }, [boardComponents]);
   const webSerialSupported = typeof navigator !== 'undefined' && 'serial' in navigator;
 
   useEffect(() => {
@@ -1042,12 +1387,31 @@ export default function SimulatorPage({ gamificationMode = false }) {
 
   // PNG Export State
   const [isExporting, setIsExporting] = useState(false);
+  const [showFirmwareDownloadDialog, setShowFirmwareDownloadDialog] = useState(false);
+  const [firmwareDownloadTarget, setFirmwareDownloadTarget] = useState('');
+  const [runStartedAtMs, setRunStartedAtMs] = useState(null);
+  const [runDurationSec, setRunDurationSec] = useState(0);
+  const simulationSpeed = 1;
+  const simulationSpeedPercent = Math.max(0, Math.round(simulationSpeed * 100));
 
   // View Panel State
   const [showViewPanel, setShowViewPanel] = useState(false);
   const [viewPanelSection, setViewPanelSection] = useState(null); // null | 'schematic' | 'components'
   const [schematicLoading, setSchematicLoading] = useState(false);
   const [schematicDataUrl, setSchematicDataUrl] = useState(null);
+
+  useEffect(() => {
+    if (!showFirmwareDownloadDialog) return;
+
+    if (firmwareDownloadTarget === '__all__' || firmwareDownloadTarget === '__latest__') {
+      return;
+    }
+
+    const hasTarget = firmwareBoardOptions.some((opt) => opt.id === firmwareDownloadTarget);
+    if (!hasTarget) {
+      setFirmwareDownloadTarget(firmwareBoardOptions[0]?.id || '__latest__');
+    }
+  }, [showFirmwareDownloadDialog, firmwareDownloadTarget, firmwareBoardOptions]);
 
   const workerRef = useRef(null)
   const lastCompiledRef = useRef(null)
@@ -1058,6 +1422,9 @@ export default function SimulatorPage({ gamificationMode = false }) {
   const rp2040UartMicroPythonBoardsRef = useRef(new Set())
   const rp2040UartSilentWarnedBoardsRef = useRef(new Set())
   const runStartGuardRef = useRef(false)
+  const runComponentUpdateCountsRef = useRef({})
+  const runPinTransitionCountsRef = useRef({})
+  const runLastBoardPinsRef = useRef(new Map())
   const neopixelRefs = useRef({})
 
   const serialPlotBufferRef = useRef('');
@@ -1348,6 +1715,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
     listProjects(owner).then((projects) => {
       if (projects.length === 0) return;
       const latest = projects[0]; // already sorted newest-first
+      const normalizedCircuit = normalizeImportedCircuitData(latest.components, latest.connections);
       const normalizedFiles = normalizeProjectFiles(latest.projectFiles);
       const normalizedTabs = normalizeOpenCodeTabs(latest.openCodeTabs, normalizedFiles);
       const preferredActive = String(latest.activeCodeFileId || '').trim();
@@ -1359,12 +1727,12 @@ export default function SimulatorPage({ gamificationMode = false }) {
       setBlocklyXml(latest.blocklyXml || '');
       setBlocklyGeneratedCode(latest.blocklyGeneratedCode || '');
       setUseBlocklyCode(!!latest.useBlocklyCode);
-      setComponents(latest.components || []);
-      setWires(latest.connections || []);
+      setComponents(normalizedCircuit.components);
+      setWires(normalizedCircuit.wires);
       setProjectFiles(normalizedFiles);
       setOpenCodeTabs(normalizedTabs);
       setActiveCodeFileId(activeId);
-      syncNextIds(latest.components, latest.connections);
+      syncNextIds(normalizedCircuit.components, normalizedCircuit.wires);
       setCurrentProjectId(latest.id);
       currentProjectIdRef.current = latest.id;
       setCurrentProjectName(latest.name || 'Untitled');
@@ -1873,19 +2241,41 @@ export default function SimulatorPage({ gamificationMode = false }) {
   useEffect(() => {
     setProjectFiles(prev => {
       const normalized = normalizeProjectFiles(prev);
-      const startedWithDuplicates = normalized.length !== prev.length;
-      const next = [...normalized];
+      let changed = normalized.length !== prev.length;
+      let result = [...normalized];
 
       // Remove board files for boards no longer present
       const validBoardIds = new Set(boardComponents.map(b => b.id));
-      const pruned = next.filter(f => {
+      const pruned = result.filter(f => {
         const m = f.path.match(/^project\/([^/]+)\//);
         if (!m) return true;
         return validBoardIds.has(m[1]);
       });
 
-      let changed = startedWithDuplicates || pruned.length !== next.length;
-      const result = [...pruned];
+      if (pruned.length !== result.length) changed = true;
+      result = [...pruned];
+
+      const replaceFilePath = (fromPath, toPath) => {
+        if (!fromPath || !toPath || fromPath === toPath) return;
+        const sourceIdx = result.findIndex((file) => file.id === fromPath);
+        if (sourceIdx === -1) return;
+
+        const duplicateIdx = result.findIndex((file, idx) => idx !== sourceIdx && file.id === toPath);
+        if (duplicateIdx !== -1) {
+          result.splice(sourceIdx, 1);
+          changed = true;
+          return;
+        }
+
+        const source = result[sourceIdx];
+        result[sourceIdx] = {
+          ...source,
+          id: toPath,
+          path: toPath,
+          name: toPath.split('/').pop() || source.name,
+        };
+        changed = true;
+      };
 
       const upsert = (fileObj) => {
         const idx = result.findIndex(f => f.id === fileObj.id);
@@ -1904,71 +2294,131 @@ export default function SimulatorPage({ gamificationMode = false }) {
       boardComponents.forEach((bc) => {
         const kind = normalizeBoardKind(bc.type);
         const basePath = `project/${bc.id}`;
-        const files = kind === 'rp2040'
-          ? [
-            {
-              path: `${basePath}/${bc.id}.ino`,
-              type: 'code',
-              content: createDefaultMainCode('arduino_uno', bc.id),
-            },
-            {
-              path: `${basePath}/main.py`,
-              type: 'code',
-              content: createDefaultMainCode('rp2040', bc.id),
-            },
-          ]
-          : [
-            {
-              path: `${basePath}/${getDefaultMainFileName(kind, bc.id)}`,
-              type: 'code',
-              content: createDefaultMainCode(kind, bc.id),
-            },
-          ];
+        const rp2040Mode = kind === 'rp2040'
+          ? normalizeRp2040Env(resolveComponentAttrString(bc?.attrs, 'env', 'native'))
+          : 'native';
 
-        files.forEach((ff) => {
-          upsert({
-            id: ff.path,
-            path: ff.path,
-            name: ff.path.split('/').pop(),
-            kind: ff.type,
-            boardId: bc.id,
-            boardKind: kind,
-            content: ff.content,
-            dirty: false,
-          });
-        });
-      });
-
-      const libraries = (libInstalled || []).map(l => l?.library?.name || l?.name).filter(Boolean);
-      const diagramJson = JSON.stringify({
-        board,
-        components: components.map(c => ({ id: c.id, type: c.type, attrs: c.attrs || {} })),
-        connections: wires.map(w => ({ id: w.id, from: w.from, to: w.to })),
-      }, null, 2);
-
-      const rootFiles = [
-        { id: 'project/diagram.json', path: 'project/diagram.json', name: 'diagram.json', kind: 'root', content: diagramJson, dirty: false },
-        { id: 'project/diagram.png', path: 'project/diagram.png', name: 'diagram.png', kind: 'root', content: '[binary png placeholder]', dirty: false },
-        { id: 'project/library.txt', path: 'project/library.txt', name: 'library.txt', kind: 'root', content: libraries.join('\n'), dirty: false },
-      ];
-
-      rootFiles.forEach((rf) => {
-        const idx = result.findIndex(f => f.id === rf.id);
-        if (idx === -1) {
-          result.push(rf);
-          changed = true;
-        } else if (result[idx].content !== rf.content) {
-          // keep manual edits only for library.txt; diagram files are generated
-          if (rf.id === 'project/library.txt' || rf.id === 'project/diagram.json') {
-            result[idx] = { ...result[idx], content: rf.content, dirty: false };
+        for (let i = 0; i < result.length; i += 1) {
+          const file = result[i];
+          if (!file.path.startsWith(`${basePath}/`)) continue;
+          if (file.boardId !== bc.id || file.boardKind !== kind) {
+            result[i] = { ...file, boardId: bc.id, boardKind: kind };
             changed = true;
           }
         }
+
+        const expectedMainName = getDefaultMainFileName(kind, bc.id, { rp2040Mode });
+        const expectedMainPath = `${basePath}/${expectedMainName}`;
+        const expectedMainDisabledPath = `${expectedMainPath}${DISABLED_FILE_SUFFIX}`;
+        if (!result.some((file) => file.id === expectedMainPath) && result.some((file) => file.id === expectedMainDisabledPath)) {
+          replaceFilePath(expectedMainDisabledPath, expectedMainPath);
+        }
+
+        const hasEnabledMainForMode = result.some((file) => {
+          if (!file.path.startsWith(`${basePath}/`)) return false;
+          if (isFileDisabled(file.path)) return false;
+          const ext = baseFileExt(file.path);
+          if (kind !== 'rp2040') return ext === '.ino';
+          return rp2040Mode === 'micropython' ? ext === '.py' : ext === '.ino';
+        });
+
+        if (!hasEnabledMainForMode) {
+          const defaultContent = createDefaultMainCode(kind, bc.id, { rp2040Mode });
+          upsert({
+            id: expectedMainPath,
+            path: expectedMainPath,
+            name: expectedMainName,
+            kind: 'code',
+            boardId: bc.id,
+            boardKind: kind,
+            content: defaultContent,
+            dirty: false,
+          });
+        }
+
+        if (kind === 'rp2040') {
+          const boardFilePaths = result
+            .filter((file) => file.path.startsWith(`${basePath}/`))
+            .map((file) => file.path);
+
+          boardFilePaths.forEach((pathLike) => {
+            const ext = baseFileExt(pathLike);
+            const disabled = isFileDisabled(pathLike);
+            const shouldDisable = rp2040Mode === 'micropython'
+              ? ARDUINO_CODE_EXTENSIONS.has(ext)
+              : ext === '.py';
+
+            if (shouldDisable && !disabled) {
+              replaceFilePath(pathLike, `${pathLike}${DISABLED_FILE_SUFFIX}`);
+            }
+          });
+        }
       });
 
-      return changed ? result : prev;
+      const libraries = (libInstalled || []).map(l => l?.library?.name || l?.name).filter(Boolean);
+      const diagramPayload = buildProjectPayload({
+        board,
+        components,
+        wires,
+        code,
+        includeCode: false,
+        blocklyXml,
+        blocklyGeneratedCode,
+        useBlocklyCode,
+        projectFiles: result,
+        openCodeTabs,
+        activeCodeFileId,
+      });
+      const diagramJson = JSON.stringify(diagramPayload, null, 2);
+
+      const generatedRootFiles = [
+        { id: 'project/diagram.json', path: 'project/diagram.json', name: 'diagram.json', kind: 'root', content: diagramJson, dirty: false },
+        { id: 'project/library.txt', path: 'project/library.txt', name: 'library.txt', kind: 'root', content: libraries.join('\n'), dirty: false },
+      ];
+
+      generatedRootFiles.forEach((rootFile) => {
+        const idx = result.findIndex((file) => file.id === rootFile.id);
+        if (idx === -1) {
+          result.push(rootFile);
+          changed = true;
+          return;
+        }
+
+        const current = result[idx];
+        if (
+          current.path !== rootFile.path
+          || current.name !== rootFile.name
+          || current.kind !== rootFile.kind
+          || current.content !== rootFile.content
+          || current.dirty !== false
+        ) {
+          result[idx] = {
+            ...current,
+            path: rootFile.path,
+            name: rootFile.name,
+            kind: rootFile.kind,
+            content: rootFile.content,
+            dirty: false,
+          };
+          changed = true;
+        }
+      });
+
+      return changed ? normalizeProjectFiles(result) : prev;
     });
-  }, [boardComponents, board, components, wires, libInstalled]);
+  }, [
+    boardComponents,
+    board,
+    components,
+    wires,
+    libInstalled,
+    code,
+    blocklyXml,
+    blocklyGeneratedCode,
+    useBlocklyCode,
+    openCodeTabs,
+    activeCodeFileId,
+  ]);
 
   useEffect(() => {
     if (projectFiles.length === 0) return;
@@ -1984,7 +2434,11 @@ export default function SimulatorPage({ gamificationMode = false }) {
   }, [projectFiles, activeCodeFileId, projectFileMap]);
 
   useEffect(() => {
-    if (!activeCodeFile) return;
+    if (!activeCodeFile) {
+      suppressCodeSyncRef.current = true;
+      setCode('');
+      return;
+    }
     suppressCodeSyncRef.current = true;
     setCode(activeCodeFile.content || '');
   }, [activeCodeFile?.id]);
@@ -2321,13 +2775,17 @@ export default function SimulatorPage({ gamificationMode = false }) {
     const rect = canvasRef.current.getBoundingClientRect()
     const x = (e.clientX - rect.left - canvasOffsetRef.current.x) / canvasZoomRef.current - (item.w || 60) / 2
     const y = (e.clientY - rect.top - canvasOffsetRef.current.y) / canvasZoomRef.current - (item.h || 60) / 2
-    setComponents(prev => [...prev, {
-      id: `${item.type}_${nextId++}`,
-      type: item.type, label: item.label,
-      x: Math.max(8, x), y: Math.max(8, y),
-      w: item.w || 60, h: item.h || 60,
-      attrs: item.attrs || {},
-    }])
+    setComponents(prev => {
+      const usedIds = new Set(prev.map((comp) => String(comp.id || '')));
+      const id = allocateComponentId(item.type, usedIds);
+      return [...prev, {
+        id,
+        type: item.type, label: item.label,
+        x: Math.max(8, x), y: Math.max(8, y),
+        w: item.w || 60, h: item.h || 60,
+        attrs: item.attrs || {},
+      }];
+    })
     dragPayload.current = null
   }, [saveHistory])
 
@@ -2336,13 +2794,17 @@ export default function SimulatorPage({ gamificationMode = false }) {
     saveHistory()
     const x = canvasX - (item.w || 60) / 2
     const y = canvasY - (item.h || 60) / 2
-    setComponents(prev => [...prev, {
-      id: `${item.type}_${nextId++}`,
-      type: item.type, label: item.label,
-      x: Math.max(8, x), y: Math.max(8, y),
-      w: item.w || 60, h: item.h || 60,
-      attrs: item.attrs || {},
-    }])
+    setComponents(prev => {
+      const usedIds = new Set(prev.map((comp) => String(comp.id || '')));
+      const id = allocateComponentId(item.type, usedIds);
+      return [...prev, {
+        id,
+        type: item.type, label: item.label,
+        x: Math.max(8, x), y: Math.max(8, y),
+        w: item.w || 60, h: item.h || 60,
+        attrs: item.attrs || {},
+      }];
+    })
   }, [saveHistory])
 
   // ── Palette click to add (adds to canvas center) ────────────────────────────
@@ -2619,13 +3081,16 @@ export default function SimulatorPage({ gamificationMode = false }) {
       if (c.id === id) {
         let newW = c.w;
         let newH = c.h;
+        const nextValue = (key === 'env' && normalizeBoardKind(c.type) === 'rp2040')
+          ? normalizeRp2040Env(value)
+          : value;
         if (c.type === 'wokwi-neopixel-matrix') {
-          const rows = key === 'rows' ? (parseInt(value) || 1) : (parseInt(c.attrs?.rows) || 1);
-          const cols = key === 'cols' ? (parseInt(value) || 1) : (parseInt(c.attrs?.cols) || 1);
+          const rows = key === 'rows' ? (parseInt(nextValue) || 1) : (parseInt(c.attrs?.rows) || 1);
+          const cols = key === 'cols' ? (parseInt(nextValue) || 1) : (parseInt(c.attrs?.cols) || 1);
           newW = Math.max(30, cols * 30);
           newH = Math.max(30, rows * 30);
         }
-        return { ...c, w: newW, h: newH, attrs: { ...c.attrs, [key]: value } };
+        return { ...c, w: newW, h: newH, attrs: { ...c.attrs, [key]: nextValue } };
       }
       return c;
     }));
@@ -2679,7 +3144,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
     setOpenCodeTabs(prev => {
       const next = prev.filter(id => id !== fileId);
       if (activeCodeFileId === fileId) {
-        setActiveCodeFileId(next[next.length - 1] || '');
+        setActiveCodeFileId(next[next.length - 1] || null);
       }
       return next;
     });
@@ -2742,7 +3207,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
     setProjectFiles(prev => prev.filter(f => f.id !== fileId));
     setOpenCodeTabs(prev => prev.filter(id => id !== fileId));
     if (activeCodeFileId === fileId) {
-      const next = openCodeTabs.find(id => id !== fileId) || '';
+      const next = openCodeTabs.find(id => id !== fileId) || null;
       setActiveCodeFileId(next);
     }
   }, [activeCodeFileId, openCodeTabs]);
@@ -2834,6 +3299,47 @@ export default function SimulatorPage({ gamificationMode = false }) {
     return payload;
   }, []);
 
+  const resolveFolderFilePolicy = useCallback((parentPath = 'project') => {
+    const normalizedParent = String(parentPath || 'project').trim() || 'project';
+    const boardMatch = normalizedParent.match(/^project\/([^/]+)(?:\/|$)/);
+    if (!boardMatch) {
+      return {
+        parent: normalizedParent,
+        boardId: '',
+        boardKind: 'root',
+        rp2040Mode: 'native',
+        defaultExt: '.ino',
+        allowedExtensions: ROOT_UPLOADABLE_EXTENSIONS,
+      };
+    }
+
+    const boardId = boardMatch[1];
+    const boardComp = boardComponentMap.get(boardId);
+    const boardKind = normalizeBoardKind(boardComp?.type || '');
+    if (boardKind !== 'rp2040') {
+      return {
+        parent: normalizedParent,
+        boardId,
+        boardKind,
+        rp2040Mode: 'native',
+        defaultExt: '.ino',
+        allowedExtensions: RP2040_NATIVE_ALLOWED_EXTENSIONS,
+      };
+    }
+
+    const rp2040Mode = rp2040BoardSourceModes[boardId] || 'native';
+    return {
+      parent: normalizedParent,
+      boardId,
+      boardKind,
+      rp2040Mode,
+      defaultExt: rp2040Mode === 'micropython' ? '.py' : '.ino',
+      allowedExtensions: rp2040Mode === 'micropython'
+        ? RP2040_MICROPYTHON_ALLOWED_EXTENSIONS
+        : RP2040_NATIVE_ALLOWED_EXTENSIONS,
+    };
+  }, [boardComponentMap, rp2040BoardSourceModes]);
+
   const createCodeFile = useCallback((requestedName, openAfterCreate = false, customParent = null) => {
     const cleaned = String(requestedName || '').trim();
     if (!cleaned) return null;
@@ -2848,12 +3354,24 @@ export default function SimulatorPage({ gamificationMode = false }) {
         : 'project';
     }
 
-    const defaultExt = '.ino';
+    const folderPolicy = resolveFolderFilePolicy(parent);
+
+    const defaultExt = folderPolicy.defaultExt || '.ino';
     const rawExt = fileExt(cleaned);
     const fileNameBase = rawExt ? cleaned.slice(0, -rawExt.length) : cleaned;
     const ext = rawExt || defaultExt;
     const safeBase = fileNameBase.replace(/[^a-zA-Z0-9._-]/g, '_') || 'new_file';
-    const safeExt = ext.replace(/[^a-zA-Z0-9.]/g, '') || defaultExt;
+    const safeExt = (ext.replace(/[^a-zA-Z0-9.]/g, '') || defaultExt).toLowerCase();
+
+    if (!folderPolicy.allowedExtensions.has(safeExt)) {
+      if (folderPolicy.boardKind === 'rp2040') {
+        const modeLabel = folderPolicy.rp2040Mode === 'micropython' ? '.py' : '.ino';
+        alert(`RP2040 board ${folderPolicy.boardId} currently allows ${modeLabel} workflow files. "${safeExt}" is disabled for this env.`);
+      } else {
+        alert(`Unsupported file type: ${safeExt}`);
+      }
+      return null;
+    }
 
     let candidate = `${safeBase}${safeExt}`;
     let candidatePath = `${parent}/${candidate}`;
@@ -2882,6 +3400,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
       name: candidate,
       kind: 'code',
       boardId: boardMatch ? boardMatch[1] : undefined,
+      boardKind: boardMatch ? folderPolicy.boardKind : undefined,
       content,
       dirty: true,
     };
@@ -2893,16 +3412,27 @@ export default function SimulatorPage({ gamificationMode = false }) {
     }
 
     return candidatePath;
-  }, [activeCodeFile, projectFileMap]);
+  }, [activeCodeFile, projectFileMap, resolveFolderFilePolicy]);
 
   const createCodeTab = useCallback((requestedName) => {
     return createCodeFile(requestedName, true);
   }, [createCodeFile]);
 
   const uploadCodeFile = useCallback((customParent = null) => {
+    let parent = 'project';
+    if (customParent) {
+      parent = customParent;
+    } else {
+      const activePath = activeCodeFile?.path || '';
+      parent = activePath.includes('/')
+        ? activePath.substring(0, activePath.lastIndexOf('/'))
+        : 'project';
+    }
+
+    const folderPolicy = resolveFolderFilePolicy(parent);
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.ino,.cpp,.h,.c,.txt,.json,.xml,.py,.uf2';
+    input.accept = Array.from(folderPolicy.allowedExtensions).join(',');
     input.onchange = (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -2916,21 +3446,21 @@ export default function SimulatorPage({ gamificationMode = false }) {
           const base64 = arrayBufferToBase64(content);
           content = `${UF2_PAYLOAD_PREFIX}${base64}`;
         }
-        
-        let parent = 'project';
-        if (customParent) {
-          parent = customParent;
-        } else {
-          const activePath = activeCodeFile?.path || '';
-          parent = activePath.includes('/')
-            ? activePath.substring(0, activePath.lastIndexOf('/'))
-            : 'project';
-        }
 
         const fileNameBase = rawExt ? file.name.slice(0, -rawExt.length) : file.name;
-        const ext = rawExt || '.ino';
+        const ext = rawExt || folderPolicy.defaultExt || '.ino';
         const safeBase = fileNameBase.replace(/[^a-zA-Z0-9._-]/g, '_') || 'uploaded';
-        const safeExt = ext.replace(/[^a-zA-Z0-9.]/g, '') || '.ino';
+        const safeExt = (ext.replace(/[^a-zA-Z0-9.]/g, '') || '.ino').toLowerCase();
+
+        if (!folderPolicy.allowedExtensions.has(safeExt)) {
+          if (folderPolicy.boardKind === 'rp2040') {
+            const modeLabel = folderPolicy.rp2040Mode === 'micropython' ? '.py' : '.ino';
+            alert(`RP2040 board ${folderPolicy.boardId} currently allows ${modeLabel} workflow files. "${safeExt}" cannot be uploaded in this env.`);
+          } else {
+            alert(`Unsupported file type: ${safeExt}`);
+          }
+          return;
+        }
 
         let candidate = `${safeBase}${safeExt}`;
         let candidatePath = `${parent}/${candidate}`;
@@ -2949,6 +3479,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
           name: candidate,
           kind: 'code',
           boardId: boardMatch ? boardMatch[1] : undefined,
+          boardKind: boardMatch ? folderPolicy.boardKind : undefined,
           content,
           dirty: true,
         };
@@ -2963,55 +3494,170 @@ export default function SimulatorPage({ gamificationMode = false }) {
       else reader.readAsText(file);
     };
     input.click();
-  }, [activeCodeFile, projectFileMap, appendConsoleEntry]);
+  }, [activeCodeFile, projectFileMap, appendConsoleEntry, resolveFolderFilePolicy]);
 
   // ─── Project Save / Load Handlers ───────────────────────────────────────────
 
-  const handleDownloadFirmware = async () => {
+  const normalizeFirmwareFileName = useCallback((artifactName, boardId, firmwarePayload) => {
+    const cleaned = String(artifactName || '').trim();
+    const isUf2 = typeof firmwarePayload === 'string' && firmwarePayload.startsWith(UF2_PAYLOAD_PREFIX);
+    const defaultExt = isUf2 ? '.uf2' : '.hex';
+
+    if (cleaned) {
+      return /\.[a-z0-9]+$/i.test(cleaned) ? cleaned : `${cleaned}${defaultExt}`;
+    }
+
+    const safeBoard = String(boardId || 'firmware').replace(/[^a-zA-Z0-9_-]/g, '_') || 'firmware';
+    return `${safeBoard}-firmware${defaultExt}`;
+  }, []);
+
+  const triggerFirmwareDownload = useCallback((firmwarePayload, fileName) => {
+    if (!firmwarePayload) return;
+
+    let content = firmwarePayload;
+    let mimeType = 'text/plain';
+
+    if (typeof firmwarePayload === 'string' && firmwarePayload.startsWith(UF2_PAYLOAD_PREFIX)) {
+      const base64 = firmwarePayload.substring(UF2_PAYLOAD_PREFIX.length);
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      content = bytes;
+      mimeType = 'application/octet-stream';
+    }
+
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }, []);
+
+  const resolveStoredFirmwareArtifact = useCallback((targetBoardId = '') => {
+    const normalizedBoardId = String(targetBoardId || '').trim();
+
+    const readStoredArtifact = (storageKey) => {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(storageKey) || 'null');
+        return parsed && typeof parsed === 'object' ? parsed : null;
+      } catch {
+        return null;
+      }
+    };
+
+    if (normalizedBoardId) {
+      const byBoard = readStoredArtifact(`openhw_gdb_artifact_${normalizedBoardId}`);
+      if (byBoard?.firmware) {
+        return {
+          boardId: normalizedBoardId,
+          firmware: byBoard.firmware,
+          artifactName: byBoard.artifactName || byBoard.elfName || '',
+        };
+      }
+    }
+
+    const latest = readStoredArtifact('openhw_gdb_last_artifact');
+    if (latest?.firmware) {
+      const latestBoardId = String(latest.boardId || '').trim();
+      if (!normalizedBoardId || !latestBoardId || latestBoardId === normalizedBoardId) {
+        return {
+          boardId: latestBoardId || normalizedBoardId,
+          firmware: latest.firmware,
+          artifactName: latest.artifactName || latest.elfName || '',
+        };
+      }
+    }
+
+    if (!normalizedBoardId) {
+      const fallback = lastCompiledRef.current?.result;
+      if (fallback?.hex) {
+        return {
+          boardId: 'latest',
+          firmware: fallback.hex,
+          artifactName: fallback.artifactName || '',
+        };
+      }
+    }
+
+    return null;
+  }, []);
+
+  const handleDownloadFirmware = useCallback(async (target = '__latest__') => {
     try {
-      let firmware = lastCompiledRef.current?.result?.hex;
-      let artifactName = lastCompiledRef.current?.result?.artifactName || 'firmware.hex';
+      const normalizedTarget = String(target || '__latest__').trim() || '__latest__';
 
-      if (!firmware) {
-        const stored = JSON.parse(localStorage.getItem(`openhw_gdb_artifact_${board.id}`) || 'null');
-        firmware = stored?.firmware;
-        artifactName = stored?.artifactName || artifactName;
-      }
+      if (normalizedTarget === '__all__') {
+        const boardIds = firmwareBoardOptions.map((opt) => opt.id);
 
-      if (!firmware) {
-        const lastArtifact = JSON.parse(localStorage.getItem('openhw_gdb_last_artifact') || 'null');
-        firmware = lastArtifact?.firmware;
-        artifactName = lastArtifact?.artifactName || artifactName;
-      }
+        if (boardIds.length === 0) {
+          const latest = resolveStoredFirmwareArtifact('');
+          if (!latest?.firmware) {
+            appendConsoleEntry('error', 'No firmware available. Compile the project first.', 'simulator');
+            return;
+          }
+          const fileName = normalizeFirmwareFileName(latest.artifactName, latest.boardId || 'latest', latest.firmware);
+          triggerFirmwareDownload(latest.firmware, fileName);
+          appendConsoleEntry('info', `Firmware downloaded: ${fileName}`, 'simulator');
+          return;
+        }
 
-      if (!firmware) {
-        appendConsoleEntry('error', 'No firmware available. Please compile the project first.', 'simulator');
+        const missingBoards = [];
+        let downloadedCount = 0;
+
+        boardIds.forEach((boardId, idx) => {
+          const artifact = resolveStoredFirmwareArtifact(boardId);
+          if (!artifact?.firmware) {
+            missingBoards.push(boardId);
+            return;
+          }
+
+          const fileName = normalizeFirmwareFileName(artifact.artifactName, boardId, artifact.firmware);
+          setTimeout(() => triggerFirmwareDownload(artifact.firmware, fileName), idx * 120);
+          downloadedCount += 1;
+        });
+
+        if (downloadedCount === 0) {
+          appendConsoleEntry('error', 'No board firmware found. Compile each board first.', 'simulator');
+          return;
+        }
+
+        appendConsoleEntry('info', `Downloaded firmware for ${downloadedCount} board(s).`, 'simulator');
+        if (missingBoards.length > 0) {
+          appendConsoleEntry('warn', `Missing firmware for: ${missingBoards.join(', ')}`, 'simulator');
+        }
         return;
       }
 
-      let content = firmware;
-      let mimeType = 'text/plain';
+      const targetBoardId = normalizedTarget === '__latest__' ? '' : normalizedTarget;
+      const artifact = resolveStoredFirmwareArtifact(targetBoardId);
 
-      if (typeof firmware === 'string' && firmware.startsWith('UF2BASE64:')) {
-        const base64 = firmware.substring('UF2BASE64:'.length);
-        const binary = atob(base64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        content = bytes;
-        mimeType = 'application/octet-stream';
+      if (!artifact?.firmware) {
+        const missingLabel = targetBoardId
+          ? `No firmware found for ${targetBoardId}. Compile this board first.`
+          : 'No firmware available. Compile the project first.';
+        appendConsoleEntry('error', missingLabel, 'simulator');
+        return;
       }
 
-      const blob = new Blob([content], { type: mimeType });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = artifactName;
-      a.click();
-      URL.revokeObjectURL(url);
+      const fileName = normalizeFirmwareFileName(
+        artifact.artifactName,
+        artifact.boardId || targetBoardId || 'firmware',
+        artifact.firmware,
+      );
+
+      triggerFirmwareDownload(artifact.firmware, fileName);
+      appendConsoleEntry('info', `Firmware downloaded: ${fileName}`, 'simulator');
     } catch (err) {
       appendConsoleEntry('error', `Download failed: ${err.message}`, 'simulator');
     }
-  };
+  }, [appendConsoleEntry, firmwareBoardOptions, normalizeFirmwareFileName, resolveStoredFirmwareArtifact, triggerFirmwareDownload]);
+
+  const openFirmwareDownloadDialog = useCallback(() => {
+    setFirmwareDownloadTarget(firmwareBoardOptions[0]?.id || '__latest__');
+    setShowFirmwareDownloadDialog(true);
+  }, [firmwareBoardOptions]);
 
   const handleStartGDB = () => {
     appendConsoleEntry('info', 'Connecting to GDB Session...', 'simulator');
@@ -3066,6 +3712,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
   /** Load a project from the My Projects modal. */
   const handleLoadProject = (proj) => {
     if (isRunning) return;
+    const normalizedCircuit = normalizeImportedCircuitData(proj.components, proj.connections);
     const normalizedFiles = normalizeProjectFiles(proj.projectFiles);
     const normalizedTabs = normalizeOpenCodeTabs(proj.openCodeTabs, normalizedFiles);
     const preferredActive = String(proj.activeCodeFileId || '').trim();
@@ -3077,12 +3724,12 @@ export default function SimulatorPage({ gamificationMode = false }) {
     setBlocklyXml(proj.blocklyXml || '');
     setBlocklyGeneratedCode(proj.blocklyGeneratedCode || '');
     setUseBlocklyCode(!!proj.useBlocklyCode);
-    setComponents(proj.components || []);
-    setWires(proj.connections || []);
+    setComponents(normalizedCircuit.components);
+    setWires(normalizedCircuit.wires);
     setProjectFiles(normalizedFiles);
     setOpenCodeTabs(normalizedTabs);
     setActiveCodeFileId(activeId);
-    syncNextIds(proj.components, proj.connections);
+    syncNextIds(normalizedCircuit.components, normalizedCircuit.wires);
     setCurrentProjectId(proj.id);
     currentProjectIdRef.current = proj.id;
     setCurrentProjectName(proj.name || 'Untitled');
@@ -3133,7 +3780,20 @@ export default function SimulatorPage({ gamificationMode = false }) {
   // ─── Backup / Restore ──────────────────────────────────────────────────────
   const handleBackupWorkflow = async () => {
     const zip = new JSZip();
-    const data = { name: currentProjectName, board, components, connections: wires, code, blocklyXml, blocklyGeneratedCode, useBlocklyCode, projectFiles, openCodeTabs, activeCodeFileId, exportedAt: new Date().toISOString() };
+    const data = buildProjectPayload({
+      name: currentProjectName,
+      board,
+      components,
+      wires,
+      code,
+      blocklyXml,
+      blocklyGeneratedCode,
+      useBlocklyCode,
+      projectFiles,
+      openCodeTabs,
+      activeCodeFileId,
+      exportedAt: new Date().toISOString(),
+    });
     zip.file('workflow.json', JSON.stringify(data, null, 2));
     const blob = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(blob);
@@ -3151,15 +3811,24 @@ export default function SimulatorPage({ gamificationMode = false }) {
       if (!wf) { alert('Invalid backup: workflow.json not found.'); return; }
       const json = JSON.parse(await wf.async('string'));
       if ((components.length > 0 || wires.length > 0) && !window.confirm('Restore backup? Current unsaved changes will be replaced.')) return;
+      const normalizedCircuit = normalizeImportedCircuitData(json.components, Array.isArray(json.connections) ? json.connections : json.wires);
+      const normalizedFiles = normalizeProjectFiles(Array.isArray(json.projectFiles) ? json.projectFiles : []);
+      const normalizedTabs = normalizeOpenCodeTabs(Array.isArray(json.openCodeTabs) ? json.openCodeTabs : [], normalizedFiles);
+      const preferredActive = String(json.activeCodeFileId || '').trim();
+      const activeId = normalizedFiles.some((f) => f.id === preferredActive)
+        ? preferredActive
+        : (normalizedTabs[0] || normalizedFiles[0]?.id || '');
       setBoard(json.board || 'arduino_uno');
       setCode(json.code || '');
       setBlocklyXml(json.blocklyXml || '');
-      setComponents(json.components || []);
-      setWires(json.connections || []);
-      setProjectFiles(Array.isArray(json.projectFiles) ? json.projectFiles : []);
-      setOpenCodeTabs(Array.isArray(json.openCodeTabs) ? json.openCodeTabs : []);
-      setActiveCodeFileId(json.activeCodeFileId || '');
-      syncNextIds(json.components, json.connections);
+      setBlocklyGeneratedCode(json.blocklyGeneratedCode || '');
+      setUseBlocklyCode(!!json.useBlocklyCode);
+      setComponents(normalizedCircuit.components);
+      setWires(normalizedCircuit.wires);
+      setProjectFiles(normalizedFiles);
+      setOpenCodeTabs(normalizedTabs);
+      setActiveCodeFileId(activeId);
+      syncNextIds(normalizedCircuit.components, normalizedCircuit.wires);
       setCurrentProjectName(json.name || 'Untitled');
       setHistory({ past: [], future: [] });
       lastCompiledRef.current = null;
@@ -3174,6 +3843,16 @@ export default function SimulatorPage({ gamificationMode = false }) {
     // In a real implementation this would push to a serial console state array
     console.log(`[SIM]`, msg);
   };
+
+  const logCompileSummary = useCallback((compiledResult, boardComp, boardKind) => {
+    const summaryLines = extractCompileSummaryLines(compiledResult?.stdout || '');
+    if (summaryLines.length === 0) return;
+
+    const boardLabel = boardCompToDisplayName(boardComp, boardKind);
+    summaryLines.forEach((line) => {
+      appendConsoleEntry('info', `[${boardLabel}] ${line}`, 'simulator');
+    });
+  }, [appendConsoleEntry]);
 
   const registerGdbArtifact = useCallback((boardId, boardKind, compiledResult) => {
     const compiled = compiledResult && typeof compiledResult === 'object' ? compiledResult : null;
@@ -3481,6 +4160,9 @@ export default function SimulatorPage({ gamificationMode = false }) {
       rp2040UartSilentWarnedBoardsRef.current.clear();
       serialIngressArbitrationRef.current.clear();
       serialPausedQueueRef.current = [];
+      runComponentUpdateCountsRef.current = {};
+      runPinTransitionCountsRef.current = {};
+      runLastBoardPinsRef.current = new Map();
 
       if (!runCircuitValidation()) {
         appendConsoleEntry('warn', 'Run blocked: validation errors found.', 'simulator');
@@ -3490,6 +4172,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
 
       setIsRunning(true);
       setIsCompiling(true);
+      setRunStartedAtMs(Date.now());
+      setRunDurationSec(0);
       const parsedRunBaud = Number(serialBaudRate);
       const selectedRunBaud = Number.isFinite(parsedRunBaud)
         ? parsedRunBaud
@@ -3500,7 +4184,6 @@ export default function SimulatorPage({ gamificationMode = false }) {
       const boardHexMap = {};
       const boardPythonMap = {};
       const boardBaudMap = {};
-      const boardRuntimeMap = {};
       const programmableBoards = components.filter(c => /(arduino|esp32|stm32|rp2040|pico)/i.test(c.type));
       const singleProgrammableBoardId = programmableBoards.length === 1 ? programmableBoards[0]?.id : '';
       const boardsWithoutCompilableSketch = [];
@@ -3551,9 +4234,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
 
           // ── RP2040: emulate a real UF2 on rp2040js and inject script via UART0 ──
           if (kind === 'rp2040') {
-            const rawEnv = resolveComponentAttrString(boardComp?.attrs, 'env', '');
-            const rawEnvLower = rawEnv.toLowerCase();
-            const configuredMode = rawEnvLower.startsWith('micropython') ? 'py' : 'ino';
+            const configuredEnv = normalizeRp2040Env(resolveComponentAttrString(boardComp?.attrs, 'env', 'native'));
+            const configuredMode = configuredEnv === 'micropython' ? 'py' : 'ino';
             const configuredBuilder = resolveComponentAttrString(boardComp?.attrs, 'builder', 'arduino-pico') || 'arduino-pico';
             const hasNativeSketch = compileUnit.hasMainFile || (activePrefersIno && !!compileSource.trim());
             const hasExplicitPython = activePrefersPy || hasPythonSource;
@@ -3577,7 +4259,6 @@ export default function SimulatorPage({ gamificationMode = false }) {
             }
 
             if (useMicroPythonPath) {
-              const useJsMicroPythonRuntime = rawEnvLower.includes('micropython-js');
               let pyToRun = pythonSource.trim();
               if (!pyToRun && looksLikeMicroPythonSource(compileSource)) {
                 pyToRun = compileSource;
@@ -3589,24 +4270,18 @@ export default function SimulatorPage({ gamificationMode = false }) {
                 pyToRun = arduinoBlinkToMicroPython(compileSource, boardComp.id);
               }
               if (!pyToRun) {
-                pyToRun = createDefaultMainCode('rp2040', boardComp.id);
+                pyToRun = createDefaultMainCode('rp2040', boardComp.id, { rp2040Mode: 'micropython' });
               }
               pyToRun = applyRp2040MicroPythonCompat(pyToRun);
               pyToRun = ensureMicroPythonSerialProbe(pyToRun, boardComp.id);
 
-              const rp2040Firmware = useJsMicroPythonRuntime
-                ? ''
-                : (firmwareAssets.uf2Payload || await fetchDefaultMicroPythonUf2Payload());
+              const rp2040Firmware = firmwareAssets.uf2Payload || await fetchDefaultMicroPythonUf2Payload();
               boardHexMap[boardComp.id] = rp2040Firmware;
               boardPythonMap[boardComp.id] = pyToRun;
-              if (useJsMicroPythonRuntime) {
-                boardRuntimeMap[boardComp.id] = 'micropython-js';
-              } else {
-                rp2040UartMicroPythonBoardsRef.current.add(boardComp.id);
-              }
+              rp2040UartMicroPythonBoardsRef.current.add(boardComp.id);
               appendConsoleEntry(
                 'info',
-                `RP2040 running via ${useJsMicroPythonRuntime ? 'MicroPython JS runtime' : 'rp2040js + UART0 MicroPython'} on ${boardComp.id} (mode: ${configuredMode || 'auto'}).`,
+                `RP2040 running via rp2040js + UART0 MicroPython on ${boardComp.id} (env: ${configuredEnv}).`,
                 'simulator'
               );
               if (!result) result = { hex: rp2040Firmware || '' };
@@ -3629,6 +4304,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
               ...compileUnit.files.map((f) => `${f.name}\n${f.content || ''}`),
             ].join('\n/*__SPLIT__*/\n');
 
+            appendConsoleEntry('info', `Compiling for ${boardCompToDisplayName(boardComp, kind)}...`, 'simulator');
             let compiled = await getCachedHex(cacheSource, cacheKeyBoard);
             if (compiled) {
               logSerial(`Using cached compilation for ${boardComp.id}...`);
@@ -3652,6 +4328,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
             }
 
             boardHexMap[boardComp.id] = compiled.hex;
+            logCompileSummary(compiled, boardComp, kind);
             registerGdbArtifact(boardComp.id, kind, compiled);
             appendConsoleEntry('info', `RP2040 native firmware compiled and running on ${boardComp.id}.`, 'simulator');
             if (!result) result = compiled;
@@ -3665,6 +4342,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
             ...compileUnit.files.map((f) => `${f.name}\n${f.content || ''}`),
           ].join('\n/*__SPLIT__*/\n');
 
+          appendConsoleEntry('info', `Compiling for ${boardCompToDisplayName(boardComp, kind)}...`, 'simulator');
           let compiled = await getCachedHex(cacheSource, cacheKeyBoard);
           if (compiled) {
             logSerial(`Using cached compilation for ${boardComp.id}...`);
@@ -3684,6 +4362,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
           }
 
           boardHexMap[boardComp.id] = compiled.hex;
+          logCompileSummary(compiled, boardComp, kind);
           registerGdbArtifact(boardComp.id, kind, compiled);
           if (!result) result = compiled;
         }
@@ -3697,6 +4376,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
         logSerial(blockedMsg, 'var(--orange)');
         setIsCompiling(false);
         setIsRunning(false);
+        setRunStartedAtMs(null);
+        setRunDurationSec(0);
         runStartGuardRef.current = false;
         return;
       }
@@ -3706,6 +4387,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
         const fallbackKind = normalizeBoardKind(board);
         const engine = fallbackKind === 'rp2040' ? 'arduino-pico' : 'arduino-cli';
         const cacheStr = [finalCode, engine].join('\n/*__SPLIT__*/\n');
+        appendConsoleEntry('info', `Compiling for ${boardKindToDisplayName(fallbackKind)}...`, 'simulator');
         
         const cached = await getCachedHex(cacheStr, board);
         if (cached) {
@@ -3721,6 +4403,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
           setCachedHex(cacheStr, board, result);
           registerGdbArtifact(board || 'default', fallbackKind, result);
         }
+        logCompileSummary(result, null, fallbackKind);
       }
 
       lastCompiledRef.current = { code, board, result };
@@ -3796,11 +4479,11 @@ export default function SimulatorPage({ gamificationMode = false }) {
             rp2040UartSilentWarnedBoardsRef.current.add(resolvedBoardId);
             appendConsoleEntry(
               'warn',
-              `RP2040 MicroPython UART injection appears silent on ${resolvedBoardId} (tx=0, rx=${rx}, inq=${inq}, stall=${stall}). If this persists, switch Environment to MicroPython JS runtime for this board.`,
+              `RP2040 MicroPython UART injection appears silent on ${resolvedBoardId} (tx=0, rx=${rx}, inq=${inq}, stall=${stall}). Check script startup logs and wiring.`,
               'simulator'
             );
             logSerial(
-              `RP2040 ${resolvedBoardId}: UART injection is silent (tx=0, rx=${rx}, inq=${inq}). Try Environment=MicroPython JS runtime if UART0 UF2 remains unresponsive.`,
+              `RP2040 ${resolvedBoardId}: UART injection is silent (tx=0, rx=${rx}, inq=${inq}). Verify script startup and board wiring.`,
               'var(--orange)'
             );
           }
@@ -3964,6 +4647,18 @@ export default function SimulatorPage({ gamificationMode = false }) {
           return;
         }
         if (msg.type === 'state' && msg.pins) {
+          const boardIdKey = String(msg.boardId || 'default');
+          const prevPins = runLastBoardPinsRef.current.get(boardIdKey) || {};
+          Object.keys(msg.pins).forEach((pinId) => {
+            const prevValue = !!prevPins[pinId];
+            const nextValue = !!msg.pins[pinId];
+            if (prevValue !== nextValue) {
+              const key = `${boardIdKey}:${pinId}`;
+              runPinTransitionCountsRef.current[key] = (runPinTransitionCountsRef.current[key] || 0) + 1;
+            }
+          });
+          runLastBoardPinsRef.current.set(boardIdKey, { ...msg.pins });
+
           setPinStates(msg.pins);
           // Push to plotData history
           setPlotData(prev => {
@@ -3982,6 +4677,12 @@ export default function SimulatorPage({ gamificationMode = false }) {
           setNeopixelData(msg.neopixels);
         }
         if (msg.type === 'state' && msg.components) {
+          msg.components.forEach((c) => {
+            const compId = String(c?.id || '').trim();
+            if (!compId) return;
+            runComponentUpdateCountsRef.current[compId] = (runComponentUpdateCountsRef.current[compId] || 0) + 1;
+          });
+
           setOopStates(prev => {
             const next = { ...prev };
             msg.components.forEach(c => {
@@ -4037,7 +4738,6 @@ export default function SimulatorPage({ gamificationMode = false }) {
         boardHexMap: Object.keys(boardHexMap).length > 0 ? boardHexMap : undefined,
         boardPythonMap: Object.keys(boardPythonMap).length > 0 ? boardPythonMap : undefined,
         boardBaudMap: Object.keys(boardBaudMap).length > 0 ? boardBaudMap : undefined,
-        boardRuntimeMap: Object.keys(boardRuntimeMap).length > 0 ? boardRuntimeMap : undefined,
         baudRate: selectedRunBaud,
         debugRp2040: rp2040DebugTelemetryEnabled,
       });
@@ -4051,6 +4751,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
       rp2040UartSilentWarnedBoardsRef.current.clear();
       setIsRunning(false);
       setIsCompiling(false);
+      setRunStartedAtMs(null);
+      setRunDurationSec(0);
       appendConsoleEntry('error', `Run failed: ${err?.message || 'Unknown error'}`, 'simulator');
       console.error(err);
       alert(err.message);
@@ -4058,11 +4760,38 @@ export default function SimulatorPage({ gamificationMode = false }) {
   };
 
   const handleStop = () => {
+    const wasRunning = isRunning;
     runStartGuardRef.current = false;
     rp2040GdbLastLogRef.current.clear();
     rp2040WirelessLastLogRef.current.clear();
     rp2040UartMicroPythonBoardsRef.current.clear();
     rp2040UartSilentWarnedBoardsRef.current.clear();
+
+    if (wasRunning) {
+      const componentSummary = Object.entries(runComponentUpdateCountsRef.current)
+        .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0))
+        .slice(0, 10)
+        .map(([id, count]) => `${id}:${count}`);
+      const pinSummary = Object.entries(runPinTransitionCountsRef.current)
+        .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0))
+        .slice(0, 12)
+        .map(([id, count]) => `${id}:${count}`);
+
+      if (componentSummary.length > 0) {
+        appendConsoleEntry('info', `Runtime verification (component updates): ${componentSummary.join(', ')}`, 'simulator');
+      }
+      if (pinSummary.length > 0) {
+        appendConsoleEntry('info', `Runtime verification (pin transitions): ${pinSummary.join(', ')}`, 'simulator');
+      }
+      if (componentSummary.length === 0 && pinSummary.length === 0) {
+        appendConsoleEntry('warn', 'Runtime verification: no component updates or pin transitions detected.', 'simulator');
+      }
+    }
+
+    runComponentUpdateCountsRef.current = {};
+    runPinTransitionCountsRef.current = {};
+    runLastBoardPinsRef.current = new Map();
+
     if (workerRef.current) {
       workerRef.current.postMessage({ type: 'STOP' });
       workerRef.current.terminate();
@@ -4071,6 +4800,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
     setIsRunning(false);
     setIsCompiling(false);
     setIsPaused(false);
+    setRunStartedAtMs(null);
+    setRunDurationSec(0);
     setPinStates({});
     setNeopixelData({});
     setOopStates({});
@@ -4085,6 +4816,18 @@ export default function SimulatorPage({ gamificationMode = false }) {
     serialPausedQueueRef.current = [];
     appendConsoleEntry('info', 'Simulation stopped.', 'simulator');
   };
+
+  useEffect(() => {
+    if (!isRunning || !runStartedAtMs) return;
+
+    const updateElapsed = () => {
+      setRunDurationSec(Math.max(0, (Date.now() - runStartedAtMs) / 1000));
+    };
+
+    updateElapsed();
+    const timer = setInterval(updateElapsed, 250);
+    return () => clearInterval(timer);
+  }, [isRunning, runStartedAtMs]);
 
   useEffect(() => {
     if (!hardwareStatus) return;
@@ -4327,16 +5070,19 @@ export default function SimulatorPage({ gamificationMode = false }) {
       ctx.fillText('Generated by OpenHW-Studio', CW - 240 * SCALE, CH - 8 * SCALE);
 
       // 3. Encode FULL metadata (no truncation) for machine-readable round-trip
-      const fullMetadata = {
+      const fullMetadata = buildProjectPayload({
         board,
-        components: components.map(c => ({ id: c.id, type: c.type, label: c.label, x: c.x, y: c.y, w: c.w, h: c.h, attrs: c.attrs })),
-        connections: wires.map(w => ({ id: w.id, from: w.from, to: w.to, color: w.color, waypoints: w.waypoints || [], isBelow: w.isBelow || false, fromLabel: w.fromLabel || '', toLabel: w.toLabel || '' })),
+        components,
+        wires,
         code,
+        blocklyXml,
+        blocklyGeneratedCode,
+        useBlocklyCode,
         projectFiles,
         openCodeTabs,
         activeCodeFileId,
-        exported: new Date().toISOString(),
-      };
+        exportedAt: new Date().toISOString(),
+      });
       const MARKER = '\x00OPENHW_META\x00';
       const jsonPayload = MARKER + JSON.stringify(fullMetadata);
 
@@ -4806,106 +5552,162 @@ export default function SimulatorPage({ gamificationMode = false }) {
   // ── PNG Import ────────────────────────────────────────────────────────────
   const importFileRef = useRef(null);
 
-  const importPng = (file) => {
-    if (!file || !file.name.toLowerCase().endsWith('.png')) {
-      alert('Please select a valid OpenHW-Studio PNG file.');
+  const applyImportedProjectMeta = (meta, sourceLabel = 'Import') => {
+    const importedComponents = Array.isArray(meta?.components) ? meta.components : [];
+    const importedConnections = Array.isArray(meta?.connections)
+      ? meta.connections
+      : (Array.isArray(meta?.wires) ? meta.wires : []);
+    const { components: normalizedComponents, wires: normalizedConnections } = normalizeImportedCircuitData(importedComponents, importedConnections);
+
+    const hasExisting = components.length > 0 || wires.length > 0;
+    if (hasExisting && !window.confirm(`Import will replace your current circuit (${components.length} components, ${wires.length} wires). Continue?`)) {
       return;
     }
+
+    saveHistory();
+    if (meta?.board) setBoard(meta.board);
+    if (Object.prototype.hasOwnProperty.call(meta || {}, 'code')) setCode(String(meta.code || ''));
+    if (Object.prototype.hasOwnProperty.call(meta || {}, 'blocklyXml')) setBlocklyXml(String(meta.blocklyXml || ''));
+    if (Object.prototype.hasOwnProperty.call(meta || {}, 'blocklyGeneratedCode')) setBlocklyGeneratedCode(String(meta.blocklyGeneratedCode || ''));
+    if (Object.prototype.hasOwnProperty.call(meta || {}, 'useBlocklyCode')) setUseBlocklyCode(!!meta.useBlocklyCode);
+
+    setComponents(normalizedComponents);
+    setWires(normalizedConnections);
+
+    const importedBoards = normalizedComponents.filter((c) => /(arduino|esp32|stm32|rp2040|pico)/i.test(c.type));
+    let normalizedFiles = normalizeProjectFiles(Array.isArray(meta?.projectFiles) ? meta.projectFiles : []);
+
+    // Backward compatibility: older exports stored only top-level `code`.
+    if (normalizedFiles.length === 0 && typeof meta?.code === 'string' && meta.code.trim()) {
+      if (importedBoards.length > 0) {
+        normalizedFiles = importedBoards.map((bc, idx) => {
+          const boardKind = normalizeBoardKind(bc.type);
+          const rp2040Mode = boardKind === 'rp2040'
+            ? normalizeRp2040Env(resolveComponentAttrString(bc?.attrs, 'env', 'native'))
+            : 'native';
+          const fileName = getDefaultMainFileName(boardKind, bc.id, { rp2040Mode });
+          const path = `project/${bc.id}/${fileName}`;
+          return {
+            id: path,
+            path,
+            name: fileName,
+            kind: 'code',
+            boardId: bc.id,
+            boardKind,
+            content: idx === 0 ? meta.code : createDefaultMainCode(boardKind, bc.id, { rp2040Mode }),
+            dirty: false,
+          };
+        });
+      }
+    }
+
+    if (normalizedFiles.length > 0 && typeof meta?.code === 'string' && meta.code.trim()) {
+      const codeFileIdx = normalizedFiles.findIndex((f) => f.kind === 'code' || /\.(ino|h|hpp|c|cpp|py)$/i.test(f.name || f.path || ''));
+      const hasCodeContent = normalizedFiles.some((f) => {
+        if (!(f.kind === 'code' || /\.(ino|h|hpp|c|cpp|py)$/i.test(f.name || f.path || ''))) return false;
+        return String(f.content || '').trim().length > 0;
+      });
+      if (!hasCodeContent && codeFileIdx >= 0) {
+        const target = normalizedFiles[codeFileIdx];
+        normalizedFiles[codeFileIdx] = { ...target, content: meta.code };
+      }
+    }
+
+    normalizedFiles = normalizeProjectFiles(normalizedFiles);
+    const normalizedTabs = normalizeOpenCodeTabs(Array.isArray(meta?.openCodeTabs) ? meta.openCodeTabs : [], normalizedFiles);
+    const preferredActive = typeof meta?.activeCodeFileId === 'string' ? meta.activeCodeFileId.trim() : '';
+    const activeId = normalizedFiles.some((f) => f.id === preferredActive)
+      ? preferredActive
+      : (normalizedTabs[0] || normalizedFiles[0]?.id || '');
+
+    setProjectFiles(normalizedFiles);
+    setOpenCodeTabs(normalizedTabs);
+    setActiveCodeFileId(activeId);
+
+    syncNextIds(normalizedComponents, normalizedConnections);
+    setSelected(null);
+    setWireStart(null);
+    lastCompiledRef.current = null;
+    appendConsoleEntry('info', `${sourceLabel} imported: ${normalizedComponents.length} components, ${normalizedConnections.length} connections.`, 'simulator');
+  };
+
+  const importPng = (file) => {
+    if (!file) return;
+    if (isRunning || isCompiling) {
+      alert('Stop the current simulation before importing a project file.');
+      if (importFileRef.current) importFileRef.current.value = '';
+      return;
+    }
+
+    const fileName = String(file.name || '').toLowerCase();
+    const isPng = fileName.endsWith('.png');
+    const isJson = fileName.endsWith('.json');
+
+    if (!isPng && !isJson) {
+      alert('Please select an OpenHW-Studio PNG or JSON file.');
+      if (importFileRef.current) importFileRef.current.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const bytes = new Uint8Array(e.target.result);
-        const MARKER = '\x00OPENHW_META\x00';
-        const markerBytes = new TextEncoder().encode(MARKER);
+        if (isPng) {
+          const bytes = new Uint8Array(e.target.result);
+          const marker = '\x00OPENHW_META\x00';
+          const markerBytes = new TextEncoder().encode(marker);
 
-        // Search full payload from the end so very large metadata remains importable.
-        let markerByteIdx = -1;
-        for (let i = bytes.length - markerBytes.length; i >= 0; i--) {
-          let ok = true;
-          for (let j = 0; j < markerBytes.length; j++) {
-            if (bytes[i + j] !== markerBytes[j]) {
-              ok = false;
+          // Search payload marker from the end so very large metadata remains importable.
+          let markerByteIdx = -1;
+          for (let i = bytes.length - markerBytes.length; i >= 0; i--) {
+            let ok = true;
+            for (let j = 0; j < markerBytes.length; j++) {
+              if (bytes[i + j] !== markerBytes[j]) {
+                ok = false;
+                break;
+              }
+            }
+            if (ok) {
+              markerByteIdx = i;
               break;
             }
           }
-          if (ok) {
-            markerByteIdx = i;
-            break;
-          }
-        }
 
-        if (markerByteIdx === -1) {
-          alert('This PNG does not contain OpenHW-Studio circuit data.\nOnly PNGs exported from this simulator can be imported.');
+          if (markerByteIdx === -1) {
+            alert('This PNG does not contain OpenHW-Studio circuit data.\nOnly PNGs exported from this simulator can be imported.');
+            return;
+          }
+
+          const payloadBytes = bytes.slice(markerByteIdx + markerBytes.length);
+          const jsonStr = new TextDecoder('utf-8', { fatal: false }).decode(payloadBytes);
+          const meta = JSON.parse(jsonStr);
+          applyImportedProjectMeta(meta, 'PNG project');
           return;
         }
 
-        const payloadBytes = bytes.slice(markerByteIdx + markerBytes.length);
-        const jsonStr = new TextDecoder('utf-8', { fatal: false }).decode(payloadBytes);
-        const meta = JSON.parse(jsonStr);
-
-        // Confirm before overwriting current circuit
-        const hasExisting = components.length > 0 || wires.length > 0;
-        if (hasExisting && !window.confirm(`Import will replace your current circuit (${components.length} components, ${wires.length} wires). Continue?`)) {
-          return;
-        }
-
-        // Restore state
-        saveHistory();
-        if (meta.board) setBoard(meta.board);
-        if (Object.prototype.hasOwnProperty.call(meta, 'code')) setCode(meta.code || '');
-        if (Array.isArray(meta.components)) setComponents(meta.components);
-        if (Array.isArray(meta.connections)) setWires(meta.connections);
-
-        const importedBoards = Array.isArray(meta.components)
-          ? meta.components.filter((c) => /(arduino|esp32|stm32|rp2040|pico)/i.test(c.type))
-          : [];
-
-        let normalizedFiles = Array.isArray(meta.projectFiles) ? [...meta.projectFiles] : [];
-
-        // Backward compatibility: older PNG exports had only `code`.
-        if (normalizedFiles.length === 0 && typeof meta.code === 'string' && meta.code.trim()) {
-          if (importedBoards.length > 0) {
-            normalizedFiles = importedBoards.map((bc, idx) => ({
-              id: `project/${bc.id}/${getDefaultMainFileName(normalizeBoardKind(bc.type), bc.id)}`,
-              path: `project/${bc.id}/${getDefaultMainFileName(normalizeBoardKind(bc.type), bc.id)}`,
-              name: getDefaultMainFileName(normalizeBoardKind(bc.type), bc.id),
-              kind: 'code',
-              boardId: bc.id,
-              boardKind: normalizeBoardKind(bc.type),
-              content: idx === 0 ? meta.code : createDefaultMainCode(normalizeBoardKind(bc.type), bc.id),
-              dirty: false,
-            }));
-          }
-        }
-
-        if (normalizedFiles.length > 0 && typeof meta.code === 'string' && meta.code.trim()) {
-          const codeFileIdx = normalizedFiles.findIndex((f) => f.kind === 'code' || /\.(ino|h|hpp|c|cpp)$/i.test(f.name || f.path || ''));
-          const hasCodeContent = normalizedFiles.some((f) => (f.kind === 'code' || /\.(ino|h|hpp|c|cpp)$/i.test(f.name || f.path || '')) && String(f.content || '').trim().length > 0);
-          if (!hasCodeContent && codeFileIdx >= 0) {
-            const target = normalizedFiles[codeFileIdx];
-            normalizedFiles[codeFileIdx] = { ...target, content: meta.code };
-          }
-        }
-
-        setProjectFiles(normalizedFiles);
-        setOpenCodeTabs(Array.isArray(meta.openCodeTabs) ? meta.openCodeTabs : []);
-        setActiveCodeFileId(typeof meta.activeCodeFileId === 'string' ? meta.activeCodeFileId : '');
-
-        syncNextIds(Array.isArray(meta.components) ? meta.components : [], Array.isArray(meta.connections) ? meta.connections : []);
-        setSelected(null);
-        setWireStart(null);
+        const jsonText = String(e.target.result || '');
+        const meta = JSON.parse(jsonText);
+        applyImportedProjectMeta(meta, 'JSON project');
       } catch (err) {
-        console.error('[PNG Import] Parse error:', err);
-        alert('Failed to parse circuit data from PNG: ' + err.message);
+        const sourceLabel = isPng ? 'PNG' : 'JSON';
+        console.error(`[${sourceLabel} Import] Parse error:`, err);
+        alert(`Failed to parse circuit data from ${sourceLabel}: ${err.message}`);
+      } finally {
+        // Reset the file input so the same file can be re-imported.
+        if (importFileRef.current) importFileRef.current.value = '';
       }
-      // Reset the file input so the same file can be re-imported
-      if (importFileRef.current) importFileRef.current.value = '';
     };
-    reader.readAsArrayBuffer(file);
+
+    if (isPng) reader.readAsArrayBuffer(file);
+    else reader.readAsText(file);
   };
 
   const getComponentStateAttrs = (comp) => {
     let attrs = { ...comp.attrs };
+
+    if (normalizeBoardKind(comp.type) === 'rp2040') {
+      attrs.env = mapRp2040EnvForLegacyContextMenu(resolveComponentAttrString(attrs, 'env', 'native'));
+    }
 
     // Remote OOP state takes priority
     const remoteState = oopStates[comp.id];
@@ -6018,6 +6820,42 @@ export default function SimulatorPage({ gamificationMode = false }) {
             })}
           </div>{/* end zoom wrapper */}
 
+          {/* Runtime mini panel (top-left) */}
+          {isRunning && !isCompiling && (
+            <div
+              data-export-ignore="true"
+              onClick={e => e.stopPropagation()}
+              onMouseDown={e => e.stopPropagation()}
+              style={{
+                position: 'absolute',
+                top: 12,
+                left: 12,
+                zIndex: 90,
+                width: 188,
+                background: 'var(--bg2)',
+                border: '1px solid var(--border)',
+                borderRadius: 12,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+                padding: '10px 12px',
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 7 }}>
+                Simulation Runtime
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, marginBottom: 5 }}>
+                <span style={{ color: 'var(--text3)' }}>Speed</span>
+                <span style={{ color: 'var(--accent)', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>{simulationSpeedPercent}%</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                <span style={{ color: 'var(--text3)' }}>Duration</span>
+                <span style={{ color: 'var(--text)', fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>{formatRunDuration(runDurationSec)}</span>
+              </div>
+              {isPaused && (
+                <div style={{ marginTop: 6, fontSize: 11, color: 'var(--orange)', fontWeight: 600 }}>Paused</div>
+              )}
+            </div>
+          )}
+
           {/* Component Description Panel — shows info of canvas-selected component */}
           {showComponentDesc && selectedComponentInfo && (
             <div
@@ -6294,7 +7132,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
           onCreateCodeFile={createCodeFile} onCreateCodeTab={createCodeTab} onUploadCodeFile={uploadCodeFile}
           libQuery={libQuery} setLibQuery={setLibQuery} handleSearchLibraries={handleSearchLibraries} isSearchingLib={isSearchingLib} libMessage={libMessage} libInstalled={libInstalled} libResults={libResults} handleInstallLibrary={handleInstallLibrary} installingLib={installingLib}
           serialPaused={serialPaused} setSerialPaused={setSerialPaused} isRunning={isRunning} serialHistory={serialHistory} setSerialHistory={setSerialHistory} serialOutputRef={serialOutputRef} serialInput={serialInput} setSerialInput={setSerialInput} sendSerialInput={sendSerialInput} clearSerialMonitor={clearSerialMonitor}
-          serialViewMode={serialViewMode} setSerialViewMode={setSerialViewMode} serialBoardFilter={serialBoardFilter} setSerialBoardFilter={setSerialBoardFilter} serialBoardOptions={serialBoardOptions} serialBoardLabels={serialBoardLabels} serialBoardKinds={serialBoardKinds} serialBaudRate={serialBaudRate} setSerialBaudRate={setSerialBaudRate} serialBaudOptions={serialBaudOptions} serialLineEnding={serialLineEnding} setSerialLineEnding={setSerialLineEnding}
+          serialViewMode={serialViewMode} setSerialViewMode={setSerialViewMode} serialBoardFilter={serialBoardFilter} setSerialBoardFilter={setSerialBoardFilter} serialBoardOptions={serialBoardOptions} serialBoardLabels={serialBoardLabels} serialBoardKinds={serialBoardKinds} serialBoardSourceModes={rp2040BoardSourceModes} serialBaudRate={serialBaudRate} setSerialBaudRate={setSerialBaudRate} serialBaudOptions={serialBaudOptions} serialLineEnding={serialLineEnding} setSerialLineEnding={setSerialLineEnding}
           rp2040DebugTelemetryEnabled={rp2040DebugTelemetryEnabled} setRp2040DebugTelemetryEnabled={setRp2040DebugTelemetryEnabled}
           hardwareConnected={hardwareConnected}
           plotterPaused={plotterPaused} setPlotterPaused={setPlotterPaused} plotData={plotData} setPlotData={setPlotData} selectedPlotPins={selectedPlotPins} setSelectedPlotPins={setSelectedPlotPins} plotterCanvasRef={plotterCanvasRef} serialPlotLabelsRef={serialPlotLabelsRef}
@@ -6674,6 +7512,44 @@ export default function SimulatorPage({ gamificationMode = false }) {
         </div>
       )}
 
+      {/* ── FIRMWARE DOWNLOAD DIALOG ─────────────────────────────────────── */}
+      {showFirmwareDownloadDialog && (
+        <div className="fixed inset-0 bg-[rgba(0,0,0,.55)] flex items-center justify-center z-[9999]" onClick={() => setShowFirmwareDownloadDialog(false)}>
+          <div className="bg-[var(--bg2)] border border-[var(--border)] rounded-xl p-6 w-[390px] shadow-[0_8px_40px_rgba(0,0,0,.4)]" onClick={e => e.stopPropagation()}>
+            <div className="text-base font-bold mb-2 text-[var(--text)]">Download Firmware</div>
+            <div className="text-xs text-[var(--text3)] mb-4">
+              Choose a board firmware artifact to download, or download all compiled board firmwares.
+            </div>
+
+            <label className="text-xs font-semibold text-[var(--text2)] block mb-2">Target</label>
+            <select
+              className="w-full bg-[var(--card)] border border-[var(--border)] text-[var(--text)] px-3 py-2 rounded-lg text-sm mb-4"
+              value={firmwareDownloadTarget}
+              onChange={(e) => setFirmwareDownloadTarget(e.target.value)}
+            >
+              <option value="__latest__">Latest compiled firmware</option>
+              {firmwareBoardOptions.map((option) => (
+                <option key={option.id} value={option.id}>{option.label}</option>
+              ))}
+              <option value="__all__">All boards</option>
+            </select>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <Btn onClick={() => setShowFirmwareDownloadDialog(false)}>Cancel</Btn>
+              <Btn
+                color="var(--accent)"
+                onClick={async () => {
+                  await handleDownloadFirmware(firmwareDownloadTarget || '__latest__');
+                  setShowFirmwareDownloadDialog(false);
+                }}
+              >
+                Download
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* F1 MENU */}
       {showF1Menu && (
         <div 
@@ -6689,7 +7565,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
               <button 
                 className="w-full px-4 py-3 text-left text-sm font-medium rounded-lg border border-[var(--border)] hover:bg-[var(--card)] transition-colors text-[var(--text2)] hover:text-[var(--text)]"
                 onClick={() => {
-                  handleDownloadFirmware();
+                  openFirmwareDownloadDialog();
                   setShowF1Menu(false);
                 }}
               >

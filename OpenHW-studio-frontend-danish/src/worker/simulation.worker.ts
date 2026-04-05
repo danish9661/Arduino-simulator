@@ -316,7 +316,7 @@ self.onmessage = async (e) => {
     const data = e.data;
 
     if (data.type === 'START') {
-        const { hex, components, wires, customLogics, boardHexMap, boardPythonMap, baudRate, boardBaudMap, boardRuntimeMap, boardExecutableRangesMap, debugRp2040 } = data;
+        const { hex, components, wires, customLogics, boardHexMap, boardPythonMap, baudRate, boardBaudMap, boardExecutableRangesMap, debugRp2040 } = data;
         const rp2040DebugEnabled = !!debugRp2040;
 
         stopAllRunners();
@@ -372,7 +372,6 @@ self.onmessage = async (e) => {
                     onByteTransmit: ({ boardId, value, char, source }) => {
                         postMessage({ type: 'serial', data: char, boardId, value, source });
                     },
-                    forceMicroPythonJsRunner: !!singleBoardId && boardRuntimeMap?.[singleBoardId] === 'micropython-js',
                     rp2040ExecutableRanges: singleBoardIsRp2040 ? singleBoardExecutableRanges : undefined,
                 }
             );
@@ -395,10 +394,9 @@ self.onmessage = async (e) => {
         buildNetIndex(wires || []);
 
         programmableBoards.forEach((boardComp: any) => {
-            const forceMicroPythonJsRunner = boardRuntimeMap?.[boardComp.id] === 'micropython-js';
             const fwHex = boardHexMap?.[boardComp.id] || boardComp?.attrs?.firmwareHex || boardComp?.attrs?.hex;
             const executableRanges = resolveRp2040ExecutableRanges(boardComp, boardExecutableRangesMap);
-            if (!forceMicroPythonJsRunner && (typeof fwHex !== 'string' || !fwHex.trim())) {
+            if (typeof fwHex !== 'string' || !fwHex.trim()) {
                 console.warn(`[Worker] Skipping board ${boardComp.id}: no board-specific firmware available.`);
                 return;
             }
@@ -421,7 +419,6 @@ self.onmessage = async (e) => {
                         postMessage({ type: 'serial', data: char, boardId, value, source });
                         routeUartByte(boardId, value, source || 'uart0');
                     },
-                    forceMicroPythonJsRunner,
                     rp2040ExecutableRanges: /(rp2040|pico)/i.test(String(boardComp.type || '')) ? executableRanges : undefined,
                 }
             );

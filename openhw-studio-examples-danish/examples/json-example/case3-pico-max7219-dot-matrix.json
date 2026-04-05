@@ -1,0 +1,101 @@
+{
+  "caseId": "case3-pico-max7219-dot-matrix",
+  "name": "Pico MAX7219 Dot Matrix",
+  "board": "pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "ino",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 90,
+      "y": 90
+    },
+    {
+      "id": "max1",
+      "type": "wokwi-max7219",
+      "attrs": {},
+      "w": 130,
+      "h": 170,
+      "rotation": 0,
+      "label": "MAX7219 Dot Matrix",
+      "x": 430,
+      "y": 120
+    }
+  ],
+  "connections": [
+    {
+      "from": "pico1:3V3",
+      "to": "max1:VCC",
+      "id": "w1",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "3V3",
+      "toLabel": "VCC"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "max1:GND",
+      "id": "w2",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GND",
+      "toLabel": "GND"
+    },
+    {
+      "from": "pico1:GP19",
+      "to": "max1:DIN",
+      "id": "w3",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GP19",
+      "toLabel": "DIN"
+    },
+    {
+      "from": "pico1:GP18",
+      "to": "max1:CLK",
+      "id": "w4",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GP18",
+      "toLabel": "CLK"
+    },
+    {
+      "from": "pico1:GP17",
+      "to": "max1:CS",
+      "id": "w5",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GP17",
+      "toLabel": "CS"
+    }
+  ],
+  "code": "#include <Arduino.h>\n#include <SPI.h>\n\nstatic const int PIN_CS = 17;\n\nvoid sendReg(uint8_t reg, uint8_t value) {\n  digitalWrite(PIN_CS, LOW);\n  SPI.transfer(reg);\n  SPI.transfer(value);\n  digitalWrite(PIN_CS, HIGH);\n}\n\nvoid setup() {\n  pinMode(PIN_CS, OUTPUT);\n  digitalWrite(PIN_CS, HIGH);\n  SPI.setRX(16);\n  SPI.setCS(17);\n  SPI.setSCK(18);\n  SPI.setTX(19);\n  SPI.begin();\n\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(115200);\n  Serial1.println(\"MAX7219_BOOT\");\n\n  sendReg(0x0C, 0x01);\n  sendReg(0x0F, 0x00);\n}\n\nvoid loop() {\n  static uint8_t row = 1;\n  static uint8_t pattern = 0x81;\n  sendReg(row, pattern);\n  row = (row >= 8) ? 1 : (row + 1);\n  pattern = (uint8_t)((pattern << 1) | (pattern >> 7));\n  Serial1.println(\"MAX7219_SPI\");\n  delay(25);\n}\n",
+  "projectFiles": [
+    {
+      "id": "project/pico1/pico1.ino",
+      "path": "project/pico1/pico1.ino",
+      "name": "pico1.ino",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "#include <Arduino.h>\n#include <SPI.h>\n\nstatic const int PIN_CS = 17;\n\nvoid sendReg(uint8_t reg, uint8_t value) {\n  digitalWrite(PIN_CS, LOW);\n  SPI.transfer(reg);\n  SPI.transfer(value);\n  digitalWrite(PIN_CS, HIGH);\n}\n\nvoid setup() {\n  pinMode(PIN_CS, OUTPUT);\n  digitalWrite(PIN_CS, HIGH);\n  SPI.setRX(16);\n  SPI.setCS(17);\n  SPI.setSCK(18);\n  SPI.setTX(19);\n  SPI.begin();\n\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(115200);\n  Serial1.println(\"MAX7219_BOOT\");\n\n  sendReg(0x0C, 0x01);\n  sendReg(0x0F, 0x00);\n}\n\nvoid loop() {\n  static uint8_t row = 1;\n  static uint8_t pattern = 0x81;\n  sendReg(row, pattern);\n  row = (row >= 8) ? 1 : (row + 1);\n  pattern = (uint8_t)((pattern << 1) | (pattern >> 7));\n  Serial1.println(\"MAX7219_SPI\");\n  delay(25);\n}\n",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/pico1/pico1.ino"
+  ],
+  "activeCodeFileId": "project/pico1/pico1.ino"
+}

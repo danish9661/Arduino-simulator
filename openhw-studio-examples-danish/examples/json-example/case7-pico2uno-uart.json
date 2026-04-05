@@ -1,0 +1,92 @@
+{
+  "caseId": "case7-pico2uno-uart",
+  "name": "Pico to UNO UART",
+  "board": "pico",
+  "components": [
+    {
+      "id": "p1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "ino",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 80,
+      "y": 90
+    },
+    {
+      "id": "u1",
+      "type": "wokwi-arduino-uno",
+      "attrs": {},
+      "w": 220,
+      "h": 300,
+      "rotation": 0,
+      "label": "Arduino Uno",
+      "x": 420,
+      "y": 90
+    }
+  ],
+  "connections": [
+    {
+      "from": "p1:GP0",
+      "to": "u1:0",
+      "id": "w1",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GP0",
+      "toLabel": "0"
+    },
+    {
+      "from": "u1:1",
+      "to": "p1:GP1",
+      "id": "w2",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "1",
+      "toLabel": "GP1"
+    },
+    {
+      "from": "p1:GND",
+      "to": "u1:gnd_2",
+      "id": "w3",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GND",
+      "toLabel": "gnd_2"
+    }
+  ],
+  "code": "#include <Arduino.h>\n\nunsigned long lastSend = 0;\n\nvoid setup() {\n  pinMode(15, OUTPUT);\n  digitalWrite(15, LOW);\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(9600);\n  Serial1.println(\"PICO_SENDER_BOOT\");\n}\n\nvoid loop() {\n  if (millis() - lastSend >= 120) {\n    lastSend = millis();\n    Serial1.write('1');\n  }\n\n  while (Serial1.available() > 0) {\n    const int c = Serial1.read();\n    if (c == 'K') {\n      digitalWrite(15, HIGH);\n      Serial1.println(\"PU_PICO_ACK\");\n    }\n  }\n}\n",
+  "projectFiles": [
+    {
+      "id": "project/p1/p1.ino",
+      "path": "project/p1/p1.ino",
+      "name": "p1.ino",
+      "kind": "code",
+      "boardId": "p1",
+      "boardKind": "rp2040",
+      "content": "#include <Arduino.h>\n\nunsigned long lastSend = 0;\n\nvoid setup() {\n  pinMode(15, OUTPUT);\n  digitalWrite(15, LOW);\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(9600);\n  Serial1.println(\"PICO_SENDER_BOOT\");\n}\n\nvoid loop() {\n  if (millis() - lastSend >= 120) {\n    lastSend = millis();\n    Serial1.write('1');\n  }\n\n  while (Serial1.available() > 0) {\n    const int c = Serial1.read();\n    if (c == 'K') {\n      digitalWrite(15, HIGH);\n      Serial1.println(\"PU_PICO_ACK\");\n    }\n  }\n}\n",
+      "dirty": false
+    },
+    {
+      "id": "project/u1/u1.ino",
+      "path": "project/u1/u1.ino",
+      "name": "u1.ino",
+      "kind": "code",
+      "boardId": "u1",
+      "boardKind": "arduino_uno",
+      "content": "#include <Arduino.h>\n\nvoid setup() {\n  pinMode(13, OUTPUT);\n  digitalWrite(13, LOW);\n  Serial.begin(9600);\n  Serial.println(\"UNO_RX_BOOT\");\n}\n\nvoid loop() {\n  while (Serial.available() > 0) {\n    const int c = Serial.read();\n    if (c == '1') {\n      digitalWrite(13, !digitalRead(13));\n      Serial.write('K');\n      Serial.println(\"PU_UNO_RX\");\n    }\n  }\n}\n",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/p1/p1.ino",
+    "project/u1/u1.ino"
+  ],
+  "activeCodeFileId": "project/p1/p1.ino"
+}

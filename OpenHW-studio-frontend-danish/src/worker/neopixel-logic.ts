@@ -5,11 +5,8 @@ function samePin(pinId: string, expected: string) {
 }
 
 export class NeopixelLogic extends BaseComponent {
-    private usePulseDecoder = false;
-
     private edgeLastCycle = 0;
-    private edgeBitCount = 0;
-    private edgeByteValue = 0;
+    private edgeCyclesPerUs = 16;
 
     private bitCount = 0;
     private byteValue = 0;
@@ -58,24 +55,26 @@ export class NeopixelLogic extends BaseComponent {
         this.resetFrameBuilder();
     }
 
-    private enablePulseDecoder() {
-        if (this.usePulseDecoder) return;
-
-        this.usePulseDecoder = true;
-        this.edgeLastCycle = 0;
-        this.edgeBitCount = 0;
-        this.edgeByteValue = 0;
-        this.byteBuffer = [];
-        this.resetFrameBuilder();
-    }
-
     private decodeEdgeFallback(isHigh: boolean, cpuCycles: number) {
-        // Legacy edge-based fallback for environments that don't publish pulse widths.
+        // Edge-based decoder with dynamic timing calibration for 16MHz AVR and 125MHz RP2040 paths.
+        if (this.edgeLastCycle <= 0) {
+            this.edgeLastCycle = cpuCycles;
+            return;
+        }
+
         const elapsed = cpuCycles - this.edgeLastCycle;
         this.edgeLastCycle = cpuCycles;
 
+        const resetThresholdCycles = Math.max(300, this.edgeCyclesPerUs * this.wsResetThresholdUs);
+        const bitOneThresholdCycles = Math.max(6, this.edgeCyclesPerUs * this.wsBitOneThresholdUs);
+
         if (isHigh) {
-            if (elapsed > 400) {
+            if (elapsed > resetThresholdCycles) {
+                const estimated = elapsed / this.wsResetThresholdUs;
+                if (Number.isFinite(estimated) && estimated >= 8 && estimated <= 512) {
+                    this.edgeCyclesPerUs = estimated;
+                }
+
                 if (this.byteBuffer.length > 0) {
                     this.flushPixels();
                 } else {
@@ -85,66 +84,36 @@ export class NeopixelLogic extends BaseComponent {
             return;
         }
 
-        const bit = elapsed >= 9 ? 1 : 0;
-        this.edgeByteValue = ((this.edgeByteValue << 1) | bit) & 0xff;
-        this.edgeBitCount += 1;
-
-        if (this.edgeBitCount >= 8) {
-            this.byteBuffer.push(this.edgeByteValue);
-            this.edgeByteValue = 0;
-            this.edgeBitCount = 0;
-        }
+        const bit = elapsed >= bitOneThresholdCycles ? 1 : 0;
+        this.pushBit(bit);
     }
 
     onPinStateChange(pinId: string, isHigh: boolean, cpuCycles: number) {
         if (!samePin(pinId, 'DIN')) return;
-        if (this.usePulseDecoder) return;
         this.decodeEdgeFallback(isHigh, cpuCycles);
     }
 
     onPulseHigh(pinId: string, payload: any) {
-        if (!samePin(pinId, 'DIN')) return;
-        this.enablePulseDecoder();
-
-        const pulseUs = Number(payload?.pulseUs ?? payload?.highUs);
-        if (!Number.isFinite(pulseUs) || pulseUs <= 0) return;
-
-        const bit = pulseUs >= this.wsBitOneThresholdUs ? 1 : 0;
-        this.pushBit(bit);
+        void pinId;
+        void payload;
     }
 
     onPulseLow(pinId: string, payload: any) {
-        if (!samePin(pinId, 'DIN')) return;
-        this.enablePulseDecoder();
-
-        const pulseUs = Number(payload?.pulseUs ?? payload?.lowUs);
-        if (!Number.isFinite(pulseUs) || pulseUs <= 0) return;
-
-        // WS2812 latch/reset when line stays LOW for ~50us+.
-        if (pulseUs >= this.wsResetThresholdUs) {
-            this.flushPixels();
-        }
+        void pinId;
+        void payload;
     }
 
     onOneWireReset(pinId: string) {
-        // Compatibility path for older protocol shims.
-        if (!samePin(pinId, 'DIN')) return;
-        if (this.usePulseDecoder) return;
-        this.flushPixels();
+        void pinId;
     }
 
     onOneWireWriteBit(pinId: string, bit: number) {
-        // Compatibility path for older protocol shims.
-        if (!samePin(pinId, 'DIN')) return;
-        if (this.usePulseDecoder) return;
-        this.pushBit(bit ? 1 : 0);
+        void pinId;
+        void bit;
     }
 
     onOneWireSlot(pinId: string, payload: any) {
-        if (!samePin(pinId, 'DIN')) return;
-        if (this.usePulseDecoder) return;
-        if (typeof payload?.bit === 'number') {
-            this.pushBit(payload.bit ? 1 : 0);
-        }
+        void pinId;
+        void payload;
     }
 }

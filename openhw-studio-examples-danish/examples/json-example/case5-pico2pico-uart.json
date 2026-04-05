@@ -1,0 +1,95 @@
+{
+  "caseId": "case5-pico2pico-uart",
+  "name": "Pico to Pico UART",
+  "board": "pico",
+  "components": [
+    {
+      "id": "p1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "ino",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 80,
+      "y": 90
+    },
+    {
+      "id": "p2",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "ino",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 420,
+      "y": 90
+    }
+  ],
+  "connections": [
+    {
+      "from": "p1:GP0",
+      "to": "p2:GP1",
+      "id": "w1",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GP0",
+      "toLabel": "GP1"
+    },
+    {
+      "from": "p2:GP0",
+      "to": "p1:GP1",
+      "id": "w2",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GP0",
+      "toLabel": "GP1"
+    },
+    {
+      "from": "p1:GND",
+      "to": "p2:GND",
+      "id": "w3",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GND",
+      "toLabel": "GND"
+    }
+  ],
+  "code": "#include <Arduino.h>\n\nunsigned long lastSend = 0;\n\nvoid setup() {\n  pinMode(15, OUTPUT);\n  digitalWrite(15, LOW);\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(9600);\n  Serial1.println(\"PICO_SENDER_BOOT\");\n}\n\nvoid loop() {\n  if (millis() - lastSend >= 120) {\n    lastSend = millis();\n    Serial1.write('1');\n  }\n\n  while (Serial1.available() > 0) {\n    const int c = Serial1.read();\n    if (c == 'K') {\n      digitalWrite(15, HIGH);\n      Serial1.println(\"P1_ACK\");\n    }\n  }\n}\n",
+  "projectFiles": [
+    {
+      "id": "project/p1/p1.ino",
+      "path": "project/p1/p1.ino",
+      "name": "p1.ino",
+      "kind": "code",
+      "boardId": "p1",
+      "boardKind": "rp2040",
+      "content": "#include <Arduino.h>\n\nunsigned long lastSend = 0;\n\nvoid setup() {\n  pinMode(15, OUTPUT);\n  digitalWrite(15, LOW);\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(9600);\n  Serial1.println(\"PICO_SENDER_BOOT\");\n}\n\nvoid loop() {\n  if (millis() - lastSend >= 120) {\n    lastSend = millis();\n    Serial1.write('1');\n  }\n\n  while (Serial1.available() > 0) {\n    const int c = Serial1.read();\n    if (c == 'K') {\n      digitalWrite(15, HIGH);\n      Serial1.println(\"P1_ACK\");\n    }\n  }\n}\n",
+      "dirty": false
+    },
+    {
+      "id": "project/p2/p2.ino",
+      "path": "project/p2/p2.ino",
+      "name": "p2.ino",
+      "kind": "code",
+      "boardId": "p2",
+      "boardKind": "rp2040",
+      "content": "#include <Arduino.h>\n\nvoid setup() {\n  pinMode(15, OUTPUT);\n  digitalWrite(15, LOW);\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(9600);\n  Serial1.println(\"PICO_RX_BOOT\");\n}\n\nvoid loop() {\n  while (Serial1.available() > 0) {\n    const int c = Serial1.read();\n    if (c == '1') {\n      digitalWrite(15, !digitalRead(15));\n      Serial1.write('K');\n      Serial1.println(\"P2_RX\");\n    }\n  }\n}\n",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/p1/p1.ino",
+    "project/p2/p2.ino"
+  ],
+  "activeCodeFileId": "project/p1/p1.ino"
+}

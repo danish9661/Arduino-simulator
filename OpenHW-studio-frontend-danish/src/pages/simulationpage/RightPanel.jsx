@@ -25,7 +25,7 @@ export function RightPanel(props) {
     onCreateCodeFile, onCreateCodeTab, onUploadCodeFile,
     libQuery, setLibQuery, handleSearchLibraries, isSearchingLib, libMessage, libInstalled, libResults, handleInstallLibrary, installingLib,
     serialPaused, setSerialPaused, isRunning, serialHistory, setSerialHistory, serialOutputRef, serialInput, setSerialInput, sendSerialInput, clearSerialMonitor,
-    serialViewMode, setSerialViewMode, serialBoardFilter, setSerialBoardFilter, serialBoardOptions, serialBoardLabels, serialBoardKinds, serialBaudRate, setSerialBaudRate, serialBaudOptions, serialLineEnding, setSerialLineEnding,
+    serialViewMode, setSerialViewMode, serialBoardFilter, setSerialBoardFilter, serialBoardOptions, serialBoardLabels, serialBoardKinds, serialBoardSourceModes, serialBaudRate, setSerialBaudRate, serialBaudOptions, serialLineEnding, setSerialLineEnding,
     rp2040DebugTelemetryEnabled, setRp2040DebugTelemetryEnabled,
     hardwareConnected,
     plotterPaused, setPlotterPaused, plotData, setPlotData, selectedPlotPins, setSelectedPlotPins, plotterCanvasRef, serialPlotLabelsRef,
@@ -56,6 +56,7 @@ export function RightPanel(props) {
   const projectRootFiles = React.useMemo(() => {
     return (projectFiles || [])
       .filter((f) => f.path.startsWith('project/') && f.path.split('/').length === 2)
+      .filter((f) => f.id !== 'project/diagram.png')
       .sort((a, b) => a.path.localeCompare(b.path));
   }, [projectFiles]);
 
@@ -437,7 +438,7 @@ export function RightPanel(props) {
                               }}
                               style={{
                                 padding: '3px 10px',
-                                fontSize: (file.name === 'diagram.json' || file.name === 'diagram.png' || file.name === 'library.txt') ? 11 : 12,
+                                fontSize: (file.name === 'diagram.json' || file.name === 'library.txt') ? 11 : 12,
                                 cursor: 'pointer',
                                 color: activeCodeFileId === file.id ? 'var(--accent)' : 'var(--text2)',
                                 background: activeCodeFileId === file.id ? 'rgba(0,255,255,0.08)' : 'transparent',
@@ -518,7 +519,7 @@ export function RightPanel(props) {
                                   }}
                                   style={{
                                     padding: '3px 10px 1px 18px',
-                                    fontSize: (file.name === 'diagram.json' || file.name === 'diagram.png' || file.name === 'library.txt') ? 10 : 12,
+                                    fontSize: (file.name === 'diagram.json' || file.name === 'library.txt') ? 10 : 12,
                                     cursor: 'pointer',
                                     color: activeCodeFileId === file.id ? 'var(--accent)' : 'var(--text2)',
                                     background: activeCodeFileId === file.id ? 'rgba(0,255,255,0.08)' : 'transparent',
@@ -801,10 +802,10 @@ export function RightPanel(props) {
                       <Editor
                         value={code}
                         onValueChange={v => {
-                          if (activeCodeFileId === 'project/diagram.json') return;
+                          if (!activeCodeFileId || activeCodeFileId === 'project/diagram.json') return;
                           setCode(v);
                         }}
-                        readOnly={activeCodeFileId === 'project/diagram.json'}
+                        readOnly={!activeCodeFileId || activeCodeFileId === 'project/diagram.json'}
                         highlight={highlightCode}
                         padding={14}
                         style={{
@@ -817,7 +818,7 @@ export function RightPanel(props) {
                           outline: 'none',
                           resize: 'none',
                           // Add a subtle opacity change if read only
-                          opacity: activeCodeFileId === 'project/diagram.json' ? 0.7 : 1
+                          opacity: (!activeCodeFileId || activeCodeFileId === 'project/diagram.json') ? 0.7 : 1
                         }}
                         textareaClassName="editor-textarea"
                       />
@@ -944,7 +945,10 @@ export function RightPanel(props) {
                           icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>, 
                           action: () => {
                             const boardKind = serialBoardKinds?.[folderMenu.boardId] || 'arduino_uno';
-                            const suggestedName = boardKind === 'rp2040' ? `${folderMenu.boardId}.ino` : 'new_file.ino';
+                            const sourceMode = serialBoardSourceModes?.[folderMenu.boardId] || 'native';
+                            const suggestedName = boardKind === 'rp2040'
+                              ? (sourceMode === 'micropython' ? 'main.py' : `${folderMenu.boardId}.ino`)
+                              : `${folderMenu.boardId}.ino`;
                             const name = window.prompt('New file name:', suggestedName);
                             if (name) onCreateCodeFile(name, true, `project/${folderMenu.boardId}`);
                           } 

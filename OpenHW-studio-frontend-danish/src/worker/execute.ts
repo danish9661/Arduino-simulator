@@ -6,7 +6,6 @@ import { BaseComponent } from '@openhw/emulator/src/components/BaseComponent.ts'
 import { LEDLogic } from '@openhw/emulator/src/components/wokwi-led/logic.ts';
 import { UnoLogic } from '@openhw/emulator/src/components/wokwi-arduino-uno/logic.ts';
 import { PicoLogic } from './pico-logic.ts';
-import { MicroPythonRunner } from './micropython-runtime.ts';
 import { ResistorLogic } from '@openhw/emulator/src/components/wokwi-resistor/logic.ts';
 import { PushbuttonLogic } from '@openhw/emulator/src/components/wokwi-pushbutton/logic.ts';
 import { PowerSupplyLogic } from '@openhw/emulator/src/components/wokwi-power-supply/logic.ts';
@@ -1442,7 +1441,6 @@ export type AVRRunnerOptions = {
     serialBaudRate?: number;
     debugEnabled?: boolean;
     debugIntervalMs?: number;
-    forceMicroPythonJsRunner?: boolean;
     rp2040ExecutableRanges?: RP2040ExecutableRangeInput[];
 };
 
@@ -1472,6 +1470,9 @@ const RP2040_CLOCKS_CLK_REF_CTRL_OFFSET = 0x30;
 const RP2040_CLOCKS_CLK_REF_SELECTED_OFFSET = 0x38;
 const RP2040_CLOCKS_CLK_SYS_CTRL_OFFSET = 0x3c;
 const RP2040_CLOCKS_CLK_SYS_SELECTED_OFFSET = 0x44;
+const RP2040_SIO_FIFO_ST_OFFSET = 0x50;
+const RP2040_SIO_FIFO_WR_OFFSET = 0x54;
+const RP2040_SIO_FIFO_RD_OFFSET = 0x58;
 const UF2_PAYLOAD_PREFIX = 'UF2BASE64:';
 const UF2_BLOCK_SIZE = 512;
 const UF2_MAGIC_START0 = 0x0a324655;
@@ -2589,8 +2590,9 @@ export class AVRRunner {
             port.addListener((value) => {
                 pinNames.forEach((pin, i) => {
                     const isHigh = (value & (1 << i)) !== 0;
-                    if (this.pinStates[pin] !== isHigh) {
-                        this.pinStates[pin] = isHigh;
+                    const gpPin = `GP${pin}`;
+                    if (this.pinStates[gpPin] !== isHigh) {
+                        this.pinStates[gpPin] = isHigh;
                         this.pinsChanged = true;
 
                         const boardInst = this.instances.get(this.boardId);
@@ -3187,7 +3189,9 @@ export class RP2040Runner implements BoardRunner {
     private debugLastStepCount: number = 0;
     private debugStepCount: number = 0;
     private totalCyclesIntended: number = 0;
-    private pioStepAccum: number = 0;
+    private pio0Accum = 0;
+    private pio1Accum = 0;
+    private pioSignalCycle = 0;
     private debugSerialTxBytes: number = 0;
     private debugSerialRxBytes: number = 0;
     private debugGpioTransitions: number = 0;
@@ -3244,6 +3248,7 @@ export class RP2040Runner implements BoardRunner {
 
         this.cpu = new RP2040(new RP2040MockClock() as any);
         this.patchClockSelectedReads();
+        this.patchSioFifoAccess();
         this.cpu.loadBootrom(bootromB1);
         this.cpu.logger = new ConsoleLogger(LogLevel.Error, true);
 
@@ -3296,6 +3301,7 @@ export class RP2040Runner implements BoardRunner {
         this.bootromLoaded = true;
         this.entryInfo = loadRP2040Firmware(this.cpu, this.firmwareHex);
         this.cpuCyclesAtStart = this.cpu.core.cycles;
+        this.pioSignalCycle = this.cpu.core.cycles;
 
         (componentsDef || []).forEach((cDef) => {
             const LogicClass = LOGIC_REGISTRY[cDef.type];
@@ -3501,6 +3507,45 @@ export class RP2040Runner implements BoardRunner {
             clocksPeripheral.writeUint32 = (offset: number, value: number) => {
                 if (offset === RP2040_CLOCKS_CLK_REF_CTRL_OFFSET || offset === RP2040_CLOCKS_CLK_SYS_CTRL_OFFSET) {
                     ctrlShadow[offset] = value >>> 0;
+                }
+                if (originalWriteUint32) {
+                    originalWriteUint32(offset, value);
+                }
+            };
+        } catch {
+            // Non-fatal: if this fails we keep default rp2040js behavior.
+        }
+    }
+
+    private patchSioFifoAccess() {
+        if (!this.cpu) return;
+
+        try {
+            const sio: any = (this.cpu as any).sio;
+            if (!sio || typeof sio.readUint32 !== 'function') return;
+
+            const originalReadUint32 = sio.readUint32.bind(sio);
+            const originalWriteUint32 = typeof sio.writeUint32 === 'function'
+                ? sio.writeUint32.bind(sio)
+                : null;
+
+            // Minimal multicore FIFO facade used by SDK startup probes.
+            // ST[0]=VLD (no data), ST[1]=RDY (write slot available).
+            const fifoStatus = 0x2;
+
+            sio.readUint32 = (offset: number) => {
+                if (offset === RP2040_SIO_FIFO_ST_OFFSET) {
+                    return fifoStatus;
+                }
+                if (offset === RP2040_SIO_FIFO_RD_OFFSET) {
+                    return 0;
+                }
+                return originalReadUint32(offset);
+            };
+
+            sio.writeUint32 = (offset: number, value: number) => {
+                if (offset === RP2040_SIO_FIFO_ST_OFFSET || offset === RP2040_SIO_FIFO_WR_OFFSET) {
+                    return;
                 }
                 if (originalWriteUint32) {
                     originalWriteUint32(offset, value);
@@ -4502,7 +4547,6 @@ export class RP2040Runner implements BoardRunner {
             if (!inst) return;
             if (!inst.pins[compPin]) inst.pins[compPin] = { voltage: 0, mode: 'INPUT' };
             inst.setPinVoltage(compPin, voltage);
-            if (this.cpu) inst.onPinStateChange(compPin, isHigh, this.cpu.core.cycles);
 
             this.traversePassive(inst, compId, compPin, voltage, (forwardNode) => {
                 for (const w of this.currentWires) {
@@ -4539,31 +4583,47 @@ export class RP2040Runner implements BoardRunner {
         });
     }
 
+    private onPinChange(pin: number, isHigh: boolean, cycleOverride?: number) {
+        const pinName = `GP${pin}`;
+        // Optimization: only propagate if state actually changed
+        if (this.pinStates[pinName] === isHigh) return;
+
+        this.pinStates[pinName] = isHigh;
+        this.pinsChanged = true;
+        this.debugGpioTransitions += 1;
+        this.debugLastGpioPin = pinName;
+
+        const rawCycles = Number.isFinite(Number(cycleOverride))
+            ? Number(cycleOverride)
+            : Number(this.cpu?.core.cycles ?? 0);
+        const cycles = rawCycles >= this.pioSignalCycle ? rawCycles : this.pioSignalCycle;
+        this.pioSignalCycle = cycles;
+        
+        // 1. Notify board logic (e.g. for internal telemetry)
+        const boardInst = this.instances.get(this.boardId);
+        if (boardInst) {
+            boardInst.onPinStateChange(pinName, isHigh, cycles);
+        }
+
+        // 2. High-fidelity endpoint routing (e.g. NeoPixel DIN)
+        for (const endpoint of this.getProtocolEndpointsForGpPin(pinName)) {
+            endpoint.inst.onPinStateChange(endpoint.pinId, isHigh, cycles);
+        }
+
+        // 3. Protocol & Voltage propagation
+        const functionSelect = this.cpu?.gpio?.[pin]?.functionSelect ?? 0;
+        this.dispatchOptionalProtocols(pinName, isHigh, cycles, functionSelect);
+        this.propagateBoardPin(pinName, isHigh);
+        this.observeSoftSerialTx(pinName, isHigh, cycles);
+    }
+
     private attachGPIOListeners() {
         if (!this.cpu) return;
 
         for (let gp = 0; gp <= 28; gp++) {
-            const pinName = `GP${gp}`;
             const unsubscribe = this.cpu.gpio[gp].addListener((state: GPIOPinState) => {
                 const isHigh = state === GPIOPinState.High || state === GPIOPinState.InputPullUp;
-                if (this.pinStates[pinName] !== isHigh) {
-                    this.pinStates[pinName] = isHigh;
-                    this.pinsChanged = true;
-                    this.debugGpioTransitions += 1;
-                    this.debugLastGpioPin = pinName;
-                    const functionSelect = this.cpu?.gpio?.[gp]?.functionSelect ?? 0;
-                    const boardInst = this.instances.get(this.boardId);
-                    if (boardInst && this.cpu) {
-                        boardInst.onPinStateChange(pinName, isHigh, this.cpu.core.cycles);
-                    }
-                    if (this.cpu) {
-                        this.dispatchOptionalProtocols(pinName, isHigh, this.cpu.core.cycles, functionSelect);
-                    }
-                    this.propagateBoardPin(pinName, isHigh);
-                    if (this.cpu) {
-                        this.observeSoftSerialTx(pinName, isHigh, this.cpu.core.cycles);
-                    }
-                }
+                this.onPinChange(gp, isHigh);
             });
             this.gpioUnsubscribers.push(unsubscribe);
         }
@@ -4604,7 +4664,6 @@ export class RP2040Runner implements BoardRunner {
         const now = performance.now();
 
         try {
-            const pioDiv = this.getPIOClockDiv();
             const executeOneInstruction = () => {
                 const before = this.cpu!.core.cycles >>> 0;
                 core.executeInstruction();
@@ -4615,6 +4674,10 @@ export class RP2040Runner implements BoardRunner {
 
             // DETERMINISTIC CYCLE-TARGETED LOOP (Velxio Pattern)
             while (cyclesDone < CYCLES_PER_FRAME && this.running && this.cpu) {
+                const pioDivs = this.getPIOClockDivs();
+                const pio0Div = pioDivs[0];
+                const pio1Div = pioDivs[1];
+
                 if (core.waiting && clock) {
                     const rawJumpNanos = Number(clock.nanosToNextAlarm);
                     const jumpNanos = Number.isFinite(rawJumpNanos) ? rawJumpNanos : -1;
@@ -4625,35 +4688,39 @@ export class RP2040Runner implements BoardRunner {
                         clock.tick(cycles * CYCLE_NANOS);
                         cyclesDone += cycles;
                         this.debugStepCount += 1;
-                        this.pioStepAccum += cycles;
-                        if (this.pioStepAccum >= pioDiv) {
-                            while (this.pioStepAccum >= pioDiv) {
-                                this.pioStepAccum -= pioDiv;
-                                this.stepPIO();
-                            }
+
+                        this.pio0Accum += cycles;
+                        while (this.pio0Accum >= pio0Div) {
+                            this.pio0Accum -= pio0Div;
+                            this.stepPIO(0, pio0Div);
+                        }
+                        this.pio1Accum += cycles;
+                        while (this.pio1Accum >= pio1Div) {
+                            this.pio1Accum -= pio1Div;
+                            this.stepPIO(1, pio1Div);
                         }
                         continue;
                     }
 
-                    // Incremental Jump with PIO Sync (Velxio logic)
+                    // Incremental Jump with PIO Sync
                     const jumpedCycles = Math.ceil(jumpNanos / CYCLE_NANOS);
-                    const pioSteps = Math.floor(jumpedCycles / pioDiv);
-                    const nanosPerPioStep = pioDiv * CYCLE_NANOS;
+                    const maxJumpCycles = Math.min(jumpedCycles, CYCLES_PER_FRAME - cyclesDone);
                     
-                    // Cap to 50k steps to prevent host stalls
-                    const maxSteps = Math.min(pioSteps, 50000);
-                    let nanosStepped = 0;
-                    for (let i = 0; i < maxSteps; i++) {
-                        clock.tick(nanosPerPioStep);
-                        nanosStepped += nanosPerPioStep;
-                        this.stepPIO();
+                    // Advance time and sync both PIO units
+                    clock.tick(maxJumpCycles * CYCLE_NANOS);
+                    
+                    this.pio0Accum += maxJumpCycles;
+                    while (this.pio0Accum >= pio0Div) {
+                        this.pio0Accum -= pio0Div;
+                        this.stepPIO(0, pio0Div);
+                    }
+                    this.pio1Accum += maxJumpCycles;
+                    while (this.pio1Accum >= pio1Div) {
+                        this.pio1Accum -= pio1Div;
+                        this.stepPIO(1, pio1Div);
                     }
 
-                    const remaining = jumpNanos - nanosStepped;
-                    if (remaining > 0) {
-                        clock.tick(remaining);
-                    }
-                    cyclesDone += Number.isFinite(jumpedCycles) && jumpedCycles > 0 ? jumpedCycles : 0;
+                    cyclesDone += maxJumpCycles;
                 } else {
                     const cycles = executeOneInstruction();
                     if (clock) clock.tick(cycles * CYCLE_NANOS);
@@ -4661,10 +4728,15 @@ export class RP2040Runner implements BoardRunner {
                     this.debugStepCount += 1;
 
                     // Synchronous PIO stepping
-                    this.pioStepAccum += cycles;
-                    while (this.pioStepAccum >= pioDiv) {
-                        this.pioStepAccum -= pioDiv;
-                        this.stepPIO();
+                    this.pio0Accum += cycles;
+                    while (this.pio0Accum >= pio0Div) {
+                        this.pio0Accum -= pio0Div;
+                        this.stepPIO(0, pio0Div);
+                    }
+                    this.pio1Accum += cycles;
+                    while (this.pio1Accum >= pio1Div) {
+                        this.pio1Accum -= pio1Div;
+                        this.stepPIO(1, pio1Div);
                     }
                 }
             }
@@ -4697,7 +4769,21 @@ export class RP2040Runner implements BoardRunner {
                 let sent = 0;
                 for (let i = 0; i < maxBytes && this.serialBuffer.length > 0; i++) {
                     const packet = this.serialBuffer[0]!;
-                    const delivered = ((packet.source === 1 ? uart1 : uart0) || uart0).feedByte(packet.value & 0xff);
+                    let delivered = false;
+                    if (packet.source === 2) {
+                        if (this.usbCdc && this.usbCdcReady) {
+                            try {
+                                this.usbCdc.sendSerialByte(packet.value & 0xff);
+                                delivered = true;
+                            } catch {
+                                delivered = false;
+                            }
+                        } else {
+                            delivered = (uart0 || uart1).feedByte(packet.value & 0xff);
+                        }
+                    } else {
+                        delivered = ((packet.source === 1 ? uart1 : uart0) || uart0).feedByte(packet.value & 0xff);
+                    }
                     if (!delivered) break;
                     this.serialBuffer.shift();
                     sent += 1;
@@ -4725,11 +4811,39 @@ export class RP2040Runner implements BoardRunner {
      * Step PIO state machines synchronously.
      * Replaces the redundant internal PIO timers that cause event-loop congestion.
      */
-    private stepPIO(): void {
+    /**
+     * Step a PIO state machine block synchronously.
+     * Implements edge detection to ensure pin changes are propagated to components.
+     */
+    private stepPIO(index: 0 | 1, stepCycles = 1): void {
         if (!this.cpu) return;
         const pio = (this.cpu as any).pio;
-        if (pio[0]) pio[0].step();
-        if (pio[1]) pio[1].step();
+        if (!pio || !pio[index]) return;
+
+        const cycleStep = Number.isFinite(Number(stepCycles)) && Number(stepCycles) > 0
+            ? Number(stepCycles)
+            : 1;
+        const baseCycles = Number(this.cpu.core.cycles ?? 0);
+        if (baseCycles > this.pioSignalCycle) {
+            this.pioSignalCycle = baseCycles;
+        }
+        this.pioSignalCycle += cycleStep;
+        const edgeCycle = this.pioSignalCycle;
+
+        // Capture pin state before stepping
+        const oldPins = pio[index].pins >>> 0;
+        pio[index].step();
+
+        // Detect and propagate changes for GPIO 0-29
+        const newPins = pio[index].pins >>> 0;
+        if (oldPins !== newPins) {
+            const changed = (oldPins ^ newPins) >>> 0;
+            for (let i = 0; i < 30; i++) {
+                if (changed & (1 << i)) {
+                    this.onPinChange(i, !!(newPins & (1 << i)), edgeCycle);
+                }
+            }
+        }
     }
 
     serialRx(data: string) {
@@ -4789,6 +4903,10 @@ export class RP2040Runner implements BoardRunner {
         this.cpu.loadBootrom(bootromB1);
         this.bootromLoaded = true;
         this.entryInfo = loadRP2040Firmware(this.cpu, this.firmwareHex);
+        this.cpuCyclesAtStart = this.cpu.core.cycles;
+        this.pio0Accum = 0;
+        this.pio1Accum = 0;
+        this.pioSignalCycle = this.cpu.core.cycles;
         this.serialBuffer = [];
         this.serialByteBudget = 0;
         this.activeUartIndex = 0;
@@ -4846,18 +4964,29 @@ export class RP2040Runner implements BoardRunner {
      * Get the current clock divider for the PIO state machines.
      * Aligned with Velxio: uses the first enabled state machine's divider or defaults to 64.
      */
-    private getPIOClockDiv(): number {
-        if (!this.cpu) return 64;
-        const pio = (this.cpu as any).pio;
-        for (const p of pio) {
-            if (p.stopped) continue;
+    /**
+     * Get the current clock dividers for PIO blocks 0 and 1.
+     * Uses the smallest divider of any enabled state machine in each block,
+     * including fractional bits.
+     */
+    private getPIOClockDivs(): number[] {
+        if (!this.cpu) return [64, 64];
+        const pioInstances = (this.cpu as any).pio || [];
+        const divs = [64, 64];
+        for (let i = 0; i < 2; i++) {
+            const p = pioInstances[i];
+            if (!p || p.stopped) continue;
+            let minDiv = Infinity;
             for (const m of p.machines) {
                 if (m.enabled) {
-                    return Math.max(1, m.clockDivInt || 1);
+                    // Extract fractional clkdiv (int + frac/256)
+                    const d = Math.max(1, Number(m.clkdiv || 1));
+                    if (d < minDiv) minDiv = d;
                 }
             }
+            divs[i] = minDiv === Infinity ? 64 : minDiv;
         }
-        return 64;
+        return divs;
     }
 
     stop() {
@@ -4881,211 +5010,15 @@ export class RP2040Runner implements BoardRunner {
     }
 }
 
-// ─── RP2040 MicroPython JS-native Runner ────────────────────────────────────
-//
-// Instead of loading a UF2 and wrestling with USB-CDC REPL, this runner
-// interprets the user's MicroPython script directly in JavaScript and drives
-// GPIO through the same propagateBoardPin mechanism used by RP2040Runner.
-// It is far simpler, boots instantly, and works for the machine.Pin / sleep_ms
-// subset that covers >90% of beginner Pico projects.
-//
-export class RP2040MicroPythonRunner implements BoardRunner {
-    readonly cpu: null = null;
-    readonly boardId: string;
-    readonly instances: Map<string, BaseComponent>;
-
-    private pyRunner: MicroPythonRunner | null = null;
-    private currentWires: any[];
-    private statusInterval: any;
-    private onStateUpdate: (state: any) => void;
-    private readonly onByteTransmit?: (payload: { boardId: string; value: number; char: string; source?: string }) => void;
-    private gpioState: Map<number, boolean> = new Map();
-    private pinStates: Record<string, boolean> = {};
-    private componentSyncMeta = new Map<string, { lastSentAt: number; lastWeight: number }>();
-
-    constructor(
-        private script: string,
-        componentsDef: any[],
-        wiresDef: any[],
-        onStateUpdate: (state: any) => void,
-        options: AVRRunnerOptions = {}
-    ) {
-        this.boardId = options.boardId || '';
-        this.onStateUpdate = onStateUpdate;
-        this.onByteTransmit = options.onByteTransmit;
-        this.currentWires = Array.isArray(wiresDef) ? wiresDef : [];
-
-        // Build component instances
-        this.instances = new Map<string, BaseComponent>();
-        (componentsDef || []).forEach((cDef) => {
-            const LogicClass = LOGIC_REGISTRY[cDef.type];
-            if (!LogicClass) return;
-            const pinList = COMPONENT_PINS[cDef.type] || [];
-            const inst = new LogicClass(cDef.id, { ...cDef, pins: pinList });
-            this.instances.set(cDef.id, inst);
-        });
-
-        // Seed all GND/K pins to 0V and VCC pins to 3.3V at init
-        this.seedFixedRails();
-
-        // Start the interpreter
-        this.startInterpreter();
-
-        // Publish state periodically
-        this.statusInterval = setInterval(() => this.publishState(), 50);
-    }
-
-    private seedFixedRails() {
-        this.instances.forEach((inst) => {
-            Object.keys(inst.pins).forEach((pinKey) => {
-                const upper = pinKey.toUpperCase();
-                if (upper === 'GND' || upper === 'VSS' || upper.startsWith('GND_') || upper === 'K') {
-                    inst.setPinVoltage(pinKey, 0.0);
-                }
-                if (upper === '3V3' || upper === 'VCC') {
-                    inst.setPinVoltage(pinKey, 3.3);
-                }
-            });
-        });
-    }
-
-    private propagateGPIO(gpioNum: number, isHigh: boolean) {
-        const voltage = isHigh ? 3.3 : 0.0;
-        const gpPin = `GP${gpioNum}`;
-        const visitedEdges = new Set<string>();
-
-        const visitNode = (node: string) => {
-            const [compId, compPin] = node.split(':');
-            const inst = this.instances.get(compId);
-            if (!inst) return;
-            if (!inst.pins[compPin]) inst.pins[compPin] = { voltage: 0, mode: 'INPUT' };
-            inst.setPinVoltage(compPin, voltage);
-
-            // Traverse passive components (resistors etc.)
-            for (const wire of this.currentWires) {
-                const edgeKey = `${wire.from}|${wire.to}`;
-                if (visitedEdges.has(edgeKey)) continue;
-                const matchFrom = wire.from === node;
-                const matchTo = wire.to === node;
-                if (!matchFrom && !matchTo) continue;
-                visitedEdges.add(edgeKey);
-                const other = matchFrom ? wire.to : wire.from;
-                const [oid, opin] = other.split(':');
-                const oinst = this.instances.get(oid);
-                if (oinst) visitNode(other);
-            }
-        };
-
-        // Find wires connected to this GPIO pin of the board
-        for (const wire of this.currentWires) {
-            const edgeKey = `${wire.from}|${wire.to}`;
-            const fromIsGP = wire.from.startsWith(`${this.boardId}:${gpPin}`) ||
-                             wire.from === `${this.boardId}:GP${gpioNum}`;
-            const toIsGP   = wire.to.startsWith(`${this.boardId}:${gpPin}`) ||
-                             wire.to === `${this.boardId}:GP${gpioNum}`;
-            if (!fromIsGP && !toIsGP) continue;
-            visitedEdges.add(edgeKey);
-            visitNode(fromIsGP ? wire.to : wire.from);
-        }
-
-        // Re-seed fixed rails (GND/VCC never change)
-        this.seedFixedRails();
-
-        // Tick component logic
-        const instArray = Array.from(this.instances.values());
-        instArray.forEach((inst) => inst.update(0, this.currentWires, instArray));
-    }
-
-    private publishState() {
-        const components: { id: string; state: any }[] = [];
-        const now = performance.now();
-        this.instances.forEach((inst, id) => {
-            if (inst.stateChanged) {
-                const syncState = inst.getSyncState();
-                if (!this.shouldEmitComponentState(id, syncState, now)) return;
-                components.push({ id, state: syncState });
-                inst.stateChanged = false;
-            }
-        });
-        if (components.length > 0) {
-            this.onStateUpdate({ type: 'state', boardId: this.boardId, components, pins: this.pinStates });
-        }
-    }
-
-    private shouldEmitComponentState(componentId: string, state: any, nowMs: number): boolean {
-        const policy = getComponentStateSyncPolicy(state);
-        const prev = this.componentSyncMeta.get(componentId);
-        if (policy.minIntervalMs > 0 && prev && (nowMs - prev.lastSentAt) < policy.minIntervalMs) {
-            return false;
-        }
-        this.componentSyncMeta.set(componentId, { lastSentAt: nowMs, lastWeight: policy.weight });
-        return true;
-    }
-
-    private startInterpreter() {
-        this.pyRunner = new MicroPythonRunner(this.script, {
-            onGpioChange: (gpioNum, isHigh) => {
-                this.pinStates[`GP${gpioNum}`] = isHigh;
-                this.propagateGPIO(gpioNum, isHigh);
-                this.publishState();
-            },
-            onSerial: (text) => {
-                for (const ch of text) {
-                    const value = ch.charCodeAt(0);
-                    if (this.onByteTransmit) {
-                        this.onByteTransmit({ boardId: this.boardId, value, char: ch, source: 'micropython-js' });
-                    } else {
-                        this.onStateUpdate({ type: 'serial', data: ch, value, boardId: this.boardId, source: 'micropython-js' });
-                    }
-                }
-            },
-            onError: (msg) => {
-                // Emit as serial output so user sees it
-                const errText = `\r\n[MicroPython] ${msg}\r\n`;
-                for (const ch of errText) {
-                    const value = ch.charCodeAt(0);
-                    if (this.onByteTransmit) {
-                        this.onByteTransmit({ boardId: this.boardId, value, char: ch, source: 'micropython-js' });
-                    } else {
-                        this.onStateUpdate({ type: 'serial', data: ch, value, boardId: this.boardId, source: 'micropython-js' });
-                    }
-                }
-            },
-        });
-        this.pyRunner.run().catch(() => {});
-    }
-
-    stop() {
-        if (this.pyRunner) { this.pyRunner.stop(); this.pyRunner = null; }
-        clearInterval(this.statusInterval);
-    }
-
-    reset() {
-        this.stop();
-        this.seedFixedRails();
-        this.componentSyncMeta.clear();
-        this.startInterpreter();
-        this.statusInterval = setInterval(() => this.publishState(), 50);
-    }
-
-    serialRx(_data: string) { /* MicroPython JS runner doesn't use UART input */ }
-    serialRxByte(_value: number) { /* no-op */ }
-    setSerialBaudRate(_baud: number) { /* no-op */ }
-    getSerialBaudRate() { return 115200; }
-}
-
 export function createRunnerForBoard(
     boardType: string,
     hexData: string,
     componentsDef: any[],
     wiresDef: any[],
     onStateUpdate: (state: any) => void,
-    options: AVRRunnerOptions & { pyScript?: string; forceMicroPythonJsRunner?: boolean } = {}
+    options: AVRRunnerOptions & { pyScript?: string } = {}
 ): BoardRunner {
     if (/pico|rp2040/i.test(String(boardType || ''))) {
-        if (options.forceMicroPythonJsRunner && typeof options.pyScript === 'string' && options.pyScript.trim()) {
-            return new RP2040MicroPythonRunner(options.pyScript, componentsDef, wiresDef, onStateUpdate, options);
-        }
         // Default RP2040 path: emulate firmware in rp2040js and inject over UART0.
         return new RP2040Runner(hexData, componentsDef, wiresDef, onStateUpdate, options);
     }

@@ -1,0 +1,249 @@
+{
+  "caseId": "case10-pico-micropython-mixed-components",
+  "name": "Pico MicroPython Mixed Components",
+  "board": "pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "micropython",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 70,
+      "y": 80
+    },
+    {
+      "id": "led1",
+      "type": "wokwi-led",
+      "attrs": {
+        "color": "red"
+      },
+      "w": 56,
+      "h": 50,
+      "rotation": 0,
+      "label": "LED",
+      "x": 410,
+      "y": 90
+    },
+    {
+      "id": "pot1",
+      "type": "wokwi-slide-potentiometer",
+      "attrs": {
+        "value": 64
+      },
+      "w": 90,
+      "h": 74,
+      "rotation": 0,
+      "label": "Slide Potentiometer",
+      "x": 410,
+      "y": 180
+    },
+    {
+      "id": "servo1",
+      "type": "wokwi-servo",
+      "attrs": {},
+      "w": 96,
+      "h": 64,
+      "rotation": 0,
+      "label": "Servo Motor",
+      "x": 405,
+      "y": 265
+    },
+    {
+      "id": "ws1",
+      "type": "wokwi-ws2812b",
+      "attrs": {},
+      "w": 84,
+      "h": 64,
+      "rotation": 0,
+      "label": "WS2812B",
+      "x": 405,
+      "y": 355
+    },
+    {
+      "id": "oled1",
+      "type": "wokwi-ssd1306-oled",
+      "attrs": {},
+      "w": 128,
+      "h": 82,
+      "rotation": 0,
+      "label": "SSD1306 OLED",
+      "x": 520,
+      "y": 130
+    }
+  ],
+  "connections": [
+    {
+      "from": "pico1:GP16",
+      "to": "led1:A",
+      "id": "w1",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GP16",
+      "toLabel": "A"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "led1:K",
+      "id": "w2",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GND",
+      "toLabel": "K"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "pot1:GND",
+      "id": "w3",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GND",
+      "toLabel": "GND"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "pot1:VCC",
+      "id": "w4",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "3V3",
+      "toLabel": "VCC"
+    },
+    {
+      "from": "pico1:GP26",
+      "to": "pot1:SIG",
+      "id": "w5",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GP26",
+      "toLabel": "SIG"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "servo1:GND",
+      "id": "w6",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GND",
+      "toLabel": "GND"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "servo1:V+",
+      "id": "w7",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "3V3",
+      "toLabel": "V+"
+    },
+    {
+      "from": "pico1:GP15",
+      "to": "servo1:PWM",
+      "id": "w8",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GP15",
+      "toLabel": "PWM"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "ws1:GND",
+      "id": "w9",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GND",
+      "toLabel": "GND"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "ws1:VCC",
+      "id": "w10",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "3V3",
+      "toLabel": "VCC"
+    },
+    {
+      "from": "pico1:GP2",
+      "to": "ws1:DIN",
+      "id": "w11",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GP2",
+      "toLabel": "DIN"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "oled1:GND",
+      "id": "w12",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GND",
+      "toLabel": "GND"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "oled1:VCC",
+      "id": "w13",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "3V3",
+      "toLabel": "VCC"
+    },
+    {
+      "from": "pico1:GP5",
+      "to": "oled1:SCL",
+      "id": "w14",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GP5",
+      "toLabel": "SCL"
+    },
+    {
+      "from": "pico1:GP4",
+      "to": "oled1:SDA",
+      "id": "w15",
+      "color": "#6ee7b7",
+      "isBelow": false,
+      "waypoints": [],
+      "fromLabel": "GP4",
+      "toLabel": "SDA"
+    }
+  ],
+  "code": "from machine import Pin\nfrom time import sleep_ms\n\nprint(\"MP_MIX_BOOT\")\nled = Pin(16, Pin.OUT, value=0)\nservo = Pin(15, Pin.OUT, value=0)\nneo = Pin(2, Pin.OUT, value=0)\nsda = Pin(4, Pin.OUT, value=0)\nscl = Pin(5, Pin.OUT, value=0)\n\nfor i in range(8):\n    if i % 2 == 0:\n        led.on()\n        servo.on()\n        neo.on()\n        sda.on()\n        scl.off()\n    else:\n        led.off()\n        servo.off()\n        neo.off()\n        sda.off()\n        scl.on()\n    print(\"MP_MIX_STEP\", i)\n    sleep_ms(30)\n\nprint(\"MP_MIX_DONE\")\n",
+  "projectFiles": [
+    {
+      "id": "project/pico1/main.py",
+      "path": "project/pico1/main.py",
+      "name": "main.py",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "from machine import Pin\nfrom time import sleep_ms\n\nprint(\"MP_MIX_BOOT\")\nled = Pin(16, Pin.OUT, value=0)\nservo = Pin(15, Pin.OUT, value=0)\nneo = Pin(2, Pin.OUT, value=0)\nsda = Pin(4, Pin.OUT, value=0)\nscl = Pin(5, Pin.OUT, value=0)\n\nfor i in range(8):\n    if i % 2 == 0:\n        led.on()\n        servo.on()\n        neo.on()\n        sda.on()\n        scl.off()\n    else:\n        led.off()\n        servo.off()\n        neo.off()\n        sda.off()\n        scl.on()\n    print(\"MP_MIX_STEP\", i)\n    sleep_ms(30)\n\nprint(\"MP_MIX_DONE\")\n",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/pico1/main.py"
+  ],
+  "activeCodeFileId": "project/pico1/main.py"
+}

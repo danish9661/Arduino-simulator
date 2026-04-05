@@ -1,0 +1,58 @@
+{
+  "caseId": "case8-arduino-multifile-ino-h-cpp",
+  "name": "Arduino Multifile (.ino/.h/.cpp)",
+  "board": "arduino_uno",
+  "components": [
+    {
+      "id": "uno1",
+      "type": "wokwi-arduino-uno",
+      "attrs": {},
+      "w": 220,
+      "h": 300,
+      "rotation": 0,
+      "label": "Arduino Uno",
+      "x": 240,
+      "y": 120
+    }
+  ],
+  "connections": [],
+  "code": "#include <Arduino.h>\n#include \"helper.h\"\n\nvoid setup() {\n  Serial.begin(9600);\n  Serial.println(\"MULTI_BOOT\");\n}\n\nvoid loop() {\n  static unsigned long counter = 0;\n  if ((counter++ & 0x1Fu) == 0u) {\n    Serial.println(helper_message());\n  }\n  delay(10);\n}\n",
+  "projectFiles": [
+    {
+      "id": "project/uno1/uno1.ino",
+      "path": "project/uno1/uno1.ino",
+      "name": "uno1.ino",
+      "kind": "code",
+      "boardId": "uno1",
+      "boardKind": "arduino_uno",
+      "content": "#include <Arduino.h>\n#include \"helper.h\"\n\nvoid setup() {\n  Serial.begin(9600);\n  Serial.println(\"MULTI_BOOT\");\n}\n\nvoid loop() {\n  static unsigned long counter = 0;\n  if ((counter++ & 0x1Fu) == 0u) {\n    Serial.println(helper_message());\n  }\n  delay(10);\n}\n",
+      "dirty": false
+    },
+    {
+      "id": "project/uno1/helper.h",
+      "path": "project/uno1/helper.h",
+      "name": "helper.h",
+      "kind": "code",
+      "boardId": "uno1",
+      "boardKind": "arduino_uno",
+      "content": "#pragma once\n\nconst char* helper_message();\n",
+      "dirty": false
+    },
+    {
+      "id": "project/uno1/helper.cpp",
+      "path": "project/uno1/helper.cpp",
+      "name": "helper.cpp",
+      "kind": "code",
+      "boardId": "uno1",
+      "boardKind": "arduino_uno",
+      "content": "#include \"helper.h\"\n\nconst char* helper_message() {\n  return \"MULTI_CPP_OK\";\n}\n",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/uno1/uno1.ino",
+    "project/uno1/helper.h",
+    "project/uno1/helper.cpp"
+  ],
+  "activeCodeFileId": "project/uno1/uno1.ino"
+}

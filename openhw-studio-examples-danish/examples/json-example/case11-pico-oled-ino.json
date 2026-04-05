@@ -1,0 +1,91 @@
+{
+  "caseId": "case11-pico-oled-ino",
+  "name": "Pico OLED Native (.ino)",
+  "board": "pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "native",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 120,
+      "y": 110
+    },
+    {
+      "id": "oled1",
+      "type": "wokwi-ssd1306-oled",
+      "attrs": {},
+      "w": 160,
+      "h": 120,
+      "rotation": 0,
+      "label": "SSD1306 OLED",
+      "x": 430,
+      "y": 140
+    }
+  ],
+  "connections": [
+    {
+      "id": "w1",
+      "from": "pico1:GND",
+      "to": "oled1:GND",
+      "color": "#6ee7b7",
+      "waypoints": [],
+      "isBelow": false,
+      "fromLabel": "GND",
+      "toLabel": "GND"
+    },
+    {
+      "id": "w2",
+      "from": "pico1:3V3",
+      "to": "oled1:VCC",
+      "color": "#6ee7b7",
+      "waypoints": [],
+      "isBelow": false,
+      "fromLabel": "3V3",
+      "toLabel": "VCC"
+    },
+    {
+      "id": "w3",
+      "from": "pico1:GP5",
+      "to": "oled1:SCL",
+      "color": "#6ee7b7",
+      "waypoints": [],
+      "isBelow": false,
+      "fromLabel": "GP5",
+      "toLabel": "SCL"
+    },
+    {
+      "id": "w4",
+      "from": "pico1:GP4",
+      "to": "oled1:SDA",
+      "color": "#6ee7b7",
+      "waypoints": [],
+      "isBelow": false,
+      "fromLabel": "GP4",
+      "toLabel": "SDA"
+    }
+  ],
+  "code": "#include <Arduino.h>\n#include <Wire.h>\n\nstatic const uint8_t OLED_ADDR = 0x3C;\nstatic uint8_t frameCounter = 0;\n\nvoid oledCommand(uint8_t cmd) {\n  Wire.beginTransmission(OLED_ADDR);\n  Wire.write(0x00);\n  Wire.write(cmd);\n  const int err = Wire.endTransmission();\n  Serial1.print(\"OLED_I2C=\");\n  Serial1.println(err);\n}\n\nvoid oledDataBurst(uint8_t valueA, uint8_t valueB) {\n  Wire.beginTransmission(OLED_ADDR);\n  Wire.write(0x40);\n  Wire.write(valueA);\n  Wire.write(valueB);\n  const int err = Wire.endTransmission();\n  Serial1.print(\"OLED_DATA=\");\n  Serial1.println(err);\n}\n\nvoid setup() {\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(115200);\n  Wire.setSDA(4);\n  Wire.setSCL(5);\n  Wire.begin();\n  delay(20);\n  Serial1.println(\"OLED_BOOT\");\n  oledCommand(0xAE);\n  oledCommand(0x20);\n  oledCommand(0x00);\n  oledCommand(0xAF);\n}\n\nvoid loop() {\n  const uint8_t pattern = (frameCounter & 0x01u) ? 0xAA : 0x55;\n  oledDataBurst(pattern, (uint8_t)~pattern);\n  Serial1.print(\"OLED_FRAME \");\n  Serial1.println(frameCounter);\n  frameCounter++;\n  delay(60);\n}\n",
+  "projectFiles": [
+    {
+      "id": "project/pico1/pico1.ino",
+      "path": "project/pico1/pico1.ino",
+      "name": "pico1.ino",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "#include <Arduino.h>\n#include <Wire.h>\n\nstatic const uint8_t OLED_ADDR = 0x3C;\nstatic uint8_t frameCounter = 0;\n\nvoid oledCommand(uint8_t cmd) {\n  Wire.beginTransmission(OLED_ADDR);\n  Wire.write(0x00);\n  Wire.write(cmd);\n  const int err = Wire.endTransmission();\n  Serial1.print(\"OLED_I2C=\");\n  Serial1.println(err);\n}\n\nvoid oledDataBurst(uint8_t valueA, uint8_t valueB) {\n  Wire.beginTransmission(OLED_ADDR);\n  Wire.write(0x40);\n  Wire.write(valueA);\n  Wire.write(valueB);\n  const int err = Wire.endTransmission();\n  Serial1.print(\"OLED_DATA=\");\n  Serial1.println(err);\n}\n\nvoid setup() {\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(115200);\n  Wire.setSDA(4);\n  Wire.setSCL(5);\n  Wire.begin();\n  delay(20);\n  Serial1.println(\"OLED_BOOT\");\n  oledCommand(0xAE);\n  oledCommand(0x20);\n  oledCommand(0x00);\n  oledCommand(0xAF);\n}\n\nvoid loop() {\n  const uint8_t pattern = (frameCounter & 0x01u) ? 0xAA : 0x55;\n  oledDataBurst(pattern, (uint8_t)~pattern);\n  Serial1.print(\"OLED_FRAME \");\n  Serial1.println(frameCounter);\n  frameCounter++;\n  delay(60);\n}\n",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/pico1/pico1.ino"
+  ],
+  "activeCodeFileId": "project/pico1/pico1.ino"
+}

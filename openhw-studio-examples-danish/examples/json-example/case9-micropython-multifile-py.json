@@ -1,0 +1,50 @@
+{
+  "caseId": "case9-micropython-multifile-py",
+  "name": "MicroPython Multifile (.py)",
+  "board": "pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "micropython",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 240,
+      "y": 120
+    }
+  ],
+  "connections": [],
+  "code": "from helper import HELPER_TAG\nprint(\"MP_MULTI_BOOT\")\nprint(HELPER_TAG)\n",
+  "projectFiles": [
+    {
+      "id": "project/pico1/helper.py",
+      "path": "project/pico1/helper.py",
+      "name": "helper.py",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "HELPER_TAG = \"MP_HELPER_OK\"\n",
+      "dirty": false
+    },
+    {
+      "id": "project/pico1/main.py",
+      "path": "project/pico1/main.py",
+      "name": "main.py",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "from helper import HELPER_TAG\nprint(\"MP_MULTI_BOOT\")\nprint(HELPER_TAG)\n",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/pico1/main.py",
+    "project/pico1/helper.py"
+  ],
+  "activeCodeFileId": "project/pico1/main.py"
+}

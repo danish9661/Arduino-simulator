@@ -466,11 +466,11 @@ export function TopToolbox(props) {
           </div>
 
           {/* Hidden file inputs */}
-          <input ref={importFileRef} type="file" accept=".png,image/png" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) importPng(e.target.files[0]); }} />
+          <input ref={importFileRef} type="file" accept=".png,image/png,.json,application/json" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) importPng(e.target.files[0]); }} />
           <input ref={backupRestoreInputRef} type="file" accept=".zip" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) { handleRestoreWorkflow(e.target.files[0]); e.target.value = ''; } }} />
 
-          {/* Import PNG */}
-          <Btn color="var(--orange)" onClick={() => importFileRef.current?.click()} title="Import a previously exported OpenHW-Studio PNG to restore the circuit"> Import PNG</Btn>
+          {/* Import PNG or JSON */}
+          <Btn color="var(--orange)" onClick={() => importFileRef.current?.click()} title="Import a previously exported OpenHW-Studio PNG or JSON project file to restore the circuit"> Import PNG/JSON</Btn>
           {/* Export PNG */}
           <Btn color="var(--purple)" onClick={downloadPng} disabled={isExporting} title="Download circuit as PNG with embedded metadata">
             {isExporting ? ' Exporting...' : ' Export PNG'}
