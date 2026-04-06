@@ -3,6 +3,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Command } from 'commander';
 import type {
+  OpenHwProject,
   SimulationRunOptions,
   SimulationSnapshot,
   SimulationTelemetryReport,
@@ -32,6 +33,228 @@ function parseNonNegative(input: string | undefined, fallback: number): number {
   const n = Number(input);
   if (!Number.isFinite(n) || n < 0) return fallback;
   return n;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
+}
+
+function parseCsvList(input: string | undefined): string[] {
+  return String(input || '')
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function hasInspectEventInput(options: {
+  eventJson?: string;
+  eventFile?: string;
+  event?: string;
+  value?: string;
+}): boolean {
+  return Boolean(options.eventJson || options.eventFile || options.event || options.value !== undefined);
+}
+
+type TraceRecord = {
+  tMs: number;
+  boardId: string;
+  type: string;
+  detail: Record<string, unknown>;
+};
+
+type TraceCaptureOptions = {
+  includeState: boolean;
+  includeSerialText: boolean;
+  maxSerialChars: number;
+  componentFilter: string | null;
+};
+
+function compactTraceValue(value: unknown, depth = 0): unknown {
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'string') {
+    return value.length > 240 ? `${value.slice(0, 240)}...` : value;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') return value;
+
+  if (ArrayBuffer.isView(value)) {
+    const typed = value as unknown as { length?: number; [k: number]: number };
+    const len = Number(typed.length || 0);
+    const preview: number[] = [];
+    for (let i = 0; i < Math.min(len, 16); i += 1) {
+      preview.push(Number(typed[i] || 0));
+    }
+    return {
+      kind: 'typed-array',
+      length: len,
+      preview,
+    };
+  }
+
+  if (Array.isArray(value)) {
+    if (depth >= 2 || value.length > 16) {
+      return {
+        kind: 'array',
+        length: value.length,
+        preview: value.slice(0, 8).map((item) => compactTraceValue(item, depth + 1)),
+      };
+    }
+    return value.map((item) => compactTraceValue(item, depth + 1));
+  }
+
+  if (typeof value === 'object') {
+    const asRecord = value as Record<string, unknown>;
+    const keys = Object.keys(asRecord).sort((a, b) => a.localeCompare(b));
+
+    if (depth >= 2 || keys.length > 20) {
+      return {
+        kind: 'object',
+        keys: keys.slice(0, 20),
+        size: keys.length,
+      };
+    }
+
+    const out: Record<string, unknown> = {};
+    for (const key of keys) {
+      out[key] = compactTraceValue(asRecord[key], depth + 1);
+    }
+    return out;
+  }
+
+  return String(value);
+}
+
+function buildTraceRecord(message: any, startedAtMs: number, options: TraceCaptureOptions): TraceRecord | null {
+  const type = String(message?.type || '').trim() || 'unknown';
+  const boardId = String(message?.boardId || 'default').trim() || 'default';
+  const tMs = Math.max(0, Date.now() - startedAtMs);
+
+  if (type === 'serial') {
+    const chunk = String(message?.data || '');
+    const source = String(message?.source || 'uart0');
+    const detail: Record<string, unknown> = {
+      source,
+      length: chunk.length,
+    };
+    if (Number.isFinite(Number(message?.value))) {
+      detail.value = Number(message.value);
+    }
+    if (options.includeSerialText) {
+      detail.data = chunk.length > options.maxSerialChars
+        ? `${chunk.slice(0, options.maxSerialChars)}...`
+        : chunk;
+    }
+    return { tMs, boardId, type, detail };
+  }
+
+  if (type === 'state') {
+    const components = Array.isArray(message?.components)
+      ? (message.components as Array<Record<string, unknown>>)
+          .map((component) => {
+            const id = String(component?.id || '').trim();
+            if (!id) return null;
+            if (options.componentFilter && id !== options.componentFilter) return null;
+
+            const state =
+              component?.state && typeof component.state === 'object' && !Array.isArray(component.state)
+                ? (component.state as Record<string, unknown>)
+                : {};
+
+            const entry: Record<string, unknown> = {
+              id,
+              stateKeys: Object.keys(state).sort((a, b) => a.localeCompare(b)),
+            };
+
+            const telemetrySummary = String(component?.telemetrySummary || '').trim();
+            if (telemetrySummary) {
+              entry.telemetrySummary = telemetrySummary;
+            }
+
+            if (options.includeState) {
+              entry.state = compactTraceValue(state);
+              if (component?.telemetryData && typeof component.telemetryData === 'object') {
+                entry.telemetryData = compactTraceValue(component.telemetryData);
+              }
+            }
+
+            return entry;
+          })
+          .filter((entry): entry is Record<string, unknown> => !!entry)
+      : [];
+
+    const detail: Record<string, unknown> = {};
+
+    if (message?.pins && typeof message.pins === 'object') {
+      const pinKeys = Object.keys(message.pins as Record<string, unknown>).sort((a, b) => a.localeCompare(b));
+      if (pinKeys.length > 0) {
+        detail.pinKeys = pinKeys;
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(message || {}, 'analog')) {
+      const analog = (message as Record<string, unknown>).analog;
+      detail.analog = options.includeState
+        ? compactTraceValue(analog)
+        : Array.isArray(analog)
+          ? { kind: 'array', length: analog.length }
+          : typeof analog;
+    }
+
+    if (components.length > 0) {
+      detail.components = components;
+    }
+
+    if (Object.keys(detail).length === 0) {
+      return null;
+    }
+
+    return {
+      tMs,
+      boardId,
+      type,
+      detail,
+    };
+  }
+
+  if (type === 'fault') {
+    return {
+      tMs,
+      boardId,
+      type,
+      detail: {
+        reason: String(message?.reason || 'runtime fault'),
+        pc: message?.pc ?? null,
+      },
+    };
+  }
+
+  if (type === 'debug') {
+    const detail: Record<string, unknown> = {
+      category: String(message?.category || ''),
+      reason: String(message?.reason || ''),
+    };
+    if (message?.metrics && typeof message.metrics === 'object') {
+      detail.metrics = compactTraceValue(message.metrics);
+    }
+    if (message?.gdb && typeof message.gdb === 'object') {
+      detail.gdb = compactTraceValue(message.gdb);
+    }
+    if (message?.wireless && typeof message.wireless === 'object') {
+      detail.wireless = compactTraceValue(message.wireless);
+    }
+    return { tMs, boardId, type, detail };
+  }
+
+  const detail: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(message || {})) {
+    if (key === 'type' || key === 'boardId') continue;
+    detail[key] = compactTraceValue(value);
+  }
+
+  if (Object.keys(detail).length === 0) {
+    return null;
+  }
+
+  return { tMs, boardId, type, detail };
 }
 
 function pickDebugMode(input: string | undefined): SimulationRunOptions['debugMode'] {
@@ -417,6 +640,129 @@ export function registerSimCommands(program: Command, getBackendUrl: () => strin
     });
 
   sim
+    .command('trace <projectFile>')
+    .description('Capture a bounded runtime trace timeline (serial/state/fault/debug events)')
+    .option('--board-id <id>', 'Board component id to run')
+    .option('--all-boards', 'Run all boards in project')
+    .option('--duration-ms <ms>', 'Trace capture duration in milliseconds', '2000')
+    .option('--debug <mode>', 'Debug mode: off|text|json', 'off')
+    .option('--baud <baud>', 'Serial baud override')
+    .option('--component-id <id>', 'Filter state events to one component id')
+    .option('--event-types <csv>', 'Comma-separated event types filter (e.g. state,serial,fault,debug)')
+    .option('--max-events <n>', 'Maximum trace events to keep in memory', '300')
+    .option('--include-state', 'Include compact component state payloads for state events')
+    .option('--include-serial-text', 'Include serial chunk text in serial events')
+    .option('--max-serial-chars <n>', 'Max serial chars kept per serial event when --include-serial-text', '120')
+    .option('--output <file>', 'Write trace payload JSON to file')
+    .option('--fail-on-fault', 'Exit non-zero when runtime faults are observed')
+    .action(async (projectFile: string, options: any) => {
+      const project = await loadProject(projectFile);
+      const boardSummary = summarizeProject(project).boards as Array<{ id: string; type: string }>;
+      const selectedBoard = options.boardId
+        ? boardSummary.find((b) => b.id === options.boardId)
+        : boardSummary.length === 1
+          ? boardSummary[0]
+          : undefined;
+
+      const durationMs = Math.max(1, parsePositiveInt(options.durationMs, 2000));
+      const maxEvents = Math.max(1, parsePositiveInt(options.maxEvents, 300));
+      const maxSerialChars = Math.max(16, parsePositiveInt(options.maxSerialChars, 120));
+      const componentFilter = String(options.componentId || '').trim() || null;
+      const typeFilterList = parseCsvList(options.eventTypes);
+      const typeFilter = typeFilterList.length > 0 ? new Set(typeFilterList) : null;
+
+      const runOptions: SimulationRunOptions = {
+        backendUrl: getBackendUrl(),
+        boardId: options.boardId,
+        allBoards: !!options.allBoards,
+        durationMs,
+        debugMode: pickDebugMode(options.debug),
+        telemetryMode: 'off',
+        baudRate: resolveDefaultBaud(selectedBoard?.type || project.board, options.baud),
+      };
+
+      const traceOptions: TraceCaptureOptions = {
+        includeState: !!options.includeState,
+        includeSerialText: !!options.includeSerialText,
+        maxSerialChars,
+        componentFilter,
+      };
+
+      const startedAtMs = Date.now();
+      const trace: TraceRecord[] = [];
+      let droppedEvents = 0;
+
+      const controller = await startSimulation(project, runOptions, {
+        suppressConsoleOutput: true,
+        onEvent: (event) => {
+          const record = buildTraceRecord(event, startedAtMs, traceOptions);
+          if (!record) return;
+
+          if (typeFilter && !typeFilter.has(record.type.toLowerCase())) {
+            return;
+          }
+
+          if (trace.length >= maxEvents) {
+            droppedEvents += 1;
+            return;
+          }
+
+          trace.push(record);
+        },
+      });
+
+      await sleep(durationMs);
+      controller.stop();
+
+      const result = controller.getResult();
+      const telemetry = controller.getTelemetryReport();
+      const eventTypeCounts: Record<string, number> = {};
+      for (const record of trace) {
+        eventTypeCounts[record.type] = Number(eventTypeCounts[record.type] || 0) + 1;
+      }
+
+      const payload = {
+        ok: true,
+        action: 'sim.trace',
+        file: relToCwd(resolveWorkspacePath(projectFile)),
+        options: {
+          boardId: runOptions.boardId || null,
+          allBoards: !!runOptions.allBoards,
+          durationMs,
+          debugMode: runOptions.debugMode,
+          baudRate: runOptions.baudRate,
+          componentFilter,
+          eventTypes: typeFilterList,
+          includeState: traceOptions.includeState,
+          includeSerialText: traceOptions.includeSerialText,
+          maxEvents,
+        },
+        summary: {
+          capturedEvents: trace.length,
+          droppedEvents,
+          eventTypeCounts,
+          faults: telemetry.faults,
+          serialChars: telemetry.serialChars,
+        },
+        result,
+        trace,
+      };
+
+      if (options.output) {
+        await writeOutputFile(options.output, `${JSON.stringify(payload, null, 2)}\n`);
+      }
+
+      printJson({
+        ...payload,
+        output: options.output ? relToCwd(resolveWorkspacePath(options.output)) : null,
+      });
+
+      if (options.failOnFault && Number(telemetry.faults || 0) > 0) {
+        process.exitCode = 1;
+      }
+    });
+
+  sim
     .command('interact <projectFile>')
     .description('Send component input event during simulation (e.g. sliders, button press/release, attrs)')
     .requiredOption('--component-id <id>', 'Target component id')
@@ -492,6 +838,207 @@ export function registerSimCommands(program: Command, getBackendUrl: () => strin
       });
 
       if (!delivered) {
+        process.exitCode = 1;
+      }
+    });
+
+  sim
+    .command('inspect <projectFile>')
+    .description('Inspect runtime board/component state and telemetry with optional event probing')
+    .option('--board-id <id>', 'Board component id to run')
+    .option('--all-boards', 'Run all boards in project')
+    .option('--duration-ms <ms>', 'Run duration before collecting inspection snapshot', '1800')
+    .option('--debug <mode>', 'Debug mode: off|text|json', 'off')
+    .option('--baud <baud>', 'Serial baud override')
+    .option('--component-id <id>', 'Inspect one component id in detail')
+    .option('--verbose', 'Include full component telemetry list when inspecting whole project')
+    .option('--event-component-id <id>', 'Target component id for injected event (defaults to --component-id)')
+    .option('--at-ms <ms>', 'When to inject event after simulation starts', '200')
+    .option('--event <name>', 'Event name (e.g. input, SET_ATTR, press, release)')
+    .option('--value <value>', 'Event value (number/string/json)')
+    .option('--key <key>', 'Event key for SET_ATTR-style payloads')
+    .option('--event-json <json>', 'Full event JSON payload')
+    .option('--event-file <file>', 'Path to JSON event payload file')
+    .option('--output <file>', 'Write inspection report JSON to file')
+    .option('--fail-on-warn', 'Exit non-zero when inspected status is warn/error')
+    .option('--fail-on-fault', 'Exit non-zero when runtime faults are observed')
+    .action(async (projectFile: string, options: any) => {
+      const project = await loadProject(projectFile);
+      const boardSummary = summarizeProject(project).boards as Array<{ id: string; type: string }>;
+      const selectedBoard = options.boardId
+        ? boardSummary.find((b) => b.id === options.boardId)
+        : boardSummary.length === 1
+          ? boardSummary[0]
+          : undefined;
+
+      const componentId = String(options.componentId || '').trim();
+      const durationMs = Math.max(1, parsePositiveInt(options.durationMs, 1800));
+
+      const runOptions: SimulationRunOptions = {
+        backendUrl: getBackendUrl(),
+        boardId: options.boardId,
+        allBoards: !!options.allBoards,
+        durationMs,
+        debugMode: pickDebugMode(options.debug),
+        telemetryMode: 'off',
+        baudRate: resolveDefaultBaud(selectedBoard?.type || project.board, options.baud),
+      };
+
+      const shouldInjectEvent = hasInspectEventInput({
+        eventJson: options.eventJson,
+        eventFile: options.eventFile,
+        event: options.event,
+        value: options.value,
+      });
+
+      let eventPayload: any = null;
+      let eventTargetComponentId = '';
+      let delivered = false;
+      let eventDelayMs = 0;
+
+      if (shouldInjectEvent) {
+        eventPayload = await resolveEventInput({
+          eventJson: options.eventJson,
+          eventFile: options.eventFile,
+          event: options.event,
+          value: options.value,
+          key: options.key,
+        });
+
+        eventTargetComponentId = String(options.eventComponentId || componentId || '').trim();
+        if (!eventTargetComponentId) {
+          throw new Error('When providing inspect event payload, set --event-component-id or --component-id.');
+        }
+      }
+
+      const controller = await startSimulation(project, runOptions, {
+        suppressConsoleOutput: true,
+      });
+
+      if (eventPayload !== null) {
+        eventDelayMs = Math.min(durationMs, parseNonNegative(options.atMs, 200));
+        if (eventDelayMs > 0) {
+          await sleep(eventDelayMs);
+        }
+        delivered = controller.sendComponentEvent(eventTargetComponentId, eventPayload);
+      }
+
+      const remainingMs = Math.max(0, durationMs - eventDelayMs);
+      if (remainingMs > 0) {
+        await sleep(remainingMs);
+      }
+
+      controller.stop();
+
+      const result = controller.getResult();
+      const telemetry = controller.getTelemetryReport();
+      const snapshot = controller.getSnapshot();
+
+      const boardInspection = telemetry.boards.map((board) => ({
+        ...board,
+        pinKeys: Object.keys(snapshot.pinsByBoard[board.id] || {}).sort((a, b) => a.localeCompare(b)),
+      }));
+
+      const componentDefinition = componentId
+        ? project.components.find((component) => component.id === componentId) || null
+        : null;
+      const componentTelemetry = componentId
+        ? telemetry.components.find((component) => component.id === componentId) || null
+        : null;
+      const componentSnapshot = componentId
+        ? snapshot.components.find((component) => component.id === componentId) || null
+        : null;
+
+      const componentFound = !componentId
+        || !!componentDefinition
+        || !!componentTelemetry
+        || !!componentSnapshot;
+
+      const componentOverview = componentId
+        ? {
+            id: componentId,
+            existsInProject: !!componentDefinition,
+            definition: componentDefinition,
+            telemetry: componentTelemetry,
+            snapshotState: componentSnapshot?.state || null,
+            snapshotBounds: componentSnapshot
+              ? {
+                  x: componentSnapshot.x,
+                  y: componentSnapshot.y,
+                  w: componentSnapshot.w,
+                  h: componentSnapshot.h,
+                }
+              : null,
+          }
+        : null;
+
+      const projectComponentView = componentId
+        ? null
+        : options.verbose
+          ? telemetry.components
+          : telemetry.components.map((component) => ({
+              id: component.id,
+              type: component.type,
+              role: component.role,
+              status: component.status,
+              updates: component.updates,
+              changedKeys: component.changedKeys,
+              outputSummary: component.outputSummary,
+              notes: component.notes,
+            }));
+
+      const payload = {
+        ok: componentFound && (eventPayload === null || delivered),
+        action: 'sim.inspect',
+        file: relToCwd(resolveWorkspacePath(projectFile)),
+        options: {
+          boardId: runOptions.boardId || null,
+          allBoards: !!runOptions.allBoards,
+          durationMs,
+          debugMode: runOptions.debugMode,
+          baudRate: runOptions.baudRate,
+          componentId: componentId || null,
+          verbose: !!options.verbose,
+        },
+        result,
+        boards: boardInspection,
+        component: componentOverview,
+        components: projectComponentView,
+        eventProbe:
+          eventPayload !== null
+            ? {
+                targetComponentId: eventTargetComponentId,
+                event: eventPayload,
+                atMs: eventDelayMs,
+                delivered,
+              }
+            : null,
+      };
+
+      if (options.output) {
+        await writeOutputFile(options.output, `${JSON.stringify(payload, null, 2)}\n`);
+      }
+
+      printJson({
+        ...payload,
+        output: options.output ? relToCwd(resolveWorkspacePath(options.output)) : null,
+      });
+
+      if (options.failOnFault && Number(telemetry.faults || 0) > 0) {
+        process.exitCode = 1;
+      }
+
+      if (options.failOnWarn) {
+        if (componentTelemetry) {
+          if (componentTelemetry.status !== 'ok') {
+            process.exitCode = 1;
+          }
+        } else if (telemetry.components.some((component) => component.status !== 'ok')) {
+          process.exitCode = 1;
+        }
+      }
+
+      if (!componentFound || (eventPayload !== null && !delivered)) {
         process.exitCode = 1;
       }
     });

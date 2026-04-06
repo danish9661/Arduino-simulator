@@ -15,6 +15,9 @@ interface ComponentMeta {
   group: string;
   role: 'board' | 'input' | 'output' | 'other';
   hasOnEvent: boolean;
+  attrs: Record<string, unknown>;
+  telemetryTemplate?: string;
+  telemetryCriticalKeys: string[];
   x: number;
   y: number;
   w: number;
@@ -120,6 +123,74 @@ function compactStateForReport(state: Record<string, unknown>): Record<string, u
   return out;
 }
 
+function mergeStatus(
+  current: 'ok' | 'warn' | 'error',
+  next: 'ok' | 'warn' | 'error'
+): 'ok' | 'warn' | 'error' {
+  if (current === 'error' || next === 'error') return 'error';
+  if (current === 'warn' || next === 'warn') return 'warn';
+  return 'ok';
+}
+
+function formatTemplateValue(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) return String(value.length);
+  if (typeof value === 'object') {
+    const asRecord = value as Record<string, unknown>;
+    if (asRecord.kind === 'array' || asRecord.kind === 'typed-array') {
+      return String(asRecord.length || 0);
+    }
+  }
+  return JSON.stringify(value);
+}
+
+function getPathValue(source: Record<string, unknown>, pathLike: string): unknown {
+  const path = String(pathLike || '').trim();
+  if (!path) return undefined;
+
+  const parts = path.split('.').map((part) => part.trim()).filter(Boolean);
+  let current: unknown = source;
+
+  for (const part of parts) {
+    if (!current || typeof current !== 'object') {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[part];
+  }
+
+  return current;
+}
+
+function renderTelemetryTemplate(
+  template: string,
+  ctx: { state: Record<string, unknown>; attr: Record<string, unknown> }
+): string {
+  return String(template || '').replace(/\$\{([^}]+)\}/g, (_m: string, expr: string) => {
+    const key = String(expr || '').trim();
+    if (!key) return '';
+
+    if (key.startsWith('state.')) {
+      return formatTemplateValue(getPathValue(ctx.state, key.slice('state.'.length)));
+    }
+
+    if (key.startsWith('attr.')) {
+      return formatTemplateValue(getPathValue(ctx.attr, key.slice('attr.'.length)));
+    }
+
+    if (key === 'state') {
+      return formatTemplateValue(ctx.state);
+    }
+
+    if (key === 'attr') {
+      return formatTemplateValue(ctx.attr);
+    }
+
+    return formatTemplateValue(getPathValue(ctx.state, key));
+  });
+}
+
 function summarizeOutputState(type: string, state: Record<string, unknown>, updates: number): string {
   const t = String(type || '').toLowerCase();
 
@@ -177,6 +248,8 @@ export class SimulationTelemetryCollector {
   private readonly componentStates = new Map<string, Record<string, unknown>>();
   private readonly componentUpdates = new Map<string, number>();
   private readonly componentChangedKeys = new Map<string, Set<string>>();
+  private readonly componentTelemetrySummary = new Map<string, string>();
+  private readonly componentTelemetryData = new Map<string, Record<string, unknown>>();
 
   private totalFaults = 0;
   private totalSerialChars = 0;
@@ -200,6 +273,14 @@ export class SimulationTelemetryCollector {
         group,
         role: classifyRole(component.type, group),
         hasOnEvent: !!info?.hasOnEvent,
+        attrs:
+          component.attrs && typeof component.attrs === 'object' && !Array.isArray(component.attrs)
+            ? (component.attrs as Record<string, unknown>)
+            : {},
+        telemetryTemplate: typeof info?.telemetry?.template === 'string' ? info.telemetry.template : undefined,
+        telemetryCriticalKeys: Array.isArray(info?.telemetry?.criticalKeys)
+          ? info!.telemetry!.criticalKeys
+          : [],
         x: Number.isFinite(Number(component.x)) ? Number(component.x) : 0,
         y: Number.isFinite(Number(component.y)) ? Number(component.y) : 0,
         w: Number.isFinite(Number(component.w)) ? Number(component.w) : 80,
@@ -248,7 +329,12 @@ export class SimulationTelemetryCollector {
       return;
     }
 
-    for (const comp of message.components as Array<{ id?: string; state?: unknown }>) {
+    for (const comp of message.components as Array<{
+      id?: string;
+      state?: unknown;
+      telemetrySummary?: unknown;
+      telemetryData?: unknown;
+    }>) {
       const compId = String(comp?.id || '');
       if (!compId) continue;
 
@@ -265,6 +351,14 @@ export class SimulationTelemetryCollector {
       const keySet = this.componentChangedKeys.get(compId)!;
       for (const key of changed) {
         keySet.add(key);
+      }
+
+      if (typeof comp.telemetrySummary === 'string' && comp.telemetrySummary.trim()) {
+        this.componentTelemetrySummary.set(compId, comp.telemetrySummary.trim());
+      }
+
+      if (comp.telemetryData && typeof comp.telemetryData === 'object' && !Array.isArray(comp.telemetryData)) {
+        this.componentTelemetryData.set(compId, normalizeState(comp.telemetryData));
       }
     }
   }
@@ -314,6 +408,8 @@ export class SimulationTelemetryCollector {
         a.localeCompare(b)
       );
       const state = compactStateForReport(this.componentStates.get(componentId) || {});
+      const telemetryData = compactStateForReport(this.componentTelemetryData.get(componentId) || {});
+      const decentralizedSummary = String(this.componentTelemetrySummary.get(componentId) || '').trim();
       const notes: string[] = [];
 
       let status: 'ok' | 'warn' | 'error' = 'ok';
@@ -322,6 +418,41 @@ export class SimulationTelemetryCollector {
       if (asRecord.burnedOut === true || asRecord.error === true || asRecord.fault === true) {
         status = 'error';
         notes.push('Component reported error/fault state.');
+      }
+
+      const heuristics = (telemetryData._heuristics && typeof telemetryData._heuristics === 'object')
+        ? (telemetryData._heuristics as Record<string, unknown>)
+        : null;
+      const heuristicStatus = String(heuristics?.status || '').toLowerCase();
+      if (heuristicStatus === 'error' || heuristicStatus === 'warn') {
+        status = mergeStatus(status, heuristicStatus as 'warn' | 'error');
+      }
+
+      if (Array.isArray(heuristics?.findings) && (heuristics?.findings as unknown[]).length > 0) {
+        for (const finding of heuristics!.findings as unknown[]) {
+          const text = String(finding || '').trim();
+          if (text) notes.push(text);
+        }
+      }
+
+      const criticalKeys = Array.isArray(meta.telemetryCriticalKeys) ? meta.telemetryCriticalKeys : [];
+      for (const key of criticalKeys) {
+        const lookup = String(key || '').trim();
+        if (!lookup) continue;
+
+        let value: unknown;
+        if (lookup.startsWith('state.')) {
+          value = getPathValue(state, lookup.slice('state.'.length));
+        } else if (lookup.startsWith('attr.')) {
+          value = getPathValue(meta.attrs, lookup.slice('attr.'.length));
+        } else {
+          value = getPathValue(state, lookup);
+        }
+
+        if (value === undefined) {
+          status = mergeStatus(status, 'warn');
+          notes.push(`Critical telemetry key missing: ${lookup}`);
+        }
       }
 
       if (meta.role === 'board') {
@@ -344,6 +475,15 @@ export class SimulationTelemetryCollector {
         }
       }
 
+      const templatedSummary = meta.telemetryTemplate
+        ? renderTelemetryTemplate(meta.telemetryTemplate, { state, attr: meta.attrs })
+        : '';
+      const outputSummary = decentralizedSummary || templatedSummary || summarizeOutputState(meta.type, state, updates);
+
+      const universalMetrics = telemetryData._metrics && typeof telemetryData._metrics === 'object'
+        ? (telemetryData._metrics as Record<string, unknown>)
+        : undefined;
+
       components.push({
         id: componentId,
         type: meta.type,
@@ -353,7 +493,10 @@ export class SimulationTelemetryCollector {
         status,
         updates,
         changedKeys,
-        outputSummary: summarizeOutputState(meta.type, state, updates),
+        outputSummary,
+        telemetrySummary: outputSummary,
+        telemetryData,
+        universalMetrics,
         notes,
         lastState: state,
       });

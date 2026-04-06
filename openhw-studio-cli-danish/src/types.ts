@@ -91,6 +91,9 @@ export interface SimulationComponentTelemetry {
   updates: number;
   changedKeys: string[];
   outputSummary: string;
+  telemetrySummary?: string;
+  telemetryData?: Record<string, unknown>;
+  universalMetrics?: Record<string, unknown>;
   notes: string[];
   lastState: Record<string, unknown>;
 }

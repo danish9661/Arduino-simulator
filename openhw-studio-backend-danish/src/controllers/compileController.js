@@ -22,9 +22,22 @@ const DEFAULT_PICO_MICROPYTHON_UF2_SOURCE = String(
     || process.env.PICO_MICROPYTHON_UF2_URL
     || ''
 ).trim();
+const DEFAULT_PICO_MICROPYTHON_HEX_SOURCE = String(
+    process.env.PICO_MICROPYTHON_HEX_PATH
+    || process.env.PICO_MICROPYTHON_HEX_SOURCE
+    || './data/firmware/rp2040-micropython-uart.hex'
+).trim();
+const DEFAULT_PICO_CIRCUITPYTHON_UF2_SOURCE = String(
+    process.env.PICO_CIRCUITPYTHON_UF2_PATH
+    || process.env.PICO_CIRCUITPYTHON_UF2_URL
+    || './data/firmware/adafruit-circuitpython-raspberry_pi_pico-en_US-8.2.7.uf2'
+).trim();
 const PICO_MICROPYTHON_CACHE_TTL_MS = Number(process.env.PICO_MICROPYTHON_CACHE_TTL_MS || (1000 * 60 * 60 * 6));
+const PICO_CIRCUITPYTHON_CACHE_TTL_MS = Number(process.env.PICO_CIRCUITPYTHON_CACHE_TTL_MS || (1000 * 60 * 60 * 6));
 
 let picoMicropythonUf2Cache = null;
+let picoMicropythonHexCache = null;
+let picoCircuitPythonUf2Cache = null;
 const compileResultCache = new Map();
 
 function stableSourceFiles(files) {
@@ -195,6 +208,38 @@ function resolvePicoMicropythonUf2Source() {
     const lower = source.toLowerCase();
     if (lower.includes('micropython.org/resources/firmware/rpi_pico')) {
         throw new Error('Configured UF2 source points to official micropython.org firmware (USB CDC REPL). Use a UART0-enabled Pico MicroPython UF2 build.');
+    }
+
+    if (/^https?:\/\//i.test(source)) {
+        return { kind: 'url', value: source };
+    }
+
+    const filePath = path.isAbsolute(source)
+        ? source
+        : path.resolve(__dirname, '../../', source);
+    return { kind: 'file', value: filePath };
+}
+
+function resolvePicoMicropythonHexSource() {
+    const source = DEFAULT_PICO_MICROPYTHON_HEX_SOURCE;
+    if (!source) {
+        throw new Error('Missing PICO_MICROPYTHON_HEX_PATH (or PICO_MICROPYTHON_HEX_SOURCE) for Pico MicroPython HEX source.');
+    }
+
+    if (/^https?:\/\//i.test(source)) {
+        return { kind: 'url', value: source };
+    }
+
+    const filePath = path.isAbsolute(source)
+        ? source
+        : path.resolve(__dirname, '../../', source);
+    return { kind: 'file', value: filePath };
+}
+
+function resolvePicoCircuitPythonUf2Source() {
+    const source = DEFAULT_PICO_CIRCUITPYTHON_UF2_SOURCE;
+    if (!source) {
+        throw new Error('Missing PICO_CIRCUITPYTHON_UF2_PATH (or PICO_CIRCUITPYTHON_UF2_URL) for Pico CircuitPython UF2 source.');
     }
 
     if (/^https?:\/\//i.test(source)) {
@@ -711,6 +756,113 @@ async function fetchPicoMicropythonUf2Asset() {
     }
 }
 
+async function fetchPicoMicropythonHexAsset() {
+    const sourceInfo = resolvePicoMicropythonHexSource();
+    const now = Date.now();
+    const isFresh = picoMicropythonHexCache
+        && (now - picoMicropythonHexCache.fetchedAt) < PICO_MICROPYTHON_CACHE_TTL_MS;
+
+    if (isFresh) {
+        return { ...picoMicropythonHexCache, cacheState: 'hit' };
+    }
+
+    try {
+        if (sourceInfo.kind === 'url') {
+            const upstream = await fetch(sourceInfo.value, {
+                headers: {
+                    'user-agent': 'OpenHW-Studio-Backend/1.0',
+                },
+            });
+
+            if (!upstream.ok) {
+                throw new Error(`Upstream HEX fetch failed (${upstream.status})`);
+            }
+
+            const text = await upstream.text();
+            const parsed = new URL(sourceInfo.value);
+            const fileName = path.basename(parsed.pathname || '') || 'rp2040-micropython-uart.hex';
+
+            picoMicropythonHexCache = {
+                buffer: Buffer.from(String(text || ''), 'utf8'),
+                fileName,
+                fetchedAt: now,
+                contentType: upstream.headers.get('content-type') || 'text/plain; charset=utf-8',
+            };
+        } else {
+            const buffer = fs.readFileSync(sourceInfo.value);
+            const fileName = path.basename(sourceInfo.value) || 'rp2040-micropython-uart.hex';
+
+            picoMicropythonHexCache = {
+                buffer,
+                fileName,
+                fetchedAt: now,
+                contentType: 'text/plain; charset=utf-8',
+            };
+        }
+
+        return { ...picoMicropythonHexCache, cacheState: 'miss' };
+    } catch (err) {
+        if (picoMicropythonHexCache) {
+            return { ...picoMicropythonHexCache, cacheState: 'stale' };
+        }
+        throw err;
+    }
+}
+
+async function fetchPicoCircuitPythonUf2Asset() {
+    const sourceInfo = resolvePicoCircuitPythonUf2Source();
+    const now = Date.now();
+    const isFresh = picoCircuitPythonUf2Cache
+        && (now - picoCircuitPythonUf2Cache.fetchedAt) < PICO_CIRCUITPYTHON_CACHE_TTL_MS;
+
+    if (isFresh) {
+        return { ...picoCircuitPythonUf2Cache, cacheState: 'hit' };
+    }
+
+    try {
+        if (sourceInfo.kind === 'url') {
+            const upstream = await fetch(sourceInfo.value, {
+                headers: {
+                    'user-agent': 'OpenHW-Studio-Backend/1.0',
+                },
+            });
+
+            if (!upstream.ok) {
+                throw new Error(`Upstream CircuitPython UF2 fetch failed (${upstream.status})`);
+            }
+
+            const arrBuf = await upstream.arrayBuffer();
+            const buffer = Buffer.from(arrBuf);
+            const parsed = new URL(sourceInfo.value);
+            const fileName = path.basename(parsed.pathname || '') || 'adafruit-circuitpython-raspberry_pi_pico-en_US-8.2.7.uf2';
+
+            picoCircuitPythonUf2Cache = {
+                buffer,
+                fileName,
+                fetchedAt: now,
+                contentType: upstream.headers.get('content-type') || 'application/octet-stream',
+            };
+        } else {
+            const buffer = fs.readFileSync(sourceInfo.value);
+            const fileName = path.basename(sourceInfo.value) || 'adafruit-circuitpython-raspberry_pi_pico-en_US-8.2.7.uf2';
+
+            picoCircuitPythonUf2Cache = {
+                buffer,
+                fileName,
+                fetchedAt: now,
+                contentType: 'application/octet-stream',
+            };
+        }
+
+        return { ...picoCircuitPythonUf2Cache, cacheState: 'miss' };
+    } catch (err) {
+        if (picoCircuitPythonUf2Cache) {
+            return { ...picoCircuitPythonUf2Cache, cacheState: 'stale' };
+        }
+        throw err;
+    }
+}
+
 export const compileArduinoCode = (req, res) => {
     const { code, files, sketchName, fqbn, builder } = req.body || {};
 
@@ -1164,6 +1316,42 @@ export const getDefaultPicoMicroPythonUf2 = async (req, res) => {
     } catch (err) {
         return res.status(502).json({
             error: 'Failed to fetch default Pico MicroPython UF2',
+            details: err?.message || 'Unknown error',
+        });
+    }
+};
+
+export const getDefaultPicoMicroPythonHex = async (req, res) => {
+    try {
+        const asset = await fetchPicoMicropythonHexAsset();
+
+        res.setHeader('Content-Type', asset.contentType || 'text/plain; charset=utf-8');
+        res.setHeader('Content-Disposition', `inline; filename="${asset.fileName || 'rp2040-micropython-uart.hex'}"`);
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.setHeader('X-OpenHW-HEX-Cache', asset.cacheState || 'unknown');
+
+        return res.status(200).send(asset.buffer);
+    } catch (err) {
+        return res.status(502).json({
+            error: 'Failed to fetch default Pico MicroPython HEX',
+            details: err?.message || 'Unknown error',
+        });
+    }
+};
+
+export const getDefaultPicoCircuitPythonUf2 = async (req, res) => {
+    try {
+        const asset = await fetchPicoCircuitPythonUf2Asset();
+
+        res.setHeader('Content-Type', asset.contentType || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `inline; filename="${asset.fileName || 'adafruit-circuitpython-raspberry_pi_pico-en_US-8.2.7.uf2'}"`);
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.setHeader('X-OpenHW-UF2-Cache', asset.cacheState || 'unknown');
+
+        return res.status(200).send(asset.buffer);
+    } catch (err) {
+        return res.status(502).json({
+            error: 'Failed to fetch default Pico CircuitPython UF2',
             details: err?.message || 'Unknown error',
         });
     }

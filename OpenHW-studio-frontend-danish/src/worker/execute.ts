@@ -9,7 +9,7 @@ import { PicoLogic } from './pico-logic.ts';
 import { ResistorLogic } from '@openhw/emulator/src/components/wokwi-resistor/logic.ts';
 import { PushbuttonLogic } from '@openhw/emulator/src/components/wokwi-pushbutton/logic.ts';
 import { PowerSupplyLogic } from '@openhw/emulator/src/components/wokwi-power-supply/logic.ts';
-import { NeopixelLogic } from './neopixel-logic.ts';
+import { NeopixelLogic } from '../components/wokwi-neopixel-matrix/logic.ts';
 import { BuzzerLogic } from '@openhw/emulator/src/components/wokwi-buzzer/logic.ts';
 import { MotorLogic } from '@openhw/emulator/src/components/wokwi-motor/logic.ts';
 import { ServoLogic } from '@openhw/emulator/src/components/wokwi-servo/logic.ts';
@@ -60,6 +60,7 @@ type LittleFsVolume = {
     unmount: () => number;
     format: () => number;
     formatAndMount: () => number;
+    mkdir: (path: string) => boolean;
     writeFile: (path: string, data: Uint8Array) => boolean;
     destroy: () => void;
 };
@@ -80,6 +81,62 @@ async function tryLoadLittleFsFactory(): Promise<((options?: any) => Promise<any
     } catch {
         return null;
     }
+}
+
+function isNodeRuntime(): boolean {
+    return typeof process !== 'undefined' && !!(process as any)?.versions?.node;
+}
+
+async function dynamicImportModule(specifier: string): Promise<any> {
+    const importer = new Function('s', 'return import(s);') as (s: string) => Promise<any>;
+    return importer(specifier);
+}
+
+async function readLittleFsWasmBinaryForNode(): Promise<Uint8Array | null> {
+    if (!isNodeRuntime()) return null;
+
+    let readFile: ((pathLike: any) => Promise<any>) | null = null;
+    try {
+        const fsPromises = await dynamicImportModule('node:fs/promises');
+        readFile = typeof fsPromises?.readFile === 'function' ? fsPromises.readFile.bind(fsPromises) : null;
+    } catch {
+        return null;
+    }
+    if (!readFile) return null;
+
+    const candidates = [
+        new URL('../../node_modules/littlefs/dist/littlefs.wasm', import.meta.url),
+        new URL('../node_modules/littlefs/dist/littlefs.wasm', import.meta.url),
+        new URL('./node_modules/littlefs/dist/littlefs.wasm', import.meta.url),
+    ];
+
+    const seen = new Set<string>();
+    for (const candidate of candidates) {
+        const key = String((candidate as any)?.href || candidate);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+
+        try {
+            const buf = await readFile(candidate);
+            if (!buf) continue;
+            if (buf instanceof Uint8Array) {
+                return buf.length > 0 ? buf : null;
+            }
+            if (buf instanceof ArrayBuffer) {
+                const out = new Uint8Array(buf);
+                return out.length > 0 ? out : null;
+            }
+            if (ArrayBuffer.isView(buf)) {
+                const view = buf as ArrayBufferView;
+                const out = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+                return out.length > 0 ? out : null;
+            }
+        } catch {
+            // try next candidate
+        }
+    }
+
+    return null;
 }
 
 function createLittleFsVolume(
@@ -151,14 +208,30 @@ function createLittleFsVolume(
     };
 
     const writeFile = (path: string, data: Uint8Array) => {
-        if (typeof cwrapWrite !== 'function' || typeof littlefs._malloc !== 'function' || typeof littlefs._free !== 'function') {
+        if (typeof cwrapWrite !== 'function') {
+            return false;
+        }
+
+        const hasMalloc = typeof littlefs._malloc === 'function' && typeof littlefs._free === 'function';
+        const hasStack = typeof littlefs.stackAlloc === 'function'
+            && typeof littlefs.stackSave === 'function'
+            && typeof littlefs.stackRestore === 'function';
+        if (!hasMalloc && !hasStack) {
             return false;
         }
 
         let ptr = 0;
+        let stackTop: number | null = null;
+        let usedStack = false;
         try {
             const size = data.length;
-            ptr = Number(littlefs._malloc(Math.max(size, 1)));
+            if (hasMalloc) {
+                ptr = Number(littlefs._malloc(Math.max(size, 1)));
+            } else {
+                stackTop = Number(littlefs.stackSave());
+                ptr = Number(littlefs.stackAlloc(Math.max(size, 1)));
+                usedStack = true;
+            }
             if (!Number.isFinite(ptr) || ptr <= 0) return false;
             if (size > 0) {
                 littlefs.HEAPU8.set(data, ptr);
@@ -168,13 +241,34 @@ function createLittleFsVolume(
         } catch {
             return false;
         } finally {
-            if (ptr > 0) {
+            if (hasMalloc && ptr > 0) {
                 try {
                     littlefs._free(ptr);
                 } catch {
                     // ignore
                 }
             }
+            if (usedStack && stackTop !== null) {
+                try {
+                    littlefs.stackRestore(stackTop);
+                } catch {
+                    // ignore
+                }
+            }
+        }
+    };
+
+    const mkdir = (path: string) => {
+        if (typeof littlefs._lfs_mkdir !== 'function') {
+            return false;
+        }
+
+        try {
+            const rc = Number(littlefs._lfs_mkdir(lfs, path));
+            // littlefs returns -17 for EEXIST.
+            return rc === 0 || rc === -17;
+        } catch {
+            return false;
         }
     };
 
@@ -204,9 +298,364 @@ function createLittleFsVolume(
         unmount,
         format,
         formatAndMount,
+        mkdir,
         writeFile,
         destroy,
     };
+}
+
+function normalizeLittleFsPath(rawPath: unknown): string {
+    const cleaned = String(rawPath || '')
+        .replace(/\\/g, '/')
+        .trim();
+    if (!cleaned) return '';
+
+    const parts = cleaned
+        .split('/')
+        .map((part) => part.trim())
+        .filter((part) => part && part !== '.' && part !== '..');
+
+    return parts.join('/');
+}
+
+function collectLittleFsParentDirs(path: string): string[] {
+    const normalized = normalizeLittleFsPath(path);
+    if (!normalized || !normalized.includes('/')) return [];
+
+    const parts = normalized.split('/');
+    const dirs: string[] = [];
+    for (let i = 1; i < parts.length; i++) {
+        const dir = parts.slice(0, i).join('/');
+        if (dir) dirs.push(dir);
+    }
+    return dirs;
+}
+
+export async function buildLittleFsImage(
+    files: Array<{ path: string; data: unknown }>,
+    options: { sizeBytes?: number; blockSize?: number } = {}
+): Promise<Uint8Array | null> {
+    if (!Array.isArray(files) || files.length === 0) return null;
+
+    const blockSizeRaw = Number(options.blockSize);
+    const blockSize = Number.isFinite(blockSizeRaw) && blockSizeRaw >= 256
+        ? Math.floor(blockSizeRaw)
+        : 4096;
+
+    const sizeBytesRaw = Number(options.sizeBytes);
+    const requestedSize = Number.isFinite(sizeBytesRaw) && sizeBytesRaw > 0
+        ? Math.floor(sizeBytesRaw)
+        : (512 * 1024);
+    const alignedSize = Math.ceil(requestedSize / blockSize) * blockSize;
+    const blockCount = Math.max(1, Math.floor(alignedSize / blockSize));
+
+    const storage = new Uint8Array(blockCount * blockSize);
+    storage.fill(0xff);
+
+    const factory = await tryLoadLittleFsFactory();
+    if (!factory) return null;
+
+    let littlefs: any = null;
+    let volume: LittleFsVolume | null = null;
+
+    try {
+        const moduleOptions: any = {
+            print: () => {},
+            printErr: () => {},
+        };
+
+        if (isNodeRuntime()) {
+            const wasmBinary = await readLittleFsWasmBinaryForNode();
+            if (wasmBinary && wasmBinary.length > 0) {
+                moduleOptions.wasmBinary = wasmBinary;
+            }
+        }
+
+        littlefs = await factory(moduleOptions);
+
+        volume = createLittleFsVolume(littlefs, storage, blockSize, blockCount);
+        if (!volume) return null;
+
+        if (volume.formatAndMount() < 0) {
+            return null;
+        }
+
+        const createdDirs = new Set<string>();
+        const encoder = new TextEncoder();
+
+        for (const file of files) {
+            const path = normalizeLittleFsPath(file?.path);
+            if (!path) continue;
+
+            const parentDirs = collectLittleFsParentDirs(path);
+            for (const dir of parentDirs) {
+                if (createdDirs.has(dir)) continue;
+                if (!volume.mkdir(`/${dir}`) && !volume.mkdir(dir)) {
+                    return null;
+                }
+                createdDirs.add(dir);
+            }
+
+            const data = toUint8Array(file?.data, encoder);
+            if (!volume.writeFile(`/${path}`, data) && !volume.writeFile(path, data)) {
+                return null;
+            }
+        }
+
+        volume.unmount();
+        return storage.slice();
+    } catch {
+        return null;
+    } finally {
+        try {
+            volume?.destroy();
+        } catch {
+            // ignore
+        }
+        try {
+            if (littlefs && typeof littlefs.quit === 'function') {
+                littlefs.quit();
+            }
+        } catch {
+            // ignore
+        }
+    }
+}
+
+const FAT_BYTES_PER_SECTOR = 512;
+const FAT12_MEDIA_DESCRIPTOR = 0xF8;
+
+function sanitizeFatNameToken(value: string, maxLength: number): string {
+    const upper = String(value || '').trim().toUpperCase();
+    const cleaned = upper.replace(/[^A-Z0-9]/g, '_');
+    if (!cleaned) return ''.padEnd(maxLength, '_');
+    return cleaned.slice(0, maxLength);
+}
+
+function normalizeFatVolumeLabel(value: unknown): string {
+    const cleaned = sanitizeFatNameToken(String(value || 'CIRCUITPY').replace(/\./g, ''), 11);
+    return cleaned.padEnd(11, ' ');
+}
+
+function toFatShortFileName(pathLike: string): string {
+    const normalized = normalizeLittleFsPath(pathLike);
+    const baseName = (normalized.split('/').pop() || normalized || 'FILE.TXT').trim();
+    const dotIndex = baseName.lastIndexOf('.');
+    const stem = dotIndex > 0 ? baseName.slice(0, dotIndex) : baseName;
+    const ext = dotIndex > 0 ? baseName.slice(dotIndex + 1) : '';
+
+    const shortStem = sanitizeFatNameToken(stem, 8).padEnd(8, ' ');
+    const shortExt = sanitizeFatNameToken(ext, 3).padEnd(3, ' ');
+    return `${shortStem}${shortExt}`;
+}
+
+function setFat12Entry(fat: Uint8Array, cluster: number, value: number) {
+    const index = Math.floor(cluster * 3 / 2);
+    const safeValue = value & 0x0fff;
+
+    if ((cluster & 1) === 0) {
+        fat[index] = safeValue & 0xff;
+        fat[index + 1] = (fat[index + 1] & 0xf0) | ((safeValue >> 8) & 0x0f);
+    } else {
+        fat[index] = (fat[index] & 0x0f) | ((safeValue << 4) & 0xf0);
+        fat[index + 1] = (safeValue >> 4) & 0xff;
+    }
+}
+
+export function buildFatFsImage(
+    files: Array<{ path: string; data: unknown }>,
+    options: { sizeBytes?: number; volumeLabel?: string; sectorsPerCluster?: number } = {}
+): Uint8Array | null {
+    if (!Array.isArray(files) || files.length === 0) return null;
+
+    const sizeBytesRaw = Number(options.sizeBytes);
+    const requestedSize = Number.isFinite(sizeBytesRaw) && sizeBytesRaw > 0
+        ? Math.floor(sizeBytesRaw)
+        : (512 * 1024);
+    const alignedSize = Math.floor(requestedSize / FAT_BYTES_PER_SECTOR) * FAT_BYTES_PER_SECTOR;
+    if (alignedSize < (128 * 1024)) return null;
+
+    const bytesPerSector = FAT_BYTES_PER_SECTOR;
+    const totalSectors = Math.floor(alignedSize / bytesPerSector);
+    const reservedSectors = 1;
+    const numberOfFATs = 2;
+    const rootEntryCount = 512;
+    const rootDirSectors = Math.ceil((rootEntryCount * 32) / bytesPerSector);
+    const sectorsPerClusterRaw = Number(options.sectorsPerCluster);
+    const sectorsPerCluster = Number.isFinite(sectorsPerClusterRaw) && sectorsPerClusterRaw > 0
+        ? Math.max(1, Math.floor(sectorsPerClusterRaw))
+        : 1;
+    const clusterSizeBytes = sectorsPerCluster * bytesPerSector;
+
+    let sectorsPerFAT = 1;
+    let clusterCount = 0;
+    for (let i = 0; i < 8; i++) {
+        const dataSectors = totalSectors - reservedSectors - (numberOfFATs * sectorsPerFAT) - rootDirSectors;
+        if (dataSectors <= 0) return null;
+
+        clusterCount = Math.floor(dataSectors / sectorsPerCluster);
+        const requiredFatSectors = Math.max(
+            1,
+            Math.ceil((((clusterCount + 2) * 12) / 8) / bytesPerSector),
+        );
+        if (requiredFatSectors === sectorsPerFAT) break;
+        sectorsPerFAT = requiredFatSectors;
+    }
+
+    if (clusterCount <= 0 || clusterCount >= 0x0ff0) {
+        return null;
+    }
+
+    const encoder = new TextEncoder();
+    const normalizedFiles = files
+        .map((file, index) => ({
+            index,
+            shortName: toFatShortFileName(file?.path || `FILE${index}.TXT`),
+            bytes: toUint8Array(file?.data, encoder),
+        }))
+        .filter((file) => !!file.shortName);
+
+    if (normalizedFiles.length === 0) return null;
+    if (normalizedFiles.length > (rootEntryCount - 1)) return null;
+
+    const usedShortNames = new Set<string>();
+    for (const file of normalizedFiles) {
+        if (!usedShortNames.has(file.shortName)) {
+            usedShortNames.add(file.shortName);
+            continue;
+        }
+
+        const stem = file.shortName.slice(0, 8).trim() || 'FILE';
+        const ext = file.shortName.slice(8, 11);
+        let suffix = 1;
+        while (suffix < 1000) {
+            const candidateStem = `${stem.slice(0, Math.max(0, 8 - String(suffix).length))}${suffix}`.padEnd(8, ' ');
+            const candidate = `${candidateStem}${ext}`;
+            if (!usedShortNames.has(candidate)) {
+                file.shortName = candidate;
+                usedShortNames.add(candidate);
+                break;
+            }
+            suffix += 1;
+        }
+    }
+
+    let nextCluster = 2;
+    const fileLayouts = normalizedFiles.map((file) => {
+        const clusterSpan = file.bytes.length > 0
+            ? Math.ceil(file.bytes.length / clusterSizeBytes)
+            : 0;
+        const firstCluster = clusterSpan > 0 ? nextCluster : 0;
+        if (clusterSpan > 0) {
+            nextCluster += clusterSpan;
+        }
+
+        return {
+            ...file,
+            firstCluster,
+            clusterSpan,
+        };
+    });
+
+    if (nextCluster > (clusterCount + 2)) {
+        return null;
+    }
+
+    const fatByteLength = sectorsPerFAT * bytesPerSector;
+    const fat = new Uint8Array(fatByteLength);
+    fat.fill(0x00);
+    fat[0] = FAT12_MEDIA_DESCRIPTOR;
+    fat[1] = 0xff;
+    fat[2] = 0xff;
+
+    for (const file of fileLayouts) {
+        if (file.clusterSpan <= 0 || file.firstCluster <= 0) continue;
+
+        for (let i = 0; i < file.clusterSpan; i++) {
+            const cluster = file.firstCluster + i;
+            const nextValue = i === (file.clusterSpan - 1)
+                ? 0x0fff
+                : (cluster + 1);
+            setFat12Entry(fat, cluster, nextValue);
+        }
+    }
+
+    const image = new Uint8Array(alignedSize);
+    image.fill(0x00);
+    const boot = image.subarray(0, bytesPerSector);
+    const bootView = new DataView(boot.buffer, boot.byteOffset, boot.byteLength);
+
+    boot[0] = 0xeb;
+    boot[1] = 0x3c;
+    boot[2] = 0x90;
+    boot.set(encoder.encode('MSDOS5.0').subarray(0, 8), 3);
+    bootView.setUint16(11, bytesPerSector, true);
+    boot[13] = sectorsPerCluster & 0xff;
+    bootView.setUint16(14, reservedSectors, true);
+    boot[16] = numberOfFATs & 0xff;
+    bootView.setUint16(17, rootEntryCount, true);
+    if (totalSectors < 0x10000) {
+        bootView.setUint16(19, totalSectors, true);
+        bootView.setUint32(32, 0, true);
+    } else {
+        bootView.setUint16(19, 0, true);
+        bootView.setUint32(32, totalSectors, true);
+    }
+    boot[21] = FAT12_MEDIA_DESCRIPTOR;
+    bootView.setUint16(22, sectorsPerFAT, true);
+    bootView.setUint16(24, 32, true);
+    bootView.setUint16(26, 64, true);
+    bootView.setUint32(28, 0, true);
+    boot[36] = 0x80;
+    boot[38] = 0x29;
+    bootView.setUint32(39, 0x43495243, true);
+    boot.set(encoder.encode(normalizeFatVolumeLabel(options.volumeLabel)).subarray(0, 11), 43);
+    boot.set(encoder.encode('FAT12   ').subarray(0, 8), 54);
+    boot[510] = 0x55;
+    boot[511] = 0xaa;
+
+    const fat1Offset = reservedSectors * bytesPerSector;
+    const fat2Offset = fat1Offset + fatByteLength;
+    image.set(fat, fat1Offset);
+    image.set(fat, fat2Offset);
+
+    const rootOffset = (reservedSectors + (numberOfFATs * sectorsPerFAT)) * bytesPerSector;
+    const rootByteLength = rootDirSectors * bytesPerSector;
+    const root = image.subarray(rootOffset, rootOffset + rootByteLength);
+    root.fill(0x00);
+
+    const volumeLabel = normalizeFatVolumeLabel(options.volumeLabel);
+    root.set(encoder.encode(volumeLabel).subarray(0, 11), 0);
+    root[11] = 0x08;
+
+    let entryIndex = 1;
+    for (const file of fileLayouts) {
+        const entryOffset = entryIndex * 32;
+        if (entryOffset + 32 > root.length) break;
+
+        root.set(encoder.encode(file.shortName).subarray(0, 11), entryOffset);
+        root[entryOffset + 11] = 0x20;
+
+        const rootView = new DataView(root.buffer, root.byteOffset + entryOffset, 32);
+        rootView.setUint16(26, file.firstCluster & 0xffff, true);
+        rootView.setUint32(28, file.bytes.length >>> 0, true);
+        entryIndex += 1;
+    }
+
+    const dataStartOffset = (reservedSectors + (numberOfFATs * sectorsPerFAT) + rootDirSectors) * bytesPerSector;
+    for (const file of fileLayouts) {
+        if (file.clusterSpan <= 0 || file.firstCluster <= 0 || file.bytes.length === 0) continue;
+
+        for (let i = 0; i < file.clusterSpan; i++) {
+            const cluster = file.firstCluster + i;
+            const clusterOffset = dataStartOffset + ((cluster - 2) * clusterSizeBytes);
+            const srcStart = i * clusterSizeBytes;
+            const srcEnd = Math.min(file.bytes.length, srcStart + clusterSizeBytes);
+            image.set(file.bytes.subarray(srcStart, srcEnd), clusterOffset);
+        }
+    }
+
+    return image;
 }
 
 class SDCardLogic extends BaseComponent {
@@ -1372,10 +1821,26 @@ type RP2040ExecutableRangeInput =
     | { start: number | string; end: number | string }
     | { start: number | string; size: number | string };
 
+type RP2040FlashPartitionInput = {
+    offset: number | string;
+    data: string | Uint8Array | ArrayBuffer | ArrayLike<number>;
+    encoding?: 'base64' | 'hex' | 'utf8';
+};
+
 type RP2040ExecutableRange = {
     start: number;
     end: number;
     description?: string;
+};
+
+type RP2040FlashPartition = {
+    offset: number;
+    bytes: Uint8Array;
+};
+
+type RP2040FirmwareLoadOptions = {
+    logicalFlashBytes?: number;
+    partitions?: RP2040FlashPartition[];
 };
 
 function parseAddressValue(raw: unknown): number | null {
@@ -1435,6 +1900,99 @@ function normalizeRp2040ExecutableRanges(value: unknown): RP2040ExecutableRange[
     return ranges;
 }
 
+function decodeHexToBytes(hex: string): Uint8Array {
+    const normalized = String(hex || '')
+        .trim()
+        .replace(/^0x/i, '')
+        .replace(/\s+/g, '');
+
+    if (!normalized || (normalized.length % 2) !== 0) {
+        return new Uint8Array();
+    }
+
+    const out = new Uint8Array(normalized.length / 2);
+    for (let i = 0; i < out.length; i++) {
+        const byte = Number.parseInt(normalized.slice(i * 2, (i * 2) + 2), 16);
+        if (Number.isNaN(byte)) {
+            return new Uint8Array();
+        }
+        out[i] = byte & 0xff;
+    }
+
+    return out;
+}
+
+function decodeRp2040FlashPartitionBytes(data: unknown, encoding: unknown): Uint8Array | null {
+    if (data == null) return null;
+
+    if (data instanceof Uint8Array) {
+        return data.length > 0 ? data : null;
+    }
+
+    if (data instanceof ArrayBuffer) {
+        const out = new Uint8Array(data);
+        return out.length > 0 ? out : null;
+    }
+
+    if (ArrayBuffer.isView(data)) {
+        const view = data as ArrayBufferView;
+        const out = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+        return out.length > 0 ? out : null;
+    }
+
+    if (Array.isArray(data)) {
+        if (data.length === 0) return null;
+        return new Uint8Array(data.map((value) => Number(value) & 0xff));
+    }
+
+    if (typeof data === 'string') {
+        const raw = data.trim();
+        if (!raw) return null;
+
+        const normalizedEncoding = String(encoding || '').trim().toLowerCase();
+        if (normalizedEncoding === 'hex') {
+            const decoded = decodeHexToBytes(raw);
+            return decoded.length > 0 ? decoded : null;
+        }
+
+        if (normalizedEncoding === 'utf8') {
+            const decoded = new TextEncoder().encode(data);
+            return decoded.length > 0 ? decoded : null;
+        }
+
+        try {
+            const decoded = decodeBase64ToBytes(raw);
+            return decoded.length > 0 ? decoded : null;
+        } catch {
+            // If string is not valid base64, preserve raw text bytes for robustness.
+            const fallback = new TextEncoder().encode(data);
+            return fallback.length > 0 ? fallback : null;
+        }
+    }
+
+    return null;
+}
+
+function normalizeRp2040FlashPartitions(value: unknown): RP2040FlashPartition[] {
+    if (!Array.isArray(value)) return [];
+
+    const partitions: RP2040FlashPartition[] = [];
+    for (const raw of value) {
+        if (!raw || typeof raw !== 'object') continue;
+        const obj = raw as Record<string, unknown>;
+        const offset = parseAddressValue(obj.offset);
+        if (offset === null) continue;
+
+        const bytes = decodeRp2040FlashPartitionBytes(obj.data, obj.encoding);
+        if (!bytes || bytes.length === 0) continue;
+
+        partitions.push({ offset: offset >>> 0, bytes });
+    }
+
+    partitions.sort((a, b) => a.offset - b.offset);
+    return partitions;
+}
+
 export type AVRRunnerOptions = {
     boardId?: string;
     onByteTransmit?: (payload: { boardId: string; value: number; char: string; source?: string }) => void;
@@ -1442,6 +2000,8 @@ export type AVRRunnerOptions = {
     debugEnabled?: boolean;
     debugIntervalMs?: number;
     rp2040ExecutableRanges?: RP2040ExecutableRangeInput[];
+    rp2040LogicalFlashBytes?: number | string;
+    rp2040FlashPartitions?: RP2040FlashPartitionInput[];
 };
 
 export type BoardRunner = {
@@ -1460,6 +2020,10 @@ export type BoardRunner = {
 
 const RP2040_FLASH_BASE = 0x10000000;
 const RP2040_XIP_NOCACHE_BASE = 0x11000000;
+const RP2040_XIP_NOALLOC_BASE = 0x12000000;
+const RP2040_XIP_NOCACHE_NOALLOC_BASE = 0x13000000;
+const RP2040_FLASH_ALIAS_END = 0x14000000;
+const RP2040_FLASH_ALIAS_MASK = 0x00ffffff;
 const RP2040_BOOTROM_BASE = 0x00000000;
 const RP2040_BOOTROM_SIZE = 0x4000;
 const RP2040_SRAM_BASE = 0x20000000;
@@ -1478,7 +2042,61 @@ const UF2_BLOCK_SIZE = 512;
 const UF2_MAGIC_START0 = 0x0a324655;
 const UF2_MAGIC_START1 = 0x9e5d5157;
 const UF2_MAGIC_END = 0x0ab16f30;
+const RP2040_DEFAULT_LOGICAL_FLASH_BYTES = 2 * 1024 * 1024;
 const SOFT_SERIAL_SOURCE_LABELS = new Set(['softserial', 'soft-serial', 'soft_uart', 'soft-uart', 'softuart']);
+const NEOPIXEL_COMPONENT_TYPE_PATTERN = /(neopixel|ws2812|ws2821)/i;
+
+function parsePositiveInt(value: any): number {
+    const parsed = Number.parseInt(String(value ?? ''), 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function normalizeRp2040FlashAliasAddress(rawAddress: number): number {
+    const address = Number(rawAddress) >>> 0;
+    if (address >= RP2040_FLASH_BASE && address < RP2040_FLASH_ALIAS_END) {
+        return (RP2040_FLASH_BASE + (address & RP2040_FLASH_ALIAS_MASK)) >>> 0;
+    }
+    return address;
+}
+
+function rp2040FlashAddressToIndex(rawAddress: number, logicalFlashLength: number): number {
+    const normalizedAddress = normalizeRp2040FlashAliasAddress(rawAddress);
+    if (normalizedAddress >= RP2040_FLASH_BASE && normalizedAddress < (RP2040_FLASH_BASE + logicalFlashLength)) {
+        return (normalizedAddress - RP2040_FLASH_BASE) >>> 0;
+    }
+
+    const address = Number(rawAddress) >>> 0;
+    if (address < logicalFlashLength) {
+        return address;
+    }
+
+    return -1;
+}
+
+function collectNeopixelShutdownStates(instances: Map<string, BaseComponent>): Array<{ id: string; state: any }> {
+    const updates: Array<{ id: string; state: any }> = [];
+
+    for (const inst of instances.values()) {
+        if (!NEOPIXEL_COMPONENT_TYPE_PATTERN.test(String(inst.type || ''))) continue;
+
+        const currentState = (inst.state && typeof inst.state === 'object') ? inst.state : {};
+        const rows = parsePositiveInt(currentState.rows);
+        const cols = parsePositiveInt(currentState.cols);
+        const configuredCount = rows > 0 && cols > 0 ? rows * cols : 0;
+        const existingPixels = Array.isArray(currentState.pixels) ? currentState.pixels : [];
+        const pixelCount = Math.max(configuredCount, existingPixels.length);
+        const nextState = {
+            ...currentState,
+            pixels: pixelCount > 0 ? new Array(pixelCount).fill(0) : [],
+        };
+
+        inst.state = nextState;
+        inst.stateChanged = false;
+        updates.push({ id: inst.id, state: nextState });
+    }
+
+    return updates;
+}
 
 function isSoftSerialSourceLabel(source: string): boolean {
     const key = String(source || '').trim().toLowerCase();
@@ -1653,6 +2271,213 @@ function getComponentStateSyncPolicy(state: any): { weight: number; minIntervalM
     return { weight, minIntervalMs: 0 };
 }
 
+type FallbackTelemetryRuntime = {
+    createdAtMs: number;
+    sampleCount: number;
+    stateMutationCount: number;
+    lastStateFingerprint: string;
+    lastStateChangeAtMs: number;
+    pinLevelMap: Record<string, boolean>;
+    pinToggleCount: number;
+};
+
+const fallbackTelemetryByInstance = new WeakMap<object, FallbackTelemetryRuntime>();
+
+function readComponentStateForTelemetry(inst: any): Record<string, unknown> {
+    const state = inst?.state;
+    if (state && typeof state === 'object' && !Array.isArray(state)) {
+        return state as Record<string, unknown>;
+    }
+    if (state === undefined) return {};
+    return { value: state as unknown };
+}
+
+function safeJsonStringify(value: unknown): string {
+    try {
+        return JSON.stringify(value);
+    } catch {
+        return '{}';
+    }
+}
+
+function readPinLevelMap(inst: any): Record<string, boolean> {
+    const out: Record<string, boolean> = {};
+    const pins = inst?.pins && typeof inst.pins === 'object'
+        ? (inst.pins as Record<string, unknown>)
+        : null;
+    if (!pins) return out;
+
+    for (const [pinId, pinState] of Object.entries(pins)) {
+        if (!pinState || typeof pinState !== 'object') continue;
+        const maybeVoltage = Number((pinState as any).voltage);
+        if (Number.isFinite(maybeVoltage)) {
+            out[String(pinId)] = maybeVoltage > 0.5;
+        }
+    }
+
+    return out;
+}
+
+function isLikelyActiveSignal(value: unknown): boolean {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return Number.isFinite(value) && value !== 0;
+    if (typeof value === 'string') {
+        const key = value.trim().toLowerCase();
+        if (!key) return false;
+        return key !== '0' && key !== 'false' && key !== 'off' && key !== 'none' && key !== 'ok';
+    }
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'object') return Object.keys(value as Record<string, unknown>).length > 0;
+    return false;
+}
+
+function buildFallbackTelemetry(inst: any): { telemetrySummary: string; telemetryData: Record<string, unknown> } {
+    const now = Date.now();
+    const key = (inst && typeof inst === 'object') ? inst : { fallback: true };
+    let runtime = fallbackTelemetryByInstance.get(key);
+    if (!runtime) {
+        runtime = {
+            createdAtMs: now,
+            sampleCount: 0,
+            stateMutationCount: 0,
+            lastStateFingerprint: '',
+            lastStateChangeAtMs: now,
+            pinLevelMap: {},
+            pinToggleCount: 0,
+        };
+        fallbackTelemetryByInstance.set(key, runtime);
+    }
+
+    runtime.sampleCount += 1;
+
+    const state = readComponentStateForTelemetry(inst);
+    const stateFingerprint = safeJsonStringify(state);
+    if (runtime.lastStateFingerprint && runtime.lastStateFingerprint !== stateFingerprint) {
+        runtime.stateMutationCount += 1;
+        runtime.lastStateChangeAtMs = now;
+    }
+    if (!runtime.lastStateFingerprint) {
+        runtime.lastStateChangeAtMs = now;
+    }
+    runtime.lastStateFingerprint = stateFingerprint;
+
+    const nextPinLevels = readPinLevelMap(inst);
+    let pinToggles = 0;
+    const pinIds = new Set<string>([
+        ...Object.keys(runtime.pinLevelMap),
+        ...Object.keys(nextPinLevels),
+    ]);
+    for (const pinId of pinIds) {
+        const prevLevel = runtime.pinLevelMap[pinId];
+        const nextLevel = nextPinLevels[pinId];
+        if (prevLevel === undefined || nextLevel === undefined) continue;
+        if (prevLevel !== nextLevel) pinToggles += 1;
+    }
+    runtime.pinToggleCount += pinToggles;
+    runtime.pinLevelMap = nextPinLevels;
+
+    let status: 'ok' | 'warn' | 'error' = 'ok';
+    const findings: string[] = [];
+    for (const [stateKey, stateValue] of Object.entries(state)) {
+        const lower = String(stateKey || '').toLowerCase();
+        if (/(error|fault|burned|panic|critical|failed)/.test(lower) && isLikelyActiveSignal(stateValue)) {
+            status = 'error';
+            findings.push(`State flag ${stateKey} indicates an error condition.`);
+            continue;
+        }
+        if (status !== 'error' && /(warn|degraded|timeout|retry|unstable)/.test(lower) && isLikelyActiveSignal(stateValue)) {
+            status = 'warn';
+            findings.push(`State flag ${stateKey} indicates a warning condition.`);
+        }
+    }
+
+    const elapsedSec = Math.max(0.001, (now - runtime.createdAtMs) / 1000);
+    const updateFreqHz = Number((runtime.sampleCount / elapsedSec).toFixed(3));
+    const idleMs = Math.max(0, now - runtime.lastStateChangeAtMs);
+    const summary = findings.length > 0
+        ? `${status.toUpperCase()}: ${findings[0]}`
+        : `OK: stateKeys=${Object.keys(state).slice(0, 8).join(', ') || 'none'}`;
+
+    const telemetryData: Record<string, unknown> = {
+        ...state,
+        _metrics: {
+            sampleCount: runtime.sampleCount,
+            updateFreqHz,
+            stateSizeBytes: stateFingerprint.length,
+            stateMutationCount: runtime.stateMutationCount,
+            idleMs,
+            pinToggleCount: runtime.pinToggleCount,
+            pinCount: Object.keys(nextPinLevels).length,
+        },
+        _heuristics: {
+            status,
+            summary,
+            findings,
+        },
+        _capturedAt: new Date(now).toISOString(),
+        _fallbackGenerated: true,
+    };
+
+    return {
+        telemetrySummary: summary,
+        telemetryData,
+    };
+}
+
+function collectComponentTelemetry(inst: any): { telemetrySummary?: string; telemetryData?: Record<string, unknown> } {
+    const out: { telemetrySummary?: string; telemetryData?: Record<string, unknown> } = {};
+
+    try {
+        if (typeof inst?.getTelemetrySummary === 'function') {
+            const summary = inst.getTelemetrySummary();
+            if (typeof summary === 'string' && summary.trim()) {
+                out.telemetrySummary = summary.trim();
+            }
+        }
+    } catch {
+        // Telemetry failures should never break simulation state delivery.
+    }
+
+    try {
+        if (typeof inst?.getTelemetryData === 'function') {
+            const data = inst.getTelemetryData();
+            if (data && typeof data === 'object' && !Array.isArray(data)) {
+                out.telemetryData = data as Record<string, unknown>;
+            }
+        }
+    } catch {
+        // Telemetry failures should never break simulation state delivery.
+    }
+
+    const fallback = buildFallbackTelemetry(inst);
+
+    if (!out.telemetrySummary) {
+        out.telemetrySummary = fallback.telemetrySummary;
+    }
+
+    if (!out.telemetryData || typeof out.telemetryData !== 'object') {
+        out.telemetryData = fallback.telemetryData;
+    } else {
+        const merged = { ...out.telemetryData };
+        if (!merged._metrics) {
+            merged._metrics = fallback.telemetryData._metrics;
+        }
+        if (!merged._heuristics) {
+            merged._heuristics = fallback.telemetryData._heuristics;
+        }
+        if (!merged._capturedAt) {
+            merged._capturedAt = fallback.telemetryData._capturedAt;
+        }
+        if (!merged._fallbackGenerated) {
+            merged._fallbackGenerated = true;
+        }
+        out.telemetryData = merged;
+    }
+
+    return out;
+}
+
 type HexSegment = {
     address: number;
     bytes: Uint8Array;
@@ -1702,55 +2527,75 @@ function parseIntelHexSegments(data: string): HexSegment[] {
     return segments;
 }
 
-function loadRP2040Entry(rp2040: RP2040): RP2040EntryInfo {
-    const flashEnd = (RP2040_FLASH_BASE + rp2040.flash.length) >>> 0;
-    const flashNoCacheEnd = (RP2040_XIP_NOCACHE_BASE + rp2040.flash.length) >>> 0;
+function flashContainsAsciiToken(flash: Uint8Array, token: string, maxBytes: number): boolean {
+    const text = String(token || '');
+    if (!flash || !text) return false;
+
+    const needle = new TextEncoder().encode(text);
+    if (needle.length === 0) return false;
+
+    const limit = Math.max(0, Math.min(flash.length, Math.floor(maxBytes || flash.length)));
+    if (limit < needle.length) return false;
+
+    for (let i = 0; i <= (limit - needle.length); i++) {
+        let matched = true;
+        for (let j = 0; j < needle.length; j++) {
+            if (flash[i + j] !== needle[j]) {
+                matched = false;
+                break;
+            }
+        }
+        if (matched) return true;
+    }
+
+    return false;
+}
+
+function loadRP2040Entry(rp2040: RP2040, logicalFlashBytes?: number): RP2040EntryInfo {
+    const logicalFlashLength = getRp2040LogicalFlashLength(rp2040, logicalFlashBytes);
+    const flashEnd = (RP2040_FLASH_BASE + logicalFlashLength) >>> 0;
     const sramStart = RP2040_SRAM_BASE;
     const sramEnd = (RP2040_SRAM_BASE + rp2040.sram.length) >>> 0;
 
     const resolvePcAddress = (rawAddress: number): number => {
         const raw = rawAddress >>> 0;
-        if (raw < rp2040.flash.length) {
+        if (raw < logicalFlashLength) {
             return (RP2040_FLASH_BASE + raw) >>> 0;
+        }
+        if (raw >= RP2040_FLASH_BASE && raw < RP2040_FLASH_ALIAS_END) {
+            return normalizeRp2040FlashAliasAddress(raw);
         }
         return raw;
     };
 
     const isExecutableAddress = (addr: number): boolean => {
         const a = addr >>> 0;
-        return (a >= RP2040_FLASH_BASE && a < flashEnd)
-            || (a >= RP2040_XIP_NOCACHE_BASE && a < flashNoCacheEnd)
-            || (a >= sramStart && a < sramEnd)
+        if (a >= RP2040_FLASH_BASE && a < RP2040_FLASH_ALIAS_END) {
+            const normalized = normalizeRp2040FlashAliasAddress(a);
+            if (normalized >= RP2040_FLASH_BASE && normalized < flashEnd) {
+                return true;
+            }
+        }
+
+        return (a >= sramStart && a < sramEnd)
             || (a >= RP2040_BOOTROM_BASE && a < (RP2040_BOOTROM_BASE + RP2040_BOOTROM_SIZE))
             || (a >= RP2040_USB_RAM_BASE && a < (RP2040_USB_RAM_BASE + RP2040_USB_RAM_SIZE));
     };
 
     const hasInstructionWord = (addr: number): boolean => {
         const a = addr >>> 0;
-        let flashIndex = -1;
-
-        if (a >= RP2040_FLASH_BASE && a < flashEnd) {
-            flashIndex = a - RP2040_FLASH_BASE;
-        } else if (a >= RP2040_XIP_NOCACHE_BASE && a < flashNoCacheEnd) {
-            flashIndex = a - RP2040_XIP_NOCACHE_BASE;
-        }
+        const flashIndex = rp2040FlashAddressToIndex(a, logicalFlashLength);
 
         if (flashIndex < 0) return true;
-        if (flashIndex + 1 >= rp2040.flash.length) return false;
+        if (flashIndex + 1 >= logicalFlashLength) return false;
         return !(rp2040.flash[flashIndex] === 0xff && rp2040.flash[flashIndex + 1] === 0xff);
     };
 
     const readWord = (addr: number): number => {
         const a = addr >>> 0;
+        const flashIndex = rp2040FlashAddressToIndex(a, logicalFlashLength);
 
-        let flashIndex = -1;
-        if (a >= RP2040_FLASH_BASE && (a + 3) < flashEnd) {
-            flashIndex = a - RP2040_FLASH_BASE;
-        } else if (a >= RP2040_XIP_NOCACHE_BASE && (a + 3) < flashNoCacheEnd) {
-            flashIndex = a - RP2040_XIP_NOCACHE_BASE;
-        }
-
-        if (flashIndex >= 0 && flashIndex + 3 < rp2040.flash.length) {
+        if (flashIndex >= 0 && flashIndex + 3 < logicalFlashLength) {
             return (
                 (rp2040.flash[flashIndex])
                 | (rp2040.flash[flashIndex + 1] << 8)
@@ -1853,7 +2698,7 @@ function loadRP2040Entry(rp2040: RP2040): RP2040EntryInfo {
 
     // Arduino-Pico and other RP2040 toolchains may place the vector table beyond +0x100.
     // Scan a reasonable early-flash window in 0x100-byte aligned steps.
-    const scanLimit = Math.min(rp2040.flash.length, 0x80000);
+    const scanLimit = Math.min(logicalFlashLength, 0x80000);
     for (let offset = 0x200; offset < scanLimit; offset += 0x100) {
         const candidate = evaluateVectorBase(
             (RP2040_FLASH_BASE + offset) >>> 0,
@@ -1870,7 +2715,27 @@ function loadRP2040Entry(rp2040: RP2040): RP2040EntryInfo {
             return a.base - b.base;
         });
 
-        const best = candidates[0];
+        let best = candidates[0];
+
+        const firmwareLooksCircuitPython = flashContainsAsciiToken(
+            rp2040.flash,
+            'CIRCUITPY',
+            Math.min(logicalFlashLength, 0x180000)
+        );
+
+        if (firmwareLooksCircuitPython) {
+            const cpBootVectorBase = (RP2040_FLASH_BASE + 0x100) >>> 0;
+            const cpBootCandidate = candidates.find((candidate) => {
+                if ((candidate.base >>> 0) !== cpBootVectorBase) return false;
+                const pcOffset = (candidate.resolvedPC - RP2040_FLASH_BASE) >>> 0;
+                return pcOffset < 0x8000;
+            });
+
+            if (cpBootCandidate) {
+                best = cpBootCandidate;
+            }
+        }
+
         rp2040.core.SP = best.initialSP;
         rp2040.core.VTOR = best.base >>> 0;
         rp2040.core.BXWritePC(((best.resolvedPC | 1) >>> 0));
@@ -1937,10 +2802,25 @@ function decodeBase64ToBytes(base64: string): Uint8Array {
     return out;
 }
 
-function loadRP2040FirmwareFromUF2Payload(rp2040: RP2040, uf2Payload: string): RP2040EntryInfo {
+function getRp2040LogicalFlashLength(rp2040: RP2040, logicalFlashBytes?: number): number {
+    const physicalSize = Math.max(0, Number(rp2040?.flash?.length || 0));
+    if (physicalSize <= 0) return 0;
+    if (!Number.isFinite(Number(logicalFlashBytes)) || Number(logicalFlashBytes) <= 0) {
+        return physicalSize;
+    }
+    return Math.max(1, Math.min(physicalSize, Math.floor(Number(logicalFlashBytes))));
+}
+
+function mapRp2040FlashAddress(targetAddr: number, logicalFlashLength: number): number {
+    if (logicalFlashLength <= 0) return -1;
+    return rp2040FlashAddressToIndex(targetAddr, logicalFlashLength);
+}
+
+function loadRP2040FirmwareFromUF2Payload(rp2040: RP2040, uf2Payload: string, logicalFlashBytes?: number): RP2040EntryInfo {
     const payload = String(uf2Payload || '').startsWith(UF2_PAYLOAD_PREFIX)
         ? String(uf2Payload).slice(UF2_PAYLOAD_PREFIX.length)
         : String(uf2Payload || '');
+    const logicalFlashLength = getRp2040LogicalFlashLength(rp2040, logicalFlashBytes);
 
     const bytes = decodeBase64ToBytes(payload);
     const blockCount = Math.floor(bytes.length / UF2_BLOCK_SIZE);
@@ -1957,35 +2837,29 @@ function loadRP2040FirmwareFromUF2Payload(rp2040: RP2040, uf2Payload: string): R
         const payloadSize = dv.getUint32(16, true) >>> 0;
         if (payloadSize === 0 || payloadSize > 476) continue;
 
-        let dstStart = -1;
-        if (targetAddr >= RP2040_FLASH_BASE && targetAddr < (RP2040_FLASH_BASE + rp2040.flash.length)) {
-            dstStart = targetAddr - RP2040_FLASH_BASE;
-        } else if (targetAddr >= RP2040_XIP_NOCACHE_BASE && targetAddr < (RP2040_XIP_NOCACHE_BASE + rp2040.flash.length)) {
-            dstStart = targetAddr - RP2040_XIP_NOCACHE_BASE;
-        } else if (targetAddr < rp2040.flash.length) {
-            dstStart = targetAddr;
-        }
-        if (dstStart < 0 || dstStart >= rp2040.flash.length) continue;
+        const dstStart = mapRp2040FlashAddress(targetAddr, logicalFlashLength);
+        if (dstStart < 0 || dstStart >= logicalFlashLength) continue;
 
-        const maxCopy = Math.min(payloadSize, rp2040.flash.length - dstStart);
+        const maxCopy = Math.min(payloadSize, logicalFlashLength - dstStart);
         if (maxCopy <= 0) continue;
 
         const payloadOffset = offset + 32;
         rp2040.flash.set(bytes.subarray(payloadOffset, payloadOffset + maxCopy), dstStart);
     }
 
-    return loadRP2040Entry(rp2040);
+    return loadRP2040Entry(rp2040, logicalFlashLength);
 }
 
-function loadRP2040FirmwareFromHex(rp2040: RP2040, firmwareHex: string): RP2040EntryInfo {
+function loadRP2040FirmwareFromHex(rp2040: RP2040, firmwareHex: string, logicalFlashBytes?: number): RP2040EntryInfo {
     const segments = parseIntelHexSegments(firmwareHex);
+    const logicalFlashLength = getRp2040LogicalFlashLength(rp2040, logicalFlashBytes);
     let flashBytesWritten = 0;
 
     for (const seg of segments) {
         const segStart = seg.address >>> 0;
         const segEnd = (seg.address + seg.bytes.length) >>> 0;
         const flashStart = RP2040_FLASH_BASE;
-        const flashEnd = RP2040_FLASH_BASE + rp2040.flash.length;
+        const flashEnd = RP2040_FLASH_BASE + logicalFlashLength;
 
         if (segEnd <= flashStart || segStart >= flashEnd) {
             continue;
@@ -2004,9 +2878,9 @@ function loadRP2040FirmwareFromHex(rp2040: RP2040, firmwareHex: string): RP2040E
     if (flashBytesWritten === 0 && segments.length > 0) {
         // Some toolchains emit HEX with low addresses; treat them as flash offsets.
         for (const seg of segments) {
-            if (seg.address < rp2040.flash.length) {
+            if (seg.address < logicalFlashLength) {
                 const dstOffset = seg.address;
-                const maxCopy = Math.max(0, Math.min(seg.bytes.length, rp2040.flash.length - dstOffset));
+                const maxCopy = Math.max(0, Math.min(seg.bytes.length, logicalFlashLength - dstOffset));
                 if (maxCopy > 0) {
                     rp2040.flash.set(seg.bytes.subarray(0, maxCopy), dstOffset);
                     flashBytesWritten += maxCopy;
@@ -2015,23 +2889,51 @@ function loadRP2040FirmwareFromHex(rp2040: RP2040, firmwareHex: string): RP2040E
         }
     }
 
-    return loadRP2040Entry(rp2040);
+    return loadRP2040Entry(rp2040, logicalFlashLength);
 }
 
-function loadRP2040Firmware(rp2040: RP2040, firmware: string): RP2040EntryInfo {
+function applyRP2040FlashPartitions(
+    rp2040: RP2040,
+    partitions: RP2040FlashPartition[],
+    logicalFlashBytes?: number
+) {
+    if (!partitions.length) return;
+    const logicalFlashLength = getRp2040LogicalFlashLength(rp2040, logicalFlashBytes);
+    if (logicalFlashLength <= 0) return;
+
+    for (const partition of partitions) {
+        const dstOffset = partition.offset >>> 0;
+        if (dstOffset >= logicalFlashLength) continue;
+        const maxCopy = Math.min(partition.bytes.length, logicalFlashLength - dstOffset);
+        if (maxCopy <= 0) continue;
+
+        rp2040.flash.set(partition.bytes.subarray(0, maxCopy), dstOffset);
+    }
+}
+
+function loadRP2040Firmware(rp2040: RP2040, firmware: string, options: RP2040FirmwareLoadOptions = {}): RP2040EntryInfo {
     // Reset flash contents before each load so stale data cannot execute.
     rp2040.flash.fill(0xff);
+    const logicalFlashLength = getRp2040LogicalFlashLength(rp2040, options.logicalFlashBytes);
+    const partitions = Array.isArray(options.partitions) ? options.partitions : [];
 
     const source = String(firmware || '').trim();
+    let entryInfo: RP2040EntryInfo;
+
     if (!source) {
-        return loadRP2040Entry(rp2040);
+        entryInfo = loadRP2040Entry(rp2040, logicalFlashLength);
+    } else if (source.startsWith(UF2_PAYLOAD_PREFIX)) {
+        entryInfo = loadRP2040FirmwareFromUF2Payload(rp2040, source, logicalFlashLength);
+    } else {
+        entryInfo = loadRP2040FirmwareFromHex(rp2040, source, logicalFlashLength);
     }
 
-    if (source.startsWith(UF2_PAYLOAD_PREFIX)) {
-        return loadRP2040FirmwareFromUF2Payload(rp2040, source);
+    if (partitions.length > 0) {
+        applyRP2040FlashPartitions(rp2040, partitions, logicalFlashLength);
+        entryInfo = loadRP2040Entry(rp2040, logicalFlashLength);
     }
 
-    return loadRP2040FirmwareFromHex(rp2040, source);
+    return entryInfo;
 }
 
 export class AVRRunner {
@@ -2286,7 +3188,11 @@ export class AVRRunner {
                     const syncState = inst.getSyncState();
                     if (!this.shouldEmitComponentState(inst.id, syncState, now)) continue;
                     inst.stateChanged = false;
-                    compStates.push({ id: inst.id, state: syncState });
+                    compStates.push({
+                        id: inst.id,
+                        state: syncState,
+                        ...collectComponentTelemetry(inst),
+                    });
                 }
 
                 if (compStates.length > 0) {
@@ -2726,6 +3632,10 @@ export class AVRRunner {
     }
 
     stop() {
+        const neopixelStates = collectNeopixelShutdownStates(this.instances);
+        if (neopixelStates.length > 0) {
+            this.onStateUpdate({ type: 'state', boardId: this.boardId, components: neopixelStates });
+        }
         this.running = false;
         clearInterval(this.statusInterval);
     }
@@ -3206,6 +4116,8 @@ export class RP2040Runner implements BoardRunner {
     private lowPcAliasRepeatCount: number = 0;
     private invalidPcStrikeCount: number = 0;
     private readonly extraExecutableRanges: RP2040ExecutableRange[];
+    private readonly configuredLogicalFlashBytes: number;
+    private readonly flashPartitions: RP2040FlashPartition[];
     private readonly uartLedOffTimers = new Map<'GP0' | 'GP1' | 'GP4' | 'GP5', ReturnType<typeof setTimeout>>();
     private entryInfo: RP2040EntryInfo | null = null;
     private picoWirelessStub: {
@@ -3245,8 +4157,39 @@ export class RP2040Runner implements BoardRunner {
         this.debugEnabled = options.debugEnabled !== false;
         this.debugIntervalMs = Math.max(150, Number(options.debugIntervalMs || 800));
         this.extraExecutableRanges = normalizeRp2040ExecutableRanges(options.rp2040ExecutableRanges);
+        const parsedLogicalFlashBytes = parseAddressValue(options.rp2040LogicalFlashBytes);
+        this.configuredLogicalFlashBytes = (
+            parsedLogicalFlashBytes !== null && parsedLogicalFlashBytes > 0
+                ? parsedLogicalFlashBytes
+                : RP2040_DEFAULT_LOGICAL_FLASH_BYTES
+        ) >>> 0;
+        this.flashPartitions = normalizeRp2040FlashPartitions(options.rp2040FlashPartitions);
 
         this.cpu = new RP2040(new RP2040MockClock() as any);
+        const wrapFlashAliasAddressMethod = (methodName: string) => {
+            const original = (this.cpu as any)?.[methodName];
+            if (typeof original !== 'function') return;
+
+            (this.cpu as any)[methodName] = (rawAddress: number, ...args: any[]) => {
+                const sourceAddress = Number(rawAddress) >>> 0;
+                const mappedAddress = normalizeRp2040FlashAliasAddress(sourceAddress);
+                try {
+                    return original.call(this.cpu, mappedAddress, ...args);
+                } catch (err: any) {
+                    const srcHex = `0x${sourceAddress.toString(16)}`;
+                    const mappedHex = `0x${mappedAddress.toString(16)}`;
+                    const reason = String(err?.message || err || `${methodName} error`);
+                    throw new Error(`${methodName}(${srcHex} -> ${mappedHex}) failed: ${reason}`);
+                }
+            };
+        };
+
+        wrapFlashAliasAddressMethod('readUint32');
+        wrapFlashAliasAddressMethod('readUint16');
+        wrapFlashAliasAddressMethod('readUint8');
+        wrapFlashAliasAddressMethod('writeUint32');
+        wrapFlashAliasAddressMethod('writeUint16');
+        wrapFlashAliasAddressMethod('writeUint8');
         this.patchClockSelectedReads();
         this.patchSioFifoAccess();
         this.cpu.loadBootrom(bootromB1);
@@ -3299,7 +4242,10 @@ export class RP2040Runner implements BoardRunner {
             this.emitGdbStatus('error', this.gdbLastError);
         }
         this.bootromLoaded = true;
-        this.entryInfo = loadRP2040Firmware(this.cpu, this.firmwareHex);
+        this.entryInfo = loadRP2040Firmware(this.cpu, this.firmwareHex, {
+            logicalFlashBytes: this.getLogicalFlashLength(),
+            partitions: this.flashPartitions,
+        });
         this.cpuCyclesAtStart = this.cpu.core.cycles;
         this.pioSignalCycle = this.cpu.core.cycles;
 
@@ -3354,7 +4300,11 @@ export class RP2040Runner implements BoardRunner {
                     const syncState = inst.getSyncState();
                     if (!this.shouldEmitComponentState(inst.id, syncState, now)) continue;
                     inst.stateChanged = false;
-                    compStates.push({ id: inst.id, state: syncState });
+                    compStates.push({
+                        id: inst.id,
+                        state: syncState,
+                        ...collectComponentTelemetry(inst),
+                    });
                 }
 
                 if (compStates.length > 0) {
@@ -3556,15 +4506,24 @@ export class RP2040Runner implements BoardRunner {
         }
     }
 
+    private getLogicalFlashLength(): number {
+        if (!this.cpu) return 0;
+        return getRp2040LogicalFlashLength(this.cpu, this.configuredLogicalFlashBytes);
+    }
+
     private isExecutableAddress(addr: number): boolean {
         const pc = (addr >>> 0);
-        const flashEnd = (RP2040_FLASH_BASE + this.cpu!.flash.length) >>> 0;
-        const flashNoCacheEnd = (RP2040_XIP_NOCACHE_BASE + this.cpu!.flash.length) >>> 0;
+        const logicalFlashLength = this.getLogicalFlashLength();
+        const flashEnd = (RP2040_FLASH_BASE + logicalFlashLength) >>> 0;
         const sramEnd = (RP2040_SRAM_BASE + this.cpu!.sram.length) >>> 0;
 
         if (this.bootromLoaded && pc >= RP2040_BOOTROM_BASE && pc < (RP2040_BOOTROM_BASE + RP2040_BOOTROM_SIZE)) return true;
-        if (pc >= RP2040_FLASH_BASE && pc < flashEnd) return true;
-        if (pc >= RP2040_XIP_NOCACHE_BASE && pc < flashNoCacheEnd) return true;
+        if (pc >= RP2040_FLASH_BASE && pc < RP2040_FLASH_ALIAS_END) {
+            const normalized = normalizeRp2040FlashAliasAddress(pc);
+            if (normalized >= RP2040_FLASH_BASE && normalized < flashEnd) {
+                return true;
+            }
+        }
         if (pc >= RP2040_SRAM_BASE && pc < sramEnd) return true;
         if (pc >= RP2040_USB_RAM_BASE && pc < (RP2040_USB_RAM_BASE + RP2040_USB_RAM_SIZE)) return true;
         for (const range of this.extraExecutableRanges) {
@@ -3666,17 +4625,18 @@ export class RP2040Runner implements BoardRunner {
     private rebaseProgramCounterAlias(stepWeight = 1) {
         if (!this.cpu) return;
         const pc = this.cpu.core.PC >>> 0;
+        const logicalFlashLength = this.getLogicalFlashLength();
         // Some firmware images carry flash-relative addresses in branch tables.
         // Map plausible flash aliases into XIP immediately, and for low ROM-range
         // addresses only recover after detecting a sustained local PC stall.
-        if (!(pc > 0 && pc < this.cpu.flash.length)) {
+        if (!(pc > 0 && pc < logicalFlashLength)) {
             this.lowPcAliasCandidate = -1;
             this.lowPcAliasRepeatCount = 0;
             return;
         }
 
         const flashIndex = pc & ~1;
-        const hasFlashData = flashIndex + 1 < this.cpu.flash.length
+        const hasFlashData = flashIndex + 1 < logicalFlashLength
             && (this.cpu.flash[flashIndex] !== 0xff || this.cpu.flash[flashIndex + 1] !== 0xff);
         if (!hasFlashData) {
             this.lowPcAliasCandidate = -1;
@@ -4573,10 +5533,10 @@ export class RP2040Runner implements BoardRunner {
         this.instances.forEach((inst) => {
             Object.keys(inst.pins).forEach((pinKey) => {
                 const upper = pinKey.toUpperCase();
-                if (upper === 'GND' || upper === 'AGND' || upper === 'VSS' || upper.startsWith('GND_') || upper === 'K') {
+                if (upper === 'GND' || upper === 'AGND' || upper === 'VSS' || upper.startsWith('GND_') || upper.startsWith('GND.') || upper === 'K') {
                     inst.setPinVoltage(pinKey, 0.0);
                 }
-                if (upper === '3V3' || upper === 'VCC') {
+                if (upper === '3V3' || upper === 'VCC' || upper.startsWith('3V3.')) {
                     inst.setPinVoltage(pinKey, 3.3);
                 }
             });
@@ -4601,13 +5561,16 @@ export class RP2040Runner implements BoardRunner {
         
         // 1. Notify board logic (e.g. for internal telemetry)
         const boardInst = this.instances.get(this.boardId);
+        const clockScale = 16_000_000 / this.getRp2040ClockHz();
+        const normalizedCycles = Math.floor(cycles * clockScale);
+
         if (boardInst) {
-            boardInst.onPinStateChange(pinName, isHigh, cycles);
+            boardInst.onPinStateChange(pinName, isHigh, normalizedCycles);
         }
 
         // 2. High-fidelity endpoint routing (e.g. NeoPixel DIN)
         for (const endpoint of this.getProtocolEndpointsForGpPin(pinName)) {
-            endpoint.inst.onPinStateChange(endpoint.pinId, isHigh, cycles);
+            endpoint.inst.onPinStateChange(endpoint.pinId, isHigh, normalizedCycles);
         }
 
         // 3. Protocol & Voltage propagation
@@ -4646,7 +5609,16 @@ export class RP2040Runner implements BoardRunner {
                 continue;
             }
 
+            // Sync Digital State
             this.cpu.gpio[gp].setInputValue(observedVoltage > 1.65);
+
+            // Sync Analog State (only for ADC-capable pins GP26-29)
+            if (gp >= 26 && gp <= 29) {
+                const adcChannel = gp - 26;
+                // rp2040js 0.15.0 RPADC expects raw 12-bit digital values in channelValues
+                const digitalValue = Math.floor(Math.max(0, Math.min(3.3, observedVoltage)) / 3.3 * 4095);
+                this.cpu.adc.channelValues[adcChannel] = digitalValue;
+            }
         }
     }
 
@@ -4773,13 +5745,17 @@ export class RP2040Runner implements BoardRunner {
                     if (packet.source === 2) {
                         if (this.usbCdc && this.usbCdcReady) {
                             try {
-                                this.usbCdc.sendSerialByte(packet.value & 0xff);
-                                delivered = true;
+                                const usbTxFifo: any = (this.usbCdc as any).txFIFO;
+                                const fifoFull = !!(usbTxFifo && (usbTxFifo.full || usbTxFifo.itemCount >= usbTxFifo.size));
+                                if (fifoFull) {
+                                    delivered = false;
+                                } else {
+                                    this.usbCdc.sendSerialByte(packet.value & 0xff);
+                                    delivered = true;
+                                }
                             } catch {
                                 delivered = false;
                             }
-                        } else {
-                            delivered = (uart0 || uart1).feedByte(packet.value & 0xff);
                         }
                     } else {
                         delivered = ((packet.source === 1 ? uart1 : uart0) || uart0).feedByte(packet.value & 0xff);
@@ -4791,11 +5767,17 @@ export class RP2040Runner implements BoardRunner {
                 this.serialByteBudget -= sent;
             }
 
+            const clockScale = 16_000_000 / this.getRp2040ClockHz();
+            const normalizedUpdateCycles = Math.floor(Number(this.cpu!.core.cycles) * clockScale);
             const instArray = Array.from(this.instances.values());
-            instArray.forEach((inst) => inst.update(this.cpu!.core.cycles, this.currentWires, instArray));
+            instArray.forEach((inst) => inst.update(normalizedUpdateCycles, this.currentWires, instArray));
 
         } catch (err: any) {
-            const message = String(err?.message || err || 'RP2040 execution error');
+            const baseMessage = String(err?.message || err || 'RP2040 execution error');
+            const shortStack = typeof err?.stack === 'string'
+                ? err.stack.split('\n').slice(0, 4).map((line: string) => line.trim()).join(' | ')
+                : '';
+            const message = shortStack ? `${baseMessage} :: ${shortStack}` : baseMessage;
             this.faultAndStop(message, this.cpu.core.PC >>> 0);
             return;
         }
@@ -4902,7 +5884,10 @@ export class RP2040Runner implements BoardRunner {
         this.cpu.reset();
         this.cpu.loadBootrom(bootromB1);
         this.bootromLoaded = true;
-        this.entryInfo = loadRP2040Firmware(this.cpu, this.firmwareHex);
+        this.entryInfo = loadRP2040Firmware(this.cpu, this.firmwareHex, {
+            logicalFlashBytes: this.getLogicalFlashLength(),
+            partitions: this.flashPartitions,
+        });
         this.cpuCyclesAtStart = this.cpu.core.cycles;
         this.pio0Accum = 0;
         this.pio1Accum = 0;
@@ -4990,6 +5975,10 @@ export class RP2040Runner implements BoardRunner {
     }
 
     stop() {
+        const neopixelStates = collectNeopixelShutdownStates(this.instances);
+        if (neopixelStates.length > 0) {
+            this.onStateUpdate({ type: 'state', boardId: this.boardId, components: neopixelStates });
+        }
         this.running = false;
         this.clearPendingUartLedTimers();
         this.gdbStatus = 'closed';
@@ -5019,7 +6008,7 @@ export function createRunnerForBoard(
     options: AVRRunnerOptions & { pyScript?: string } = {}
 ): BoardRunner {
     if (/pico|rp2040/i.test(String(boardType || ''))) {
-        // Default RP2040 path: emulate firmware in rp2040js and inject over UART0.
+        // RP2040 path: emulate firmware in rp2040js with optional flash partitions.
         return new RP2040Runner(hexData, componentsDef, wiresDef, onStateUpdate, options);
     }
     return new AVRRunner(hexData, componentsDef, wiresDef, onStateUpdate, options);

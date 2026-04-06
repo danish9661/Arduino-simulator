@@ -1,0 +1,195 @@
+{
+  "caseId": "case13-pico-micropython-mixed-io-serial",
+  "name": "Pico MicroPython Mixed IO + Serial Monitor",
+  "board": "pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "micropython",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 70,
+      "y": 80
+    },
+    {
+      "id": "led1",
+      "type": "wokwi-led",
+      "attrs": {
+        "color": "yellow"
+      },
+      "w": 56,
+      "h": 50,
+      "rotation": 0,
+      "label": "LED",
+      "x": 410,
+      "y": 80
+    },
+    {
+      "id": "pot1",
+      "type": "wokwi-slide-potentiometer",
+      "attrs": {
+        "value": 68
+      },
+      "w": 90,
+      "h": 74,
+      "rotation": 0,
+      "label": "Slide Potentiometer",
+      "x": 410,
+      "y": 165
+    },
+    {
+      "id": "servo1",
+      "type": "wokwi-servo",
+      "attrs": {},
+      "w": 96,
+      "h": 64,
+      "rotation": 0,
+      "label": "Servo",
+      "x": 405,
+      "y": 250
+    },
+    {
+      "id": "ws1",
+      "type": "wokwi-ws2812b",
+      "attrs": {},
+      "w": 84,
+      "h": 64,
+      "rotation": 0,
+      "label": "NeoPixel",
+      "x": 405,
+      "y": 340
+    },
+    {
+      "id": "oled1",
+      "type": "wokwi-ssd1306-oled",
+      "attrs": {},
+      "w": 128,
+      "h": 82,
+      "rotation": 0,
+      "label": "OLED",
+      "x": 525,
+      "y": 135
+    },
+    {
+      "id": "buzz1",
+      "type": "wokwi-buzzer",
+      "attrs": {},
+      "w": 68,
+      "h": 90,
+      "rotation": 0,
+      "label": "Buzzer",
+      "x": 530,
+      "y": 275
+    }
+  ],
+  "connections": [
+    {
+      "from": "pico1:GP16",
+      "to": "led1:A",
+      "id": "w1"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "led1:K",
+      "id": "w2"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "pot1:GND",
+      "id": "w3"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "pot1:VCC",
+      "id": "w4"
+    },
+    {
+      "from": "pico1:GP26",
+      "to": "pot1:SIG",
+      "id": "w5"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "servo1:GND",
+      "id": "w6"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "servo1:V+",
+      "id": "w7"
+    },
+    {
+      "from": "pico1:GP15",
+      "to": "servo1:PWM",
+      "id": "w8"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "ws1:GND",
+      "id": "w9"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "ws1:VCC",
+      "id": "w10"
+    },
+    {
+      "from": "pico1:GP2",
+      "to": "ws1:DIN",
+      "id": "w11"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "oled1:GND",
+      "id": "w12"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "oled1:VCC",
+      "id": "w13"
+    },
+    {
+      "from": "pico1:GP5",
+      "to": "oled1:SCL",
+      "id": "w14"
+    },
+    {
+      "from": "pico1:GP4",
+      "to": "oled1:SDA",
+      "id": "w15"
+    },
+    {
+      "from": "pico1:GP18",
+      "to": "buzz1:1",
+      "id": "w16"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "buzz1:2",
+      "id": "w17"
+    }
+  ],
+  "code": "from machine import Pin, ADC, PWM, UART, I2C\nfrom time import sleep_ms, ticks_ms, ticks_diff\n\ntry:\n    import neopixel\nexcept Exception:\n    neopixel = None\n\nprint(\"MP_IO_BOOT\")\nled = Pin(16, Pin.OUT, value=0)\nservo_pwm = PWM(Pin(15))\nservo_pwm.freq(50)\nbuzz_pwm = PWM(Pin(18))\nbuzz_pwm.freq(1400)\nbuzz_pwm.duty_u16(0)\npot = ADC(26)\nuart = UART(1, baudrate=115200, tx=Pin(8), rx=Pin(9))\ni2c = I2C(0, scl=Pin(5), sda=Pin(4), freq=400000)\npixels = None\nif neopixel is not None:\n    try:\n        pixels = neopixel.NeoPixel(Pin(2), 1)\n    except Exception as exc:\n        print(\"MP_IO_NEO_INIT_ERR\", exc)\n\ndef clamp_u16(value):\n    return max(0, min(65535, int(value)))\n\ndef servo_angle(angle):\n    angle = max(0, min(180, int(angle)))\n    pulse_us = 500 + int((angle * 2000) / 180)\n    duty = int((pulse_us * 65535) / 20000)\n    servo_pwm.duty_u16(clamp_u16(duty))\n\ndef oled_cmd(cmd):\n    i2c.writeto(0x3C, bytes((0x00, cmd & 0xFF)))\n\ndef oled_data(buf):\n    i2c.writeto(0x3C, b\"\\x40\" + bytes(buf))\n\ndef oled_init():\n    for cmd in (0xAE, 0x20, 0x00, 0x21, 0x00, 0x7F, 0x22, 0x00, 0x07, 0xAF):\n        oled_cmd(cmd)\n\noled_init()\n\nfor i in range(10):\n    on = (i % 2) == 0\n    led.value(1 if on else 0)\n    angle = (i * 20) % 181\n    servo_angle(angle)\n    buzz_pwm.freq(1400 + (i * 80))\n    buzz_pwm.duty_u16(28000 if on else 0)\n    if pixels is not None:\n        pixels[0] = ((32 + (i * 18)) & 0xFF, 8 if on else 2, 24 if on else 96)\n        pixels.write()\n    oled_ok = True\n    try:\n        pattern = 0xAA if on else 0x55\n        oled_cmd(0xB0 + (i % 8))\n        oled_cmd(0x00)\n        oled_cmd(0x10)\n        oled_data(bytes([pattern]) * 16)\n    except Exception as exc:\n        oled_ok = False\n        print(\"MP_IO_OLED_ERR\", exc)\n    print(\"MP_IO_STEP\", i, \"POT\", pot.read_u16(), \"ANGLE\", angle, \"OLED\", 1 if oled_ok else 0)\n    sleep_ms(80)\n\nprint(\"MP_IO_READY\")\ndeadline = ticks_ms() + 2500\nwhile ticks_diff(deadline, ticks_ms()) > 0:\n    if uart.any():\n        raw = uart.read() or b\"\"\n        text = raw.decode(\"utf-8\", \"ignore\").strip()\n        if text:\n            print(\"MP_IO_RX\", text)\n            print(\"MP_IO_ECHO:\" + text)\n            break\n    sleep_ms(25)\n\nprint(\"MP_IO_DONE\")\n",
+  "projectFiles": [
+    {
+      "id": "project/pico1/main.py",
+      "path": "project/pico1/main.py",
+      "name": "main.py",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "from machine import Pin, ADC, PWM, UART, I2C\nfrom time import sleep_ms, ticks_ms, ticks_diff\n\ntry:\n    import neopixel\nexcept Exception:\n    neopixel = None\n\nprint(\"MP_IO_BOOT\")\nled = Pin(16, Pin.OUT, value=0)\nservo_pwm = PWM(Pin(15))\nservo_pwm.freq(50)\nbuzz_pwm = PWM(Pin(18))\nbuzz_pwm.freq(1400)\nbuzz_pwm.duty_u16(0)\npot = ADC(26)\nuart = UART(1, baudrate=115200, tx=Pin(8), rx=Pin(9))\ni2c = I2C(0, scl=Pin(5), sda=Pin(4), freq=400000)\npixels = None\nif neopixel is not None:\n    try:\n        pixels = neopixel.NeoPixel(Pin(2), 1)\n    except Exception as exc:\n        print(\"MP_IO_NEO_INIT_ERR\", exc)\n\ndef clamp_u16(value):\n    return max(0, min(65535, int(value)))\n\ndef servo_angle(angle):\n    angle = max(0, min(180, int(angle)))\n    pulse_us = 500 + int((angle * 2000) / 180)\n    duty = int((pulse_us * 65535) / 20000)\n    servo_pwm.duty_u16(clamp_u16(duty))\n\ndef oled_cmd(cmd):\n    i2c.writeto(0x3C, bytes((0x00, cmd & 0xFF)))\n\ndef oled_data(buf):\n    i2c.writeto(0x3C, b\"\\x40\" + bytes(buf))\n\ndef oled_init():\n    for cmd in (0xAE, 0x20, 0x00, 0x21, 0x00, 0x7F, 0x22, 0x00, 0x07, 0xAF):\n        oled_cmd(cmd)\n\noled_init()\n\nfor i in range(10):\n    on = (i % 2) == 0\n    led.value(1 if on else 0)\n    angle = (i * 20) % 181\n    servo_angle(angle)\n    buzz_pwm.freq(1400 + (i * 80))\n    buzz_pwm.duty_u16(28000 if on else 0)\n    if pixels is not None:\n        pixels[0] = ((32 + (i * 18)) & 0xFF, 8 if on else 2, 24 if on else 96)\n        pixels.write()\n    oled_ok = True\n    try:\n        pattern = 0xAA if on else 0x55\n        oled_cmd(0xB0 + (i % 8))\n        oled_cmd(0x00)\n        oled_cmd(0x10)\n        oled_data(bytes([pattern]) * 16)\n    except Exception as exc:\n        oled_ok = False\n        print(\"MP_IO_OLED_ERR\", exc)\n    print(\"MP_IO_STEP\", i, \"POT\", pot.read_u16(), \"ANGLE\", angle, \"OLED\", 1 if oled_ok else 0)\n    sleep_ms(80)\n\nprint(\"MP_IO_READY\")\ndeadline = ticks_ms() + 2500\nwhile ticks_diff(deadline, ticks_ms()) > 0:\n    if uart.any():\n        raw = uart.read() or b\"\"\n        text = raw.decode(\"utf-8\", \"ignore\").strip()\n        if text:\n            print(\"MP_IO_RX\", text)\n            print(\"MP_IO_ECHO:\" + text)\n            break\n    sleep_ms(25)\n\nprint(\"MP_IO_DONE\")\n",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/pico1/main.py"
+  ],
+  "activeCodeFileId": "project/pico1/main.py"
+}

@@ -75,6 +75,15 @@ npm run cli -- sim run temp/project.json --all-boards --duration-ms 4000 --telem
 # Emit component behavior report
 npm run cli -- sim telemetry temp/project.json --duration-ms 2500 --json
 
+# Capture bounded runtime event trace timeline
+npm run cli -- sim trace temp/project.json --duration-ms 3000 --event-types state,serial,fault --include-state
+
+# Inspect one component in detail (state + telemetry)
+npm run cli -- sim inspect temp/project.json --component-id led1 --duration-ms 2000
+
+# Inspect by probing an interaction event first
+npm run cli -- sim inspect temp/project.json --component-id ldr1 --event SET_ATTR --key lux --value 700 --at-ms 250
+
 # Inject component events (input, SET_ATTR, press/release)
 npm run cli -- sim interact temp/project.json --component-id ldr1 --event SET_ATTR --key lux --value 700
 
@@ -106,6 +115,18 @@ npm run cli -- serial monitor --port COM7 --baud 9600
 npm run cli -- serial sim-monitor temp/project.json --duration-ms 10000
 ```
 
+### MCP server (local stdio)
+
+```bash
+# Run local MCP server over stdio
+npm run cli -- mcp serve
+
+# Optional token gate for tool calls
+npm run cli -- mcp serve --auth-token local-dev-token
+```
+
+MCP tools now include `sim_execute`, `sim_trace`, and `sim_inspect` with support for debug/GDB trace capture (`debug_mode`, `include_trace`) and simulation console capture (`include_console`) without polluting stdio transport.
+
 ### Library management
 
 ```bash
@@ -127,6 +148,9 @@ npm run cli -- repl
 - `sim run` supports `--board-id` and `--all-boards` for multi-board projects.
 - `serial monitor` provides hardware COM/TTY communication.
 - `sim run`, `sim telemetry`, and `serial sim-monitor` provide terminal-visible simulation telemetry/debug streams.
+- `sim trace` captures event timelines (state/serial/fault/debug) with optional filters.
+- `sim inspect` returns focused runtime diagnostics for one component or the whole project.
 - `sim screenshot` supports both static (`--duration-ms 0`) and runtime (`--duration-ms > 0`) capture to SVG.
 - `sim interact` can inject component events for interactive parts (e.g. LDR, potentiometer, pushbutton).
+- `mcp serve` starts a local Model Context Protocol server over stdio, including simulation trace/inspect tools for remote automation.
 - Default backend URL is `http://localhost:5001/api` and can be overridden with `--backend-url`.

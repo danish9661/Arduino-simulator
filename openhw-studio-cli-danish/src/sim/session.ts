@@ -61,6 +61,7 @@ type ProtocolRoutingModule = {
 
 interface StartSimulationHooks {
   onEvent?: (event: any) => void;
+  suppressConsoleOutput?: boolean;
 }
 
 interface NetIndex {
@@ -360,6 +361,7 @@ export async function startSimulation(
   const startedAt = Date.now();
 
   const emitEvent = (message: any, fallbackBoardId?: string) => {
+    const suppressConsoleOutput = !!hooks.suppressConsoleOutput;
     const normalized =
       message && typeof message === 'object'
         ? { ...message }
@@ -379,7 +381,9 @@ export async function startSimulation(
 
     if (normalized.type === 'serial') {
       const chunk = String(normalized.data || '');
-      process.stdout.write(chunk);
+      if (!suppressConsoleOutput) {
+        process.stdout.write(chunk);
+      }
       if (boardId) {
         boardSerialChars.set(boardId, Number(boardSerialChars.get(boardId) || 0) + chunk.length);
       }
@@ -390,11 +394,17 @@ export async function startSimulation(
       if (boardId) {
         boardFaultCounts.set(boardId, Number(boardFaultCounts.get(boardId) || 0) + 1);
       }
-      process.stderr.write(
-        `\n[fault:${boardId || 'unknown'}] ${String(normalized.reason || 'runtime fault')} @ ${String(
-          normalized.pc ?? 'n/a'
-        )}\n`
-      );
+      if (!suppressConsoleOutput) {
+        process.stderr.write(
+          `\n[fault:${boardId || 'unknown'}] ${String(normalized.reason || 'runtime fault')} @ ${String(
+            normalized.pc ?? 'n/a'
+          )}\n`
+        );
+      }
+      return;
+    }
+
+    if (suppressConsoleOutput) {
       return;
     }
 

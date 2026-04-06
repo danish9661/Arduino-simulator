@@ -1,5 +1,6 @@
 import { Command, CommanderError } from 'commander';
 import { registerLibCommands } from './commands/lib.js';
+import { registerMcpCommands } from './commands/mcp.js';
 import { registerProjectCommands } from './commands/project.js';
 import { registerReplCommand } from './commands/repl.js';
 import { registerSerialCommands } from './commands/serial.js';
@@ -33,6 +34,7 @@ export function createProgram(options: CreateProgramOptions): Command {
   };
 
   registerProjectCommands(program);
+  registerMcpCommands(program, getBackendUrl);
   registerSimCommands(program, getBackendUrl);
   registerSerialCommands(program, getBackendUrl);
   registerLibCommands(program, getBackendUrl);

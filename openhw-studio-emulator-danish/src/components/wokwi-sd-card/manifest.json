@@ -9,6 +9,16 @@
     "mounted": "true",
     "capacityKB": "2048"
   },
+  "telemetry": {
+    "template": "mounted=${state.mounted}, fsReady=${state.fsReady}, fileCount=${state.fileCount}, usedBytes=${state.usedBytes}, lastOp=${state.lastOp}",
+    "criticalKeys": [
+      "state.mounted",
+      "state.fsReady",
+      "state.fileCount",
+      "state.usedBytes",
+      "state.lastOp"
+    ]
+  },
   "pins": [
     {
       "id": "VCC",

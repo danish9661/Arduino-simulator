@@ -10,6 +10,11 @@ export interface ManifestPinInfo {
   description?: string;
 }
 
+export interface ManifestTelemetryInfo {
+  template?: string;
+  criticalKeys: string[];
+}
+
 export interface ManifestInfo {
   type: string;
   label: string;
@@ -17,6 +22,7 @@ export interface ManifestInfo {
   pins: ManifestPinInfo[];
   pinIds: Set<string>;
   hasOnEvent: boolean;
+  telemetry?: ManifestTelemetryInfo;
 }
 
 const MANIFEST_CACHE = new Map<string, ManifestInfo>();
@@ -51,6 +57,10 @@ async function loadAllManifests(): Promise<void> {
         label?: string;
         group?: string;
         pins?: Array<{ id?: string; x?: number; y?: number; type?: string; description?: string }>;
+        telemetry?: {
+          template?: unknown;
+          criticalKeys?: unknown;
+        };
       };
       const type = String(parsed.type || '').trim();
       if (!type) continue;
@@ -79,6 +89,16 @@ async function loadAllManifests(): Promise<void> {
         hasOnEvent = false;
       }
 
+      const telemetryRaw = parsed.telemetry;
+      const telemetry = telemetryRaw && typeof telemetryRaw === 'object'
+        ? {
+            template: typeof telemetryRaw.template === 'string' ? telemetryRaw.template : undefined,
+            criticalKeys: Array.isArray(telemetryRaw.criticalKeys)
+              ? telemetryRaw.criticalKeys.map((key) => String(key || '').trim()).filter(Boolean)
+              : [],
+          }
+        : undefined;
+
       MANIFEST_CACHE.set(type, {
         type,
         label: String(parsed.label || type),
@@ -86,6 +106,7 @@ async function loadAllManifests(): Promise<void> {
         pins,
         pinIds,
         hasOnEvent,
+        telemetry,
       });
     } catch {
       // Ignore malformed or missing manifests.

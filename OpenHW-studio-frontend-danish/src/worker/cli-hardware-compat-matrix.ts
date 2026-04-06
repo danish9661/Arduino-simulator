@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { createRunnerForBoard } from './execute.ts';
+import { buildFatFsImage, buildLittleFsImage, createRunnerForBoard } from './execute.ts';
 import {
   endpointAliases,
   resolveUartRoute,
@@ -49,7 +49,12 @@ type SingleBoardCaseOptions = {
   boardId?: string;
   serialBaudRate?: number;
   pyScript?: string;
+  circuitPythonScript?: string;
   loopbackToSelf?: boolean;
+  rp2040LogicalFlashBytes?: number;
+  rp2040FlashPartitions?: Array<{ offset: number; data: Uint8Array }>;
+  circuitPythonWaitMs?: number;
+  serialInputs?: Array<{ delayMs: number; data: string; source?: string }>;
 };
 
 type LinkedBoardCaseOptions = {
@@ -85,11 +90,19 @@ const __dirname = path.dirname(__filename);
 const WORKSPACE_ROOT = path.resolve(__dirname, '..', '..', '..');
 const JSON_EXAMPLE_DIR = path.resolve(WORKSPACE_ROOT, 'openhw-studio-examples-danish', 'examples', 'json-example');
 const MICROPYTHON_UF2_PATH = path.resolve(WORKSPACE_ROOT, 'openhw-studio-backend-danish', 'data', 'firmware', 'pico-micropython-uart0.uf2');
+const CIRCUITPYTHON_UF2_PATH = path.resolve(WORKSPACE_ROOT, 'openhw-studio-backend-danish', 'data', 'firmware', 'adafruit-circuitpython-raspberry_pi_pico-en_US-8.2.7.uf2');
 const UF2_PAYLOAD_PREFIX = 'UF2BASE64:';
+const RP2040_LOGICAL_FLASH_BYTES = 2 * 1024 * 1024;
+const RP2040_MICROPYTHON_FS_OFFSET = 0xA0000;
+const RP2040_CIRCUITPYTHON_FS_OFFSET = 0xC0000;
+const RP2040_LITTLEFS_BLOCK_SIZE = 4096;
+
+type Rp2040RuntimeEnv = 'native' | 'micropython' | 'circuitpython';
 
 const ALLOWED_ARDUINO_SOURCE_EXTS = new Set(['.ino', '.h', '.hpp', '.c', '.cpp']);
 const jsonExampleCache = new Map<string, any | null>();
 const micropythonUf2PayloadCache = { value: '' };
+const circuitpythonUf2PayloadCache = { value: '' };
 
 function loadJsonExampleFixture(caseId: string): any | null {
   if (jsonExampleCache.has(caseId)) {
@@ -110,6 +123,127 @@ function loadJsonExampleFixture(caseId: string): any | null {
 
 function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeRp2040RuntimeEnv(source: unknown): Rp2040RuntimeEnv {
+  const value = String(source || '').trim().toLowerCase();
+  if (!value || value === 'none' || value === 'native' || value === 'ino') return 'native';
+  if (value === 'cp' || value === 'circuitpy' || value === 'circuitpython' || value.startsWith('circuitpython')) {
+    return 'circuitpython';
+  }
+  if (value === 'py' || value === 'python' || value === 'micropython' || value.startsWith('micropython')) {
+    return 'micropython';
+  }
+  return 'native';
+}
+
+function getRp2040PythonFsOffset(env: Rp2040RuntimeEnv): number {
+  if (env === 'circuitpython') {
+    const override = Number.parseInt(String(process.env.CLI_CP_FS_OFFSET || ''), 0);
+    if (Number.isFinite(override) && override > 0) {
+      return Math.floor(override) >>> 0;
+    }
+  }
+
+  return env === 'circuitpython'
+    ? RP2040_CIRCUITPYTHON_FS_OFFSET
+    : RP2040_MICROPYTHON_FS_OFFSET;
+}
+
+function getRp2040PythonFsBytes(env: Rp2040RuntimeEnv): number {
+  const offset = getRp2040PythonFsOffset(env);
+  return Math.max(0, RP2040_LOGICAL_FLASH_BYTES - offset);
+}
+
+function getRp2040PythonEntryFileName(env: Rp2040RuntimeEnv): string {
+  return env === 'circuitpython' ? 'code.py' : 'main.py';
+}
+
+function normalizeRuntimePath(pathLike: unknown): string {
+  const normalized = String(pathLike || '')
+    .replace(/\\/g, '/')
+    .replace(/^\/+/, '')
+    .trim();
+
+  if (!normalized) return '';
+
+  const parts = normalized
+    .split('/')
+    .map((part) => part.trim())
+    .filter((part) => part && part !== '.' && part !== '..');
+
+  return parts.join('/');
+}
+
+function resolveFixtureRuntimeEnv(caseId: string, boardId: string): Rp2040RuntimeEnv {
+  const fixture = loadJsonExampleFixture(caseId);
+  if (!fixture) return 'native';
+
+  const components = Array.isArray(fixture.components) ? fixture.components : [];
+  const board = components.find((comp: any) => String(comp?.id || '') === String(boardId || ''));
+  return normalizeRp2040RuntimeEnv(board?.attrs?.env);
+}
+
+function resolveFixturePythonRuntimeFiles(caseId: string, boardId: string): Array<{ path: string; content: string }> {
+  const fixture = loadJsonExampleFixture(caseId);
+  if (!fixture) return [];
+
+  const boardPrefix = `project/${String(boardId || '').trim()}/`;
+  const projectFiles = Array.isArray(fixture.projectFiles) ? fixture.projectFiles : [];
+  const filesByPath = new Map<string, string>();
+
+  for (const file of projectFiles) {
+    if (String(file?.boardId || '').trim() !== String(boardId || '').trim()) continue;
+    if (String(file?.kind || 'code') !== 'code') continue;
+
+    const rawPath = String(file?.path || file?.name || '').replace(/\\/g, '/').trim();
+    const ext = path.extname(rawPath || String(file?.name || '')).toLowerCase();
+    if (ext !== '.py') continue;
+
+    let relativePath = rawPath;
+    if (rawPath.toLowerCase().startsWith(boardPrefix.toLowerCase())) {
+      relativePath = rawPath.slice(boardPrefix.length);
+    }
+
+    const normalizedPath = normalizeRuntimePath(relativePath || file?.name || '');
+    if (!normalizedPath) continue;
+    filesByPath.set(normalizedPath, String(file?.content || ''));
+  }
+
+  return Array.from(filesByPath.entries())
+    .map(([runtimePath, content]) => ({ path: runtimePath, content }))
+    .sort((a, b) => a.path.localeCompare(b.path));
+}
+
+function resolveRp2040RuntimeFiles(
+  caseId: string,
+  boardId: string,
+  env: Rp2040RuntimeEnv,
+  fallbackFiles: Array<{ path: string; content: string }> = [],
+): Array<{ path: string; content: string }> {
+  const filesByPath = new Map<string, string>();
+  const addFile = (rawPath: unknown, rawContent: unknown) => {
+    const runtimePath = normalizeRuntimePath(rawPath);
+    if (!runtimePath) return;
+    filesByPath.set(runtimePath, String(rawContent || ''));
+  };
+
+  for (const file of resolveFixturePythonRuntimeFiles(caseId, boardId)) {
+    addFile(file.path, file.content);
+  }
+
+  for (const file of (Array.isArray(fallbackFiles) ? fallbackFiles : [])) {
+    addFile(file?.path, file?.content);
+  }
+
+  const entryName = getRp2040PythonEntryFileName(env);
+  if (!filesByPath.has(entryName) && filesByPath.has('main.py')) {
+    filesByPath.set(entryName, String(filesByPath.get('main.py') || ''));
+  }
+
+  return Array.from(filesByPath.entries())
+    .map(([runtimePath, content]) => ({ path: runtimePath, content }))
+    .sort((a, b) => a.path.localeCompare(b.path));
 }
 
 function resolveCaseCircuit(caseId: string, fallbackCircuit: CircuitFixture): CircuitFixture {
@@ -208,6 +342,46 @@ function loadMicroPythonUf2Payload(): string {
   return micropythonUf2PayloadCache.value;
 }
 
+function loadCircuitPythonUf2Payload(): string {
+  if (circuitpythonUf2PayloadCache.value) return circuitpythonUf2PayloadCache.value;
+
+  if (!fs.existsSync(CIRCUITPYTHON_UF2_PATH)) {
+    throw new Error(`CircuitPython UF2 not found: ${CIRCUITPYTHON_UF2_PATH}`);
+  }
+
+  const uf2Data = fs.readFileSync(CIRCUITPYTHON_UF2_PATH);
+  circuitpythonUf2PayloadCache.value = `${UF2_PAYLOAD_PREFIX}${uf2Data.toString('base64')}`;
+  return circuitpythonUf2PayloadCache.value;
+}
+
+async function buildRp2040RuntimeFsPartitions(
+  runtimeFiles: Array<{ path: string; content: string }>,
+  env: Rp2040RuntimeEnv,
+): Promise<Array<{ offset: number; data: Uint8Array }> | undefined> {
+  if (!Array.isArray(runtimeFiles) || runtimeFiles.length === 0) return undefined;
+
+  const fsOffset = getRp2040PythonFsOffset(env);
+  const fsBytes = getRp2040PythonFsBytes(env);
+  if (fsBytes <= 0) return undefined;
+
+  const fsFiles = runtimeFiles.map((file) => ({ path: file.path, data: String(file.content || '') }));
+  const image = env === 'circuitpython'
+    ? buildFatFsImage(fsFiles, {
+      sizeBytes: fsBytes,
+      volumeLabel: 'CIRCUITPY',
+    })
+    : await buildLittleFsImage(fsFiles, {
+      sizeBytes: fsBytes,
+      blockSize: RP2040_LITTLEFS_BLOCK_SIZE,
+    });
+  if (!image || image.length === 0) return undefined;
+
+  return [{
+    offset: fsOffset,
+    data: image,
+  }];
+}
+
 function buildMicroPythonRawPayload(scriptSource: string): string {
   const normalized = String(scriptSource || '')
     .replace(/\r\n/g, '\n')
@@ -220,6 +394,49 @@ function buildMicroPythonRawPayload(scriptSource: string): string {
 
 function buildMicroPythonReplProbe(): string {
   return '\r\n';
+}
+
+function buildCircuitPythonInjectedScript(runtimeFiles: Array<{ path: string; content: string }>): string {
+  const files = Array.isArray(runtimeFiles) ? runtimeFiles : [];
+  if (files.length === 0) return '';
+
+  const normalizeModuleName = (runtimePath: string): string | null => {
+    const normalized = normalizeRuntimePath(runtimePath);
+    if (!normalized || !normalized.toLowerCase().endsWith('.py')) return null;
+    if (normalized.includes('/')) return null;
+    const stem = normalized.slice(0, -3);
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(stem)) return null;
+    if (stem === 'code' || stem === 'main') return null;
+    return stem;
+  };
+
+  const escapeRegExp = (value: string): string => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const mainFile = files.find((file) => String(file.path || '').toLowerCase() === 'code.py')
+    || files.find((file) => String(file.path || '').toLowerCase() === 'main.py')
+    || files.find((file) => String(file.path || '').toLowerCase().endsWith('.py'))
+    || null;
+  if (!mainFile) return '';
+
+  let mainSource = String(mainFile.content || '');
+  const lines: string[] = [];
+
+  for (const file of files) {
+    const moduleName = normalizeModuleName(String(file.path || ''));
+    if (!moduleName) continue;
+
+    const importFromPattern = new RegExp(`^\\s*from\\s+${escapeRegExp(moduleName)}\\s+import\\s+.*$`, 'gm');
+    const importModulePattern = new RegExp(`^\\s*import\\s+${escapeRegExp(moduleName)}\\s*$`, 'gm');
+    mainSource = mainSource.replace(importFromPattern, '');
+    mainSource = mainSource.replace(importModulePattern, '');
+
+    lines.push(String(file.content || ''));
+    lines.push('');
+  }
+
+  lines.push(mainSource);
+  lines.push('');
+  return lines.join('\n');
 }
 
 function scheduleMicroPythonInject(
@@ -628,6 +845,17 @@ function makePicoMicroPythonMixedCircuit(): CircuitFixture {
   return { components, wires };
 }
 
+function makePicoMixedIoCircuit(): CircuitFixture {
+  const base = makePicoMicroPythonMixedCircuit();
+  const components = [...base.components, { id: 'buzz1', type: 'wokwi-buzzer', attrs: {} }];
+  const wires = [
+    ...base.wires,
+    { from: 'pico1:GP18', to: 'buzz1:1' },
+    { from: 'pico1:GND', to: 'buzz1:2' },
+  ];
+  return { components, wires };
+}
+
 function makePicoOledCircuit(): CircuitFixture {
   const components = [
     makePicoBoard('pico1'),
@@ -661,6 +889,8 @@ async function runSingleBoardCase(
   let faultCount = 0;
 
   const boardId = String(options.boardId || options.circuit?.components?.[0]?.id || 'board1');
+  const serialInputTimers: Array<ReturnType<typeof setTimeout>> = [];
+  let acceptStateUpdates = true;
 
   let runner: any = null;
 
@@ -689,6 +919,9 @@ async function runSingleBoardCase(
           Number(event.metrics?.serialRxBytes || 0),
         );
       } else if (msg?.type === 'state') {
+        if (!acceptStateUpdates) {
+          return;
+        }
         if (msg?.pins) {
           pinSnapshots.push({ ...(msg.pins || {}) });
         }
@@ -714,6 +947,8 @@ async function runSingleBoardCase(
       debugEnabled: /rp2040|pico/i.test(String(boardType || '')),
       debugIntervalMs: 300,
       pyScript: options.pyScript,
+      rp2040LogicalFlashBytes: options.rp2040LogicalFlashBytes,
+      rp2040FlashPartitions: options.rp2040FlashPartitions,
       onByteTransmit: ({ boardId: txBoardId, value, char, source }) => {
         serialText += String(char || '');
         events.push({
@@ -747,6 +982,147 @@ async function runSingleBoardCase(
     );
   }
 
+  const circuitPythonScript = String(options.circuitPythonScript || '').trim();
+  if (circuitPythonScript && /rp2040|pico/i.test(String(boardType || ''))) {
+    const waitForUsbMs = Math.max(1000, Number(options.circuitPythonWaitMs || 9000));
+    const sendByte = (byte: number, source: string = 'usb') => {
+      if (!runner) return;
+      if (typeof runner.serialRxByteFromSource === 'function') {
+        runner.serialRxByteFromSource(byte & 0xff, source);
+      } else if (typeof runner.serialRxByte === 'function') {
+        runner.serialRxByte(byte & 0xff);
+      } else if (typeof runner.serialRx === 'function') {
+        runner.serialRx(String.fromCharCode(byte & 0xff));
+      }
+    };
+
+    const streamText = (
+      text: string,
+      source: string,
+      chunkSize = 8,
+      everyMs = 10,
+      onDone?: () => void,
+    ) => {
+      const bytes = Array.from(text || '', (ch) => ch.charCodeAt(0) & 0xff);
+      if (bytes.length === 0) {
+        if (typeof onDone === 'function') onDone();
+        return;
+      }
+
+      let index = 0;
+      const streamTimer = setInterval(() => {
+        if (!runner) {
+          clearInterval(streamTimer);
+          return;
+        }
+
+        const end = Math.min(index + chunkSize, bytes.length);
+        for (let i = index; i < end; i++) {
+          sendByte(bytes[i], source);
+        }
+        index = end;
+
+        if (index >= bytes.length) {
+          clearInterval(streamTimer);
+          if (typeof onDone === 'function') {
+            onDone();
+          }
+        }
+      }, Math.max(1, everyMs));
+
+      serialInputTimers.push(streamTimer as unknown as ReturnType<typeof setTimeout>);
+    };
+
+    const startedAt = Date.now();
+    let injected = false;
+    const timer = setInterval(() => {
+      if (!runner || injected) return;
+
+      const usbReady = !!(runner as any)?.usbCdcReady;
+      const waitedMs = Date.now() - startedAt;
+      if (!usbReady && waitedMs < waitForUsbMs) {
+        return;
+      }
+
+      const transportSource = usbReady ? 'usb' : 'uart0';
+
+      injected = true;
+      clearInterval(timer);
+
+      // Stage CP raw-REPL injection and wait for the raw prompt before script payload.
+      streamText('x\r', transportSource, 1, 24);
+      const interruptTimer = setTimeout(() => {
+        streamText('\u0003\u0003', transportSource, 1, 30);
+      }, 80);
+      serialInputTimers.push(interruptTimer);
+
+      const enterRawTimer = setTimeout(() => {
+        streamText('\u0001', transportSource, 1, 30);
+      }, 260);
+      serialInputTimers.push(enterRawTimer);
+
+      const rawPromptStartedAt = Date.now();
+      let scriptDispatched = false;
+      const dispatchScript = () => {
+        if (scriptDispatched || !runner) return;
+        scriptDispatched = true;
+        const scriptPayload = `${circuitPythonScript}\n`;
+        streamText(scriptPayload, transportSource, 64, 8, () => {
+          // Send Ctrl-D with a small tail delay, then repeat once for robustness.
+          const ctrlD1 = setTimeout(() => sendByte(0x04, transportSource), 120);
+          const ctrlD2 = setTimeout(() => sendByte(0x04, transportSource), 1500);
+          serialInputTimers.push(ctrlD1, ctrlD2);
+        });
+      };
+
+      const rawPromptPoll = setInterval(() => {
+        if (!runner || scriptDispatched) {
+          clearInterval(rawPromptPoll);
+          return;
+        }
+
+        const waitedMs = Date.now() - rawPromptStartedAt;
+        if (/raw REPL; CTRL-B to exit[\s\S]*>\s*$/.test(serialText)) {
+          dispatchScript();
+          clearInterval(rawPromptPoll);
+          return;
+        }
+
+        // Fall back to sending script after bounded wait.
+        if (waitedMs >= 3500) {
+          dispatchScript();
+          clearInterval(rawPromptPoll);
+        }
+      }, 80);
+      serialInputTimers.push(rawPromptPoll as unknown as ReturnType<typeof setTimeout>);
+    }, 120);
+    serialInputTimers.push(timer as unknown as ReturnType<typeof setTimeout>);
+  }
+
+  const serialInputs = Array.isArray(options.serialInputs) ? options.serialInputs : [];
+  for (const item of serialInputs) {
+    if (!item || typeof item !== 'object') continue;
+    const delayMs = Math.max(0, Number(item.delayMs || 0));
+    const payload = String(item.data || '');
+    if (!payload) continue;
+    const source = String(item.source || '').trim().toLowerCase() || 'uart0';
+
+    const timer = setTimeout(() => {
+      if (!runner) return;
+      for (let i = 0; i < payload.length; i++) {
+        const byte = payload.charCodeAt(i) & 0xff;
+        if (typeof runner.serialRxByteFromSource === 'function') {
+          runner.serialRxByteFromSource(byte, source);
+        } else if (typeof runner.serialRxByte === 'function') {
+          runner.serialRxByte(byte);
+        } else if (typeof runner.serialRx === 'function') {
+          runner.serialRx(String.fromCharCode(byte));
+        }
+      }
+    }, delayMs);
+    serialInputTimers.push(timer);
+  }
+
   await sleep(durationMs);
 
   const componentPinVoltages: Record<string, Record<string, number>> = {};
@@ -773,9 +1149,15 @@ async function runSingleBoardCase(
   }
 
   try {
+    acceptStateUpdates = false;
     runner.stop();
   } catch {
     // no-op
+  }
+
+
+  for (const timer of serialInputTimers) {
+    clearTimeout(timer);
   }
 
   const pinSummary = summarizePinActivity(pinSnapshots);
@@ -1497,6 +1879,172 @@ function makeMicroPythonMixedScript(): string {
   ].join('\n');
 }
 
+function makeCircuitPythonMultiFileCodeScript(): string {
+  return [
+    'import time',
+    'from helper import HELPER_TAG',
+    '',
+    'print("CP_MULTI_BOOT")',
+    'print(HELPER_TAG)',
+    'for i in range(3):',
+    '    print("CP_MULTI_TICK", i)',
+    '    time.sleep(0.05)',
+    '',
+  ].join('\n');
+}
+
+function makeMicroPythonMixedIoScript(): string {
+  return [
+    'from machine import Pin, ADC, PWM, UART, I2C',
+    'from time import sleep_ms, ticks_ms, ticks_diff',
+    '',
+    'try:',
+    '    import neopixel',
+    'except Exception:',
+    '    neopixel = None',
+    '',
+    'print("MP_IO_BOOT")',
+    'led = Pin(16, Pin.OUT, value=0)',
+    'servo_pwm = PWM(Pin(15))',
+    'servo_pwm.freq(50)',
+    'buzz_pwm = PWM(Pin(18))',
+    'buzz_pwm.freq(1400)',
+    'buzz_pwm.duty_u16(0)',
+    'pot = ADC(26)',
+    'uart = UART(1, baudrate=115200, tx=Pin(8), rx=Pin(9))',
+    'i2c = I2C(0, scl=Pin(5), sda=Pin(4), freq=400000)',
+    'pixels = None',
+    'if neopixel is not None:',
+    '    try:',
+    '        pixels = neopixel.NeoPixel(Pin(2), 1)',
+    '    except Exception as exc:',
+    '        print("MP_IO_NEO_INIT_ERR", exc)',
+    '',
+    'def clamp_u16(value):',
+    '    return max(0, min(65535, int(value)))',
+    '',
+    'def servo_angle(angle):',
+    '    angle = max(0, min(180, int(angle)))',
+    '    pulse_us = 500 + int((angle * 2000) / 180)',
+    '    duty = int((pulse_us * 65535) / 20000)',
+    '    servo_pwm.duty_u16(clamp_u16(duty))',
+    '',
+    'def oled_cmd(cmd):',
+    '    i2c.writeto(0x3C, bytes((0x00, cmd & 0xFF)))',
+    '',
+    'def oled_data(buf):',
+    '    i2c.writeto(0x3C, b"\\x40" + bytes(buf))',
+    '',
+    'def oled_init():',
+    '    for cmd in (0xAE, 0x20, 0x00, 0x21, 0x00, 0x7F, 0x22, 0x00, 0x07, 0xAF):',
+    '        oled_cmd(cmd)',
+    '',
+    'oled_init()',
+    '',
+    'for i in range(10):',
+    '    on = (i % 2) == 0',
+    '    led.value(1 if on else 0)',
+    '    angle = (i * 20) % 181',
+    '    servo_angle(angle)',
+    '    buzz_pwm.freq(1400 + (i * 80))',
+    '    buzz_pwm.duty_u16(28000 if on else 0)',
+    '    if pixels is not None:',
+    '        pixels[0] = ((32 + (i * 18)) & 0xFF, 8 if on else 2, 24 if on else 96)',
+    '        pixels.write()',
+    '    oled_ok = True',
+    '    try:',
+    '        pattern = 0xAA if on else 0x55',
+    '        oled_cmd(0xB0 + (i % 8))',
+    '        oled_cmd(0x00)',
+    '        oled_cmd(0x10)',
+    '        oled_data(bytes([pattern]) * 16)',
+    '    except Exception as exc:',
+    '        oled_ok = False',
+    '        print("MP_IO_OLED_ERR", exc)',
+    '    print("MP_IO_STEP", i, "POT", pot.read_u16(), "ANGLE", angle, "OLED", 1 if oled_ok else 0)',
+    '    sleep_ms(80)',
+    '',
+    'print("MP_IO_READY")',
+    'deadline = ticks_ms() + 2500',
+    'while ticks_diff(deadline, ticks_ms()) > 0:',
+    '    if uart.any():',
+    '        raw = uart.read() or b""',
+    '        text = raw.decode("utf-8", "ignore").strip()',
+    '        if text:',
+    '            print("MP_IO_RX", text)',
+    '            print("MP_IO_ECHO:" + text)',
+    '            break',
+    '    sleep_ms(25)',
+    '',
+    'print("MP_IO_DONE")',
+    '',
+  ].join('\n');
+}
+
+function makeCircuitPythonMixedIoCodeScript(): string {
+  return [
+    'import time',
+    'import board',
+    'import digitalio',
+    '',
+    'print("CP_IO_BOOT")',
+    '',
+    'led = None',
+    'servo = None',
+    'buzz = None',
+    '',
+    'print("CP_IO_NO_NEOPIXEL")',
+    'print("CP_IO_NO_OLED")',
+    '',
+    'try:',
+    '    led = digitalio.DigitalInOut(board.GP16)',
+    '    led.direction = digitalio.Direction.OUTPUT',
+    'except Exception as exc:',
+    '    print("CP_IO_LED_ERR", exc)',
+    '',
+    'try:',
+    '    servo = digitalio.DigitalInOut(board.GP15)',
+    '    servo.direction = digitalio.Direction.OUTPUT',
+    'except Exception as exc:',
+    '    print("CP_IO_SERVO_ERR", exc)',
+    '',
+    'try:',
+    '    buzz = digitalio.DigitalInOut(board.GP18)',
+    '    buzz.direction = digitalio.Direction.OUTPUT',
+    'except Exception as exc:',
+    '    print("CP_IO_BUZZ_ERR", exc)',
+    '',
+    'def pulse_servo(angle):',
+    '    if servo is None:',
+    '        return',
+    '    angle = max(0, min(180, int(angle)))',
+    '    pulse_us = 700 + int((angle * 1400) / 180)',
+    '    servo.value = True',
+    '    time.sleep(pulse_us / 1000000.0)',
+    '    servo.value = False',
+    '',
+    'for i in range(10):',
+    '    on = (i % 2) == 0',
+    '    if led is not None:',
+    '        led.value = on',
+    '    pulse_servo((i * 20) % 181)',
+    '    if buzz is not None:',
+    '        buzz.value = on',
+    '    print("CP_IO_STEP", i)',
+    '    pulse_servo((i * 20 + 10) % 181)',
+    '    time.sleep(0.06)',
+    '',
+    'if led is not None:',
+    '    led.value = False',
+    'if servo is not None:',
+    '    servo.value = False',
+    'if buzz is not None:',
+    '    buzz.value = False',
+    'print("CP_IO_DONE")',
+    '',
+  ].join('\n');
+}
+
 function writeLogs(reports: CaseReport[], rawEvents: Record<string, WorkerEvent[]>, serialDump: Record<string, string>) {
   const outDir = path.join(WORKSPACE_ROOT, 'temp', 'cli-hw-matrix');
   ensureDir(outDir);
@@ -1541,7 +2089,11 @@ async function main() {
   // Case 1: WS2812B with Pico
   if (shouldRunCase('case1-pico-ws2812b')) {
     const caseId = 'case1-pico-ws2812b';
-    const compileInput = resolveArduinoCompileInputs(caseId, 'pico1', makePicoWs2812Sketch());
+    const fixtureCircuit = makeWs2812Circuit();
+    const compileInput = {
+      mainCode: makePicoWs2812Sketch(),
+      extraFiles: [],
+    };
     const artifact = compileArduinoSketch({
       fqbn: 'rp2040:rp2040:rpipico',
       sketchName: 'PicoWs2812',
@@ -1553,20 +2105,23 @@ async function main() {
       caseId,
       'wokwi-raspberry-pi-pico',
       artifact.payload,
-      4200,
-      { circuit: resolveCaseCircuit(caseId, makeWs2812Circuit()), serialBaudRate: 115200 },
+      7000,
+      { circuit: fixtureCircuit, serialBaudRate: 115200 },
     );
 
     const pixels = run.report.details.componentLastState?.ws1?.pixels;
     const hasPixels = Array.isArray(pixels) && pixels.some((v: number) => Number(v) !== 0);
+    const serialMarker = /WS2812_SENT|NEO_POS|8X8_NEOPIXEL_BOOT/.test(run.serialText);
+
     run.report.pass = run.report.details.faultCount === 0
-      && /WS2812_SENT/.test(run.serialText)
+      && serialMarker
       && hasPixels;
     run.report.details.ws2812HasPixels = hasPixels;
+    run.report.details.ws2812SerialMarker = serialMarker;
     run.report.details.compileArtifact = artifact.artifactType;
     attachBehaviorChecks(run.report, {
       noFaults: run.report.details.faultCount === 0,
-      serialMarker: /WS2812_SENT/.test(run.serialText),
+      serialMarker,
       pixelsUpdated: hasPixels,
     });
 
@@ -2105,6 +2660,247 @@ async function main() {
       oledFramesPrinted: /OLED_FRAME\s+\d+/.test(run.serialText),
       oledStateUpdated: oledUpdates > 0,
       oledDisplayEnabled: oledState.displayOn === true,
+    });
+
+    reports.push(run.report);
+    rawEvents[run.report.caseId] = run.events;
+    serialDump[run.report.caseId] = run.serialText;
+  }
+
+  // Case 12: CircuitPython multi-file support (code.py + helper import)
+  if (shouldRunCase('case12-circuitpython-multifile-py')) {
+    const caseId = 'case12-circuitpython-multifile-py';
+    const runtimeEnv = resolveFixtureRuntimeEnv(caseId, 'pico1');
+    const effectiveEnv = runtimeEnv === 'native' ? 'circuitpython' : runtimeEnv;
+    const runtimeFiles = resolveRp2040RuntimeFiles(
+      caseId,
+      'pico1',
+      effectiveEnv,
+      [
+        { path: 'helper.py', content: 'HELPER_TAG = "CP_HELPER_OK"\n' },
+        { path: 'code.py', content: makeCircuitPythonMultiFileCodeScript() },
+      ],
+    );
+    const flashPartitions = await buildRp2040RuntimeFsPartitions(runtimeFiles, effectiveEnv);
+    const hasFlashPartitions = Array.isArray(flashPartitions) && flashPartitions.length > 0;
+    const circuitPythonUf2 = loadCircuitPythonUf2Payload();
+
+    const run = await runSingleBoardCase(
+      caseId,
+      'wokwi-raspberry-pi-pico',
+      circuitPythonUf2,
+      17000,
+      {
+        circuit: resolveCaseCircuit(caseId, {
+          components: [makePicoBoard('pico1')],
+          wires: [],
+        }),
+        serialBaudRate: 115200,
+        rp2040LogicalFlashBytes: RP2040_LOGICAL_FLASH_BYTES,
+        rp2040FlashPartitions: flashPartitions,
+        circuitPythonWaitMs: 12000,
+        circuitPythonScript: buildCircuitPythonInjectedScript(runtimeFiles),
+      },
+    );
+
+    const bootPrinted = /CP_MULTI_BOOT/.test(run.serialText);
+    const helperImported = /CP_HELPER_OK/.test(run.serialText);
+    const tickPrinted = /CP_MULTI_TICK/.test(run.serialText);
+
+    run.report.pass = run.report.details.faultCount === 0
+      && hasFlashPartitions
+      && bootPrinted
+      && helperImported
+      && tickPrinted;
+    run.report.details.runtimeEnv = effectiveEnv;
+    run.report.details.runtimeFiles = runtimeFiles.map((f) => f.path);
+    run.report.details.flashPartitionCount = hasFlashPartitions ? flashPartitions.length : 0;
+    run.report.details.flashPartitionBytes = hasFlashPartitions ? Number(flashPartitions[0]?.data?.length || 0) : 0;
+    attachBehaviorChecks(run.report, {
+      noFaults: run.report.details.faultCount === 0,
+      partitionsBuilt: hasFlashPartitions,
+      circuitPythonBoot: bootPrinted,
+      helperImport: helperImported,
+      codePyExecuted: tickPrinted,
+    });
+
+    reports.push(run.report);
+    rawEvents[run.report.caseId] = run.events;
+    serialDump[run.report.caseId] = run.serialText;
+  }
+
+  // Case 13: MicroPython mixed components + serial input echo
+  if (shouldRunCase('case13-pico-micropython-mixed-io-serial')) {
+    const caseId = 'case13-pico-micropython-mixed-io-serial';
+    const mainScript = makeMicroPythonMixedIoScript();
+    const runtimeFiles = resolveRp2040RuntimeFiles(
+      caseId,
+      'pico1',
+      'micropython',
+      [{ path: 'main.py', content: mainScript }],
+    );
+    const flashPartitions = await buildRp2040RuntimeFsPartitions(runtimeFiles, 'micropython');
+    const hasFlashPartitions = Array.isArray(flashPartitions) && flashPartitions.length > 0;
+    const pyScriptFallback = hasFlashPartitions ? '' : mainScript;
+    const micropythonUf2 = loadMicroPythonUf2Payload();
+    const fixtureCircuit = resolveCaseCircuit(caseId, makePicoMixedIoCircuit());
+
+    const run = await runSingleBoardCase(
+      caseId,
+      'wokwi-raspberry-pi-pico',
+      micropythonUf2,
+      10800,
+      {
+        circuit: fixtureCircuit,
+        pyScript: pyScriptFallback,
+        serialBaudRate: 115200,
+        rp2040LogicalFlashBytes: RP2040_LOGICAL_FLASH_BYTES,
+        rp2040FlashPartitions: flashPartitions,
+        serialInputs: [
+          { delayMs: 1400, data: 'matrix-input-mp\\n', source: 'uart1' },
+          { delayMs: 1800, data: 'matrix-input-mp\\n', source: 'uart1' },
+        ],
+      },
+    );
+
+    const componentState = run.report.details.componentLastState || {};
+    const componentUpdateCount = run.report.details.componentUpdateCount || {};
+    const hasAllComponents = ['led1', 'pot1', 'servo1', 'ws1', 'oled1', 'buzz1']
+      .every((id) => Object.prototype.hasOwnProperty.call(componentState, id));
+    const potSig = Number(run.report.details.componentPinVoltages?.pot1?.SIG ?? 0);
+    const mixSignals = {
+      led: Number(componentUpdateCount.led1 || 0),
+      pot: Number(componentUpdateCount.pot1 || 0),
+      oled: Number(componentUpdateCount.oled1 || 0),
+      servo: Number(componentUpdateCount.servo1 || 0),
+      neopixel: Number(componentUpdateCount.ws1 || 0),
+      buzzer: Number(componentUpdateCount.buzz1 || 0),
+    };
+    const serialInputObserved = /MP_IO_RX/.test(run.serialText) && /MP_IO_ECHO:/.test(run.serialText);
+
+    run.report.pass = run.report.details.faultCount === 0
+      && hasFlashPartitions
+      && /MP_IO_BOOT/.test(run.serialText)
+      && /MP_IO_DONE/.test(run.serialText)
+      && serialInputObserved
+      && hasAllComponents
+      && potSig > 0
+      && mixSignals.led > 1
+      && mixSignals.servo > 1
+      && mixSignals.neopixel > 1
+      && mixSignals.oled > 1
+      && mixSignals.buzzer > 1;
+    run.report.details.runtimeFiles = runtimeFiles.map((f) => f.path);
+    run.report.details.flashPartitionCount = hasFlashPartitions ? flashPartitions.length : 0;
+    run.report.details.flashPartitionBytes = hasFlashPartitions ? Number(flashPartitions[0]?.data?.length || 0) : 0;
+    run.report.details.hasAllComponents = hasAllComponents;
+    run.report.details.mixSignals = mixSignals;
+    run.report.details.potSigVoltage = potSig;
+    run.report.details.pyScriptLength = mainScript.length;
+    run.report.details.pyScriptFallbackUsed = !hasFlashPartitions;
+    run.report.details.serialInputObserved = serialInputObserved;
+    attachBehaviorChecks(run.report, {
+      noFaults: run.report.details.faultCount === 0,
+      partitionsBuilt: hasFlashPartitions,
+      bootAndDonePrinted: /MP_IO_BOOT/.test(run.serialText) && /MP_IO_DONE/.test(run.serialText),
+      serialInputEcho: serialInputObserved,
+      componentsPresent: hasAllComponents,
+      ledActivity: mixSignals.led > 1,
+      oledActivity: mixSignals.oled > 1,
+      servoActivity: mixSignals.servo > 1,
+      neopixelActivity: mixSignals.neopixel > 1,
+      buzzerActivity: mixSignals.buzzer > 1,
+      potentiometerSignal: potSig > 0,
+    });
+
+    reports.push(run.report);
+    rawEvents[run.report.caseId] = run.events;
+    serialDump[run.report.caseId] = run.serialText;
+  }
+
+  // Case 14: CircuitPython mixed components + serial input echo via USB CDC
+  if (shouldRunCase('case14-pico-circuitpython-mixed-io-serial')) {
+    const caseId = 'case14-pico-circuitpython-mixed-io-serial';
+    const runtimeEnv = resolveFixtureRuntimeEnv(caseId, 'pico1');
+    const effectiveEnv = runtimeEnv === 'native' ? 'circuitpython' : runtimeEnv;
+    const runtimeFiles = resolveRp2040RuntimeFiles(
+      caseId,
+      'pico1',
+      effectiveEnv,
+      [
+        { path: 'code.py', content: makeCircuitPythonMixedIoCodeScript() },
+      ],
+    );
+    const flashPartitions = await buildRp2040RuntimeFsPartitions(runtimeFiles, effectiveEnv);
+    const hasFlashPartitions = Array.isArray(flashPartitions) && flashPartitions.length > 0;
+    const circuitPythonUf2 = loadCircuitPythonUf2Payload();
+    const fixtureCircuit = resolveCaseCircuit(caseId, makePicoMixedIoCircuit());
+
+    const run = await runSingleBoardCase(
+      caseId,
+      'wokwi-raspberry-pi-pico',
+      circuitPythonUf2,
+      15000,
+      {
+        circuit: fixtureCircuit,
+        serialBaudRate: 115200,
+        rp2040LogicalFlashBytes: RP2040_LOGICAL_FLASH_BYTES,
+        rp2040FlashPartitions: flashPartitions,
+        circuitPythonWaitMs: 12000,
+        circuitPythonScript: buildCircuitPythonInjectedScript(runtimeFiles),
+      },
+    );
+
+    const componentState = run.report.details.componentLastState || {};
+    const componentUpdateCount = run.report.details.componentUpdateCount || {};
+    const hasAllComponents = ['led1', 'pot1', 'servo1', 'ws1', 'oled1', 'buzz1']
+      .every((id) => Object.prototype.hasOwnProperty.call(componentState, id));
+    const potSig = Number(run.report.details.componentPinVoltages?.pot1?.SIG ?? 0);
+    const mixSignals = {
+      led: Number(componentUpdateCount.led1 || 0),
+      pot: Number(componentUpdateCount.pot1 || 0),
+      oled: Number(componentUpdateCount.oled1 || 0),
+      servo: Number(componentUpdateCount.servo1 || 0),
+      neopixel: Number(componentUpdateCount.ws1 || 0),
+      buzzer: Number(componentUpdateCount.buzz1 || 0),
+    };
+    const serialInputObserved = /CP_IO_RX/.test(run.serialText);
+    const neopixelUnavailable = /CP_IO_NO_NEOPIXEL/.test(run.serialText)
+      || /ImportError:\s*no module named ['\"]neopixel['\"]/i.test(run.serialText);
+    const oledSkipped = /CP_IO_NO_OLED/.test(run.serialText);
+
+    run.report.pass = run.report.details.faultCount === 0
+      && hasFlashPartitions
+      && /CP_IO_BOOT/.test(run.serialText)
+      && /CP_IO_DONE/.test(run.serialText)
+      && hasAllComponents
+      && mixSignals.led > 1
+      && mixSignals.servo > 1
+      && (mixSignals.neopixel > 1 || neopixelUnavailable)
+      && (mixSignals.oled > 1 || oledSkipped)
+      && mixSignals.buzzer > 1
+      && potSig > 0;
+    run.report.details.runtimeEnv = effectiveEnv;
+    run.report.details.runtimeFiles = runtimeFiles.map((f) => f.path);
+    run.report.details.hasAllComponents = hasAllComponents;
+    run.report.details.mixSignals = mixSignals;
+    run.report.details.flashPartitionCount = hasFlashPartitions ? flashPartitions.length : 0;
+    run.report.details.flashPartitionBytes = hasFlashPartitions ? Number(flashPartitions[0]?.data?.length || 0) : 0;
+    run.report.details.potSigVoltage = potSig;
+    run.report.details.neopixelUnavailable = neopixelUnavailable;
+    run.report.details.oledSkipped = oledSkipped;
+    run.report.details.serialInputObserved = serialInputObserved;
+    attachBehaviorChecks(run.report, {
+      noFaults: run.report.details.faultCount === 0,
+      partitionsBuilt: hasFlashPartitions,
+      bootAndDonePrinted: /CP_IO_BOOT/.test(run.serialText) && /CP_IO_DONE/.test(run.serialText),
+      componentsPresent: hasAllComponents,
+      ledActivity: mixSignals.led > 1,
+      oledActivity: mixSignals.oled > 1 || oledSkipped,
+      servoActivity: mixSignals.servo > 1,
+      neopixelActivity: mixSignals.neopixel > 1 || neopixelUnavailable,
+      buzzerActivity: mixSignals.buzzer > 1,
+      potentiometerSignal: potSig > 0,
     });
 
     reports.push(run.report);

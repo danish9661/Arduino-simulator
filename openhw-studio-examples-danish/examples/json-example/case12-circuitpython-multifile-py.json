@@ -1,0 +1,50 @@
+{
+  "caseId": "case12-circuitpython-multifile-py",
+  "name": "CircuitPython Multifile (code.py + helper.py)",
+  "board": "pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "circuitpython",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 220,
+      "y": 120
+    }
+  ],
+  "connections": [],
+  "code": "import time\nfrom helper import HELPER_TAG\n\nprint(\"CP_MULTI_BOOT\")\nprint(HELPER_TAG)\nfor i in range(3):\n    print(\"CP_MULTI_TICK\", i)\n    time.sleep(0.05)\n",
+  "projectFiles": [
+    {
+      "id": "project/pico1/helper.py",
+      "path": "project/pico1/helper.py",
+      "name": "helper.py",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "HELPER_TAG = \"CP_HELPER_OK\"\n",
+      "dirty": false
+    },
+    {
+      "id": "project/pico1/code.py",
+      "path": "project/pico1/code.py",
+      "name": "code.py",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "import time\nfrom helper import HELPER_TAG\n\nprint(\"CP_MULTI_BOOT\")\nprint(HELPER_TAG)\nfor i in range(3):\n    print(\"CP_MULTI_TICK\", i)\n    time.sleep(0.05)\n",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/pico1/code.py",
+    "project/pico1/helper.py"
+  ],
+  "activeCodeFileId": "project/pico1/code.py"
+}

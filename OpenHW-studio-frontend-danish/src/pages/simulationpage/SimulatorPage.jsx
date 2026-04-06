@@ -317,6 +317,8 @@ const BOARD_DISPLAY_NAME = {
 
 const UF2_PAYLOAD_PREFIX = 'UF2BASE64:';
 const DEFAULT_PICO_MICROPYTHON_UF2_URL = `${API_BASE_URL}/compile/pico/micropython-uf2`;
+const DEFAULT_PICO_CIRCUITPYTHON_UF2_URL = `${API_BASE_URL}/compile/pico/circuitpython-uf2`;
+const DEFAULT_PICO_CIRCUITPYTHON_VERSION = '8.2.7';
 const DISABLED_FILE_SUFFIX = '.disabled';
 const GENERATED_ROOT_FILE_IDS = new Set(['project/diagram.png']);
 const ARDUINO_CODE_EXTENSIONS = new Set(['.ino', '.h', '.hpp', '.c', '.cpp']);
@@ -379,6 +381,65 @@ function formatRunDuration(secondsValue) {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
+function normalizeHashValue(value, depth = 0) {
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+
+  if (ArrayBuffer.isView(value)) {
+    const len = Number(value.length || 0);
+    return {
+      kind: 'typed-array',
+      length: len,
+      preview: Array.from(value).slice(0, 24),
+    };
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length > 64) {
+      return {
+        kind: 'array',
+        length: value.length,
+        preview: value.slice(0, 64).map((entry) => normalizeHashValue(entry, depth + 1)),
+      };
+    }
+    return value.map((entry) => normalizeHashValue(entry, depth + 1));
+  }
+
+  if (typeof value === 'object') {
+    const keys = Object.keys(value);
+    if (depth > 4 && keys.length > 24) {
+      return {
+        kind: 'object',
+        keys: keys.sort().slice(0, 24),
+        size: keys.length,
+      };
+    }
+
+    const out = {};
+    keys
+      .sort((a, b) => a.localeCompare(b))
+      .forEach((key) => {
+        out[key] = normalizeHashValue(value[key], depth + 1);
+      });
+    return out;
+  }
+
+  return String(value);
+}
+
+function fnv1aHash(input) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
+function computeRenderSyncHash(payload) {
+  return fnv1aHash(JSON.stringify(normalizeHashValue(payload, 0)));
+}
+
 function arrayBufferToBase64(buffer) {
   const bytes = new Uint8Array(buffer);
   let binary = '';
@@ -389,15 +450,27 @@ function arrayBufferToBase64(buffer) {
 function normalizeRp2040Env(source) {
   const value = String(source || '').trim().toLowerCase();
   if (!value || value === 'none' || value === 'native' || value === 'ino') return 'native';
+  if (value === 'cp' || value === 'circuitpy' || value === 'circuitpython') return 'circuitpython';
+  if (value.startsWith('circuitpython')) return 'circuitpython';
   if (value === 'py' || value === 'python') return 'micropython';
   if (value.startsWith('micropython')) return 'micropython';
   return 'native';
 }
 
+function isRp2040PythonEnv(source) {
+  const env = normalizeRp2040Env(source);
+  return env === 'micropython' || env === 'circuitpython';
+}
+
+function getRp2040PythonEntryFileName(source) {
+  return normalizeRp2040Env(source) === 'circuitpython' ? 'code.py' : 'main.py';
+}
+
 function mapRp2040EnvForLegacyContextMenu(source) {
-  return normalizeRp2040Env(source) === 'micropython'
-    ? 'micropython-20241129-v1.24.1'
-    : '';
+  const env = normalizeRp2040Env(source);
+  if (env === 'micropython') return 'micropython-20241129-v1.24.1';
+  if (env === 'circuitpython') return `circuitpython-${DEFAULT_PICO_CIRCUITPYTHON_VERSION}`;
+  return '';
 }
 
 function resolveComponentIdFormat(type) {
@@ -471,6 +544,9 @@ function createDefaultMainCode(boardKind, boardId, options = {}) {
   if (boardKind === 'rp2040' && rp2040Mode === 'micropython') {
     return `# ${boardId} MicroPython script\nfrom machine import Pin\nfrom time import sleep\n\nled = Pin('LED', Pin.OUT)\n\nwhile True:\n  led.toggle()\n  sleep(0.5)\n`;
   }
+  if (boardKind === 'rp2040' && rp2040Mode === 'circuitpython') {
+    return `# ${boardId} CircuitPython script\nimport time\nimport board\nimport digitalio\n\nled = digitalio.DigitalInOut(board.LED)\nled.direction = digitalio.Direction.OUTPUT\n\nwhile True:\n  led.value = not led.value\n  time.sleep(0.5)\n`;
+  }
   if (boardKind === 'esp32' || boardKind === 'stm32' || boardKind === 'rp2040') {
     return `// ${boardId} main sketch\nvoid setup() {\n  // Serial.begin(${BOARD_DEFAULT_BAUD[boardKind] || 115200});\n}\n\nvoid loop() {\n  delay(1000);\n}\n`;
   }
@@ -479,9 +555,11 @@ function createDefaultMainCode(boardKind, boardId, options = {}) {
 
 function getDefaultMainFileName(boardKind, boardId, options = {}) {
   if (boardKind === 'rp2040') {
-    return normalizeRp2040Env(options?.rp2040Mode || 'native') === 'micropython'
-      ? 'main.py'
-      : `${boardId}.ino`;
+    const rp2040Mode = normalizeRp2040Env(options?.rp2040Mode || 'native');
+    if (isRp2040PythonEnv(rp2040Mode)) {
+      return getRp2040PythonEntryFileName(rp2040Mode);
+    }
+    return `${boardId}.ino`;
   }
   return `${boardId}.ino`;
 }
@@ -489,6 +567,21 @@ function getDefaultMainFileName(boardKind, boardId, options = {}) {
 function fileExt(path) {
   const idx = path.lastIndexOf('.');
   return idx >= 0 ? path.substring(idx).toLowerCase() : '';
+}
+
+function toBoardRelativePath(boardId, fullPath) {
+  const prefix = `project/${boardId}/`;
+  const raw = String(fullPath || '').replace(/\\/g, '/');
+  if (!raw.startsWith(prefix)) {
+    return String(raw.split('/').pop() || '').trim();
+  }
+
+  const relative = raw.slice(prefix.length).trim();
+  const parts = relative
+    .split('/')
+    .map((part) => part.trim())
+    .filter((part) => part && part !== '.' && part !== '..');
+  return parts.join('/');
 }
 
 function isFileDisabled(pathLike) {
@@ -902,6 +995,10 @@ function resolveRp2040SourceMode({
 }) {
   const mode = String(configuredMode || 'auto').toLowerCase();
 
+  if (mode === 'cp' || mode === 'circuitpy' || mode === 'circuitpython') {
+    return 'cp';
+  }
+
   if (mode === 'py' || mode === 'python' || mode === 'micropython') {
     return 'py';
   }
@@ -909,10 +1006,10 @@ function resolveRp2040SourceMode({
   if (mode === 'ino' || mode === 'native' || mode === 'none') return 'ino';
 
   if (activePrefersIno) return 'ino';
-  if (activePrefersPy) return 'py';
+  if (activePrefersPy) return mode === 'cp' ? 'cp' : 'py';
 
   if (hasNativeSketch || prefersNativeFromSyntax) return 'ino';
-  if (hasPythonSource) return 'py';
+  if (hasPythonSource) return mode === 'cp' ? 'cp' : 'py';
   return 'ino';
 }
 
@@ -1271,6 +1368,10 @@ export default function SimulatorPage({ gamificationMode = false }) {
   const serialOutputRef = useRef(null);
   const lastHardwareStatusRef = useRef('');
   const hardwareSerialTargetRef = useRef(null);
+  const renderPinsByBoardRef = useRef({});
+  const renderAnalogByBoardRef = useRef({});
+  const renderComponentsByBoardRef = useRef({});
+  const renderNeopixelsByBoardRef = useRef({});
 
   const {
     consoleEntries,
@@ -1416,6 +1517,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
   const workerRef = useRef(null)
   const lastCompiledRef = useRef(null)
   const micropythonUf2PayloadRef = useRef(null)
+  const circuitPythonUf2PayloadRef = useRef(null)
   const rp2040DebugLastLogRef = useRef(new Map())
   const rp2040WirelessLastLogRef = useRef(new Map())
   const rp2040GdbLastLogRef = useRef(new Map())
@@ -2319,7 +2421,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
           if (isFileDisabled(file.path)) return false;
           const ext = baseFileExt(file.path);
           if (kind !== 'rp2040') return ext === '.ino';
-          return rp2040Mode === 'micropython' ? ext === '.py' : ext === '.ino';
+          return isRp2040PythonEnv(rp2040Mode) ? ext === '.py' : ext === '.ino';
         });
 
         if (!hasEnabledMainForMode) {
@@ -2344,7 +2446,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
           boardFilePaths.forEach((pathLike) => {
             const ext = baseFileExt(pathLike);
             const disabled = isFileDisabled(pathLike);
-            const shouldDisable = rp2040Mode === 'micropython'
+            const shouldDisable = isRp2040PythonEnv(rp2040Mode)
               ? ARDUINO_CODE_EXTENSIONS.has(ext)
               : ext === '.py';
 
@@ -3272,7 +3374,11 @@ export default function SimulatorPage({ gamificationMode = false }) {
     const uf2File = boardFiles.find((f) => fileExt(f.path) === '.uf2' && typeof f.content === 'string' && f.content.trim());
     const pyFiles = boardFiles
       .filter((f) => fileExt(f.path) === '.py')
-      .map((f) => ({ name: f.name, content: String(f.content || '') }));
+      .map((f) => ({
+        path: toBoardRelativePath(boardId, f.path),
+        name: f.name,
+        content: String(f.content || ''),
+      }));
 
     const mainPy = pyFiles.find((f) => f.name.toLowerCase() === 'main.py') || pyFiles[0] || null;
 
@@ -3282,7 +3388,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
       uf2Payload = raw.startsWith(UF2_PAYLOAD_PREFIX) ? raw : `${UF2_PAYLOAD_PREFIX}${raw}`;
     }
 
-    return { uf2Payload, mainPy };
+    return { uf2Payload, mainPy, pythonFiles: pyFiles };
   }, [projectFiles]);
 
   const fetchDefaultMicroPythonUf2Payload = useCallback(async () => {
@@ -3296,6 +3402,21 @@ export default function SimulatorPage({ gamificationMode = false }) {
     const buffer = await response.arrayBuffer();
     const payload = `${UF2_PAYLOAD_PREFIX}${arrayBufferToBase64(buffer)}`;
     micropythonUf2PayloadRef.current = payload;
+    return payload;
+  }, []);
+
+  const fetchDefaultCircuitPythonUf2Payload = useCallback(async () => {
+    if (circuitPythonUf2PayloadRef.current) return circuitPythonUf2PayloadRef.current;
+
+    const version = encodeURIComponent(DEFAULT_PICO_CIRCUITPYTHON_VERSION);
+    const response = await fetch(`${DEFAULT_PICO_CIRCUITPYTHON_UF2_URL}?v=${version}`, { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error(`Unable to fetch default CircuitPython UF2 (${response.status})`);
+    }
+
+    const buffer = await response.arrayBuffer();
+    const payload = `${UF2_PAYLOAD_PREFIX}${arrayBufferToBase64(buffer)}`;
+    circuitPythonUf2PayloadRef.current = payload;
     return payload;
   }, []);
 
@@ -3333,8 +3454,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
       boardId,
       boardKind,
       rp2040Mode,
-      defaultExt: rp2040Mode === 'micropython' ? '.py' : '.ino',
-      allowedExtensions: rp2040Mode === 'micropython'
+      defaultExt: isRp2040PythonEnv(rp2040Mode) ? '.py' : '.ino',
+      allowedExtensions: isRp2040PythonEnv(rp2040Mode)
         ? RP2040_MICROPYTHON_ALLOWED_EXTENSIONS
         : RP2040_NATIVE_ALLOWED_EXTENSIONS,
     };
@@ -3365,7 +3486,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
 
     if (!folderPolicy.allowedExtensions.has(safeExt)) {
       if (folderPolicy.boardKind === 'rp2040') {
-        const modeLabel = folderPolicy.rp2040Mode === 'micropython' ? '.py' : '.ino';
+        const modeLabel = isRp2040PythonEnv(folderPolicy.rp2040Mode) ? '.py' : '.ino';
         alert(`RP2040 board ${folderPolicy.boardId} currently allows ${modeLabel} workflow files. "${safeExt}" is disabled for this env.`);
       } else {
         alert(`Unsupported file type: ${safeExt}`);
@@ -3454,7 +3575,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
 
         if (!folderPolicy.allowedExtensions.has(safeExt)) {
           if (folderPolicy.boardKind === 'rp2040') {
-            const modeLabel = folderPolicy.rp2040Mode === 'micropython' ? '.py' : '.ino';
+            const modeLabel = isRp2040PythonEnv(folderPolicy.rp2040Mode) ? '.py' : '.ino';
             alert(`RP2040 board ${folderPolicy.boardId} currently allows ${modeLabel} workflow files. "${safeExt}" cannot be uploaded in this env.`);
           } else {
             alert(`Unsupported file type: ${safeExt}`);
@@ -4183,6 +4304,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
         : '';
       const boardHexMap = {};
       const boardPythonMap = {};
+      const boardPythonFilesMap = {};
+      const boardRuntimeEnvMap = {};
       const boardBaudMap = {};
       const programmableBoards = components.filter(c => /(arduino|esp32|stm32|rp2040|pico)/i.test(c.type));
       const singleProgrammableBoardId = programmableBoards.length === 1 ? programmableBoards[0]?.id : '';
@@ -4232,10 +4355,12 @@ export default function SimulatorPage({ gamificationMode = false }) {
             continue;
           }
 
-          // ── RP2040: emulate a real UF2 on rp2040js and inject script via UART0 ──
+          // ── RP2040: emulate UF2 on rp2040js and boot user files from flash filesystem ──
           if (kind === 'rp2040') {
             const configuredEnv = normalizeRp2040Env(resolveComponentAttrString(boardComp?.attrs, 'env', 'native'));
-            const configuredMode = configuredEnv === 'micropython' ? 'py' : 'ino';
+            boardRuntimeEnvMap[boardComp.id] = configuredEnv;
+
+            const configuredMode = configuredEnv === 'native' ? 'ino' : configuredEnv;
             const configuredBuilder = resolveComponentAttrString(boardComp?.attrs, 'builder', 'arduino-pico') || 'arduino-pico';
             const hasNativeSketch = compileUnit.hasMainFile || (activePrefersIno && !!compileSource.trim());
             const hasExplicitPython = activePrefersPy || hasPythonSource;
@@ -4249,6 +4374,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
               prefersNativeFromSyntax,
             });
             const useMicroPythonPath = selectedSourceMode === 'py';
+            const useCircuitPythonPath = selectedSourceMode === 'cp';
+            const usePythonPath = useMicroPythonPath || useCircuitPythonPath;
 
             if (selectedSourceMode === 'ino' && !hasNativeSketch) {
               const msg = `RP2040 source mode is set to .ino for ${boardComp.id}, but no enabled .ino sketch was found.`;
@@ -4258,30 +4385,63 @@ export default function SimulatorPage({ gamificationMode = false }) {
               continue;
             }
 
-            if (useMicroPythonPath) {
-              let pyToRun = pythonSource.trim();
+            if (usePythonPath) {
+              const runtimeEnv = useCircuitPythonPath ? 'circuitpython' : 'micropython';
+              const entryFileName = getRp2040PythonEntryFileName(runtimeEnv);
+              const firmwareEntryPy = runtimeEnv === 'circuitpython'
+                ? (firmwareAssets.pythonFiles || []).find((f) => String(f.name || '').toLowerCase() === 'code.py')
+                : firmwareAssets.mainPy;
+
+              let pyToRun = String(firmwareEntryPy?.content || '').trim() || pythonSource.trim();
               if (!pyToRun && looksLikeMicroPythonSource(compileSource)) {
                 pyToRun = compileSource;
               }
-              if (!pyToRun) {
+              if (!pyToRun && runtimeEnv === 'micropython') {
                 pyToRun = arduinoSerialToMicroPython(compileSource, boardComp.id);
               }
-              if (!pyToRun) {
+              if (!pyToRun && runtimeEnv === 'micropython') {
                 pyToRun = arduinoBlinkToMicroPython(compileSource, boardComp.id);
               }
               if (!pyToRun) {
-                pyToRun = createDefaultMainCode('rp2040', boardComp.id, { rp2040Mode: 'micropython' });
+                pyToRun = createDefaultMainCode('rp2040', boardComp.id, { rp2040Mode: runtimeEnv });
               }
-              pyToRun = applyRp2040MicroPythonCompat(pyToRun);
-              pyToRun = ensureMicroPythonSerialProbe(pyToRun, boardComp.id);
 
-              const rp2040Firmware = firmwareAssets.uf2Payload || await fetchDefaultMicroPythonUf2Payload();
+              if (runtimeEnv === 'micropython') {
+                pyToRun = applyRp2040MicroPythonCompat(pyToRun);
+              }
+
+              const runtimeFiles = {};
+              boardEnabledFiles.forEach((fileObj) => {
+                const ext = fileExt(fileObj.path);
+                if (!ext) return;
+                if (ext === '.uf2') return;
+                if (ARDUINO_CODE_EXTENSIONS.has(ext)) return;
+
+                const relPath = toBoardRelativePath(boardComp.id, fileObj.path);
+                if (!relPath) return;
+
+                const fileContent = fileObj.id === activeCodeFileId
+                  ? String(code || '')
+                  : String(fileObj.content || '');
+                runtimeFiles[relPath] = fileContent;
+              });
+
+              if (!String(runtimeFiles[entryFileName] || '').trim()) {
+                runtimeFiles[entryFileName] = pyToRun;
+              }
+
+              const rp2040Firmware = firmwareAssets.uf2Payload
+                || (runtimeEnv === 'circuitpython'
+                  ? await fetchDefaultCircuitPythonUf2Payload()
+                  : await fetchDefaultMicroPythonUf2Payload());
               boardHexMap[boardComp.id] = rp2040Firmware;
               boardPythonMap[boardComp.id] = pyToRun;
-              rp2040UartMicroPythonBoardsRef.current.add(boardComp.id);
+              boardPythonFilesMap[boardComp.id] = runtimeFiles;
+
+              const runtimeLabel = runtimeEnv === 'circuitpython' ? 'CircuitPython' : 'MicroPython';
               appendConsoleEntry(
                 'info',
-                `RP2040 running via rp2040js + UART0 MicroPython on ${boardComp.id} (env: ${configuredEnv}).`,
+                `RP2040 running via rp2040js + ${runtimeLabel} flash filesystem on ${boardComp.id} (env: ${configuredEnv}).`,
                 'simulator'
               );
               if (!result) result = { hex: rp2040Firmware || '' };
@@ -4632,6 +4792,40 @@ export default function SimulatorPage({ gamificationMode = false }) {
           }
           return;
         }
+        if (msg.type === 'sync_heartbeat') {
+          if (!rp2040DebugTelemetryEnabled) {
+            return;
+          }
+
+          const boardId = String(msg.boardId || 'default').trim() || 'default';
+          const frameId = Number(msg.frameId || 0);
+
+          const renderPayload = {
+            pins: renderPinsByBoardRef.current[boardId] || {},
+            analog: renderAnalogByBoardRef.current[boardId] || [],
+            components: renderComponentsByBoardRef.current[boardId] || {},
+            neopixels: renderNeopixelsByBoardRef.current[boardId] || {},
+          };
+
+          const renderedHash = computeRenderSyncHash(renderPayload);
+          workerRef.current?.postMessage({
+            type: 'RENDER_REPORT',
+            boardId,
+            frameId,
+            hash: renderedHash,
+            renderedAt: Date.now(),
+          });
+          return;
+        }
+        if (msg.type === 'sync_fault') {
+          const boardId = String(msg.boardId || 'default').trim() || 'default';
+          appendConsoleEntry(
+            'warn',
+            `SYNC_FAULT ${boardId}: expected=${String(msg.expectedHash || '')} rendered=${String(msg.renderedHash || '')} mismatches=${Number(msg.mismatches || 0)}`,
+            'simulator'
+          );
+          return;
+        }
         if (msg.type === 'fault') {
           const boardId = String(msg.boardId || '');
           const pcHex = Number.isFinite(Number(msg.pc))
@@ -4658,6 +4852,10 @@ export default function SimulatorPage({ gamificationMode = false }) {
             }
           });
           runLastBoardPinsRef.current.set(boardIdKey, { ...msg.pins });
+          renderPinsByBoardRef.current[boardIdKey] = { ...msg.pins };
+          if (Object.prototype.hasOwnProperty.call(msg, 'analog')) {
+            renderAnalogByBoardRef.current[boardIdKey] = Array.isArray(msg.analog) ? [...msg.analog] : msg.analog;
+          }
 
           setPinStates(msg.pins);
           // Push to plotData history
@@ -4674,14 +4872,24 @@ export default function SimulatorPage({ gamificationMode = false }) {
           });
         }
         if (msg.type === 'state' && msg.neopixels) {
+          const boardIdKey = String(msg.boardId || 'default');
+          renderNeopixelsByBoardRef.current[boardIdKey] = msg.neopixels;
           setNeopixelData(msg.neopixels);
         }
         if (msg.type === 'state' && msg.components) {
+          const boardIdKey = String(msg.boardId || 'default');
+          const boardComponentState = {
+            ...(renderComponentsByBoardRef.current[boardIdKey] || {}),
+          };
+
           msg.components.forEach((c) => {
             const compId = String(c?.id || '').trim();
             if (!compId) return;
             runComponentUpdateCountsRef.current[compId] = (runComponentUpdateCountsRef.current[compId] || 0) + 1;
+            boardComponentState[compId] = c.state;
           });
+
+          renderComponentsByBoardRef.current[boardIdKey] = boardComponentState;
 
           setOopStates(prev => {
             const next = { ...prev };
@@ -4737,9 +4945,12 @@ export default function SimulatorPage({ gamificationMode = false }) {
         customLogics: customLogics,
         boardHexMap: Object.keys(boardHexMap).length > 0 ? boardHexMap : undefined,
         boardPythonMap: Object.keys(boardPythonMap).length > 0 ? boardPythonMap : undefined,
+        boardPythonFilesMap: Object.keys(boardPythonFilesMap).length > 0 ? boardPythonFilesMap : undefined,
+        boardRuntimeEnvMap: Object.keys(boardRuntimeEnvMap).length > 0 ? boardRuntimeEnvMap : undefined,
         boardBaudMap: Object.keys(boardBaudMap).length > 0 ? boardBaudMap : undefined,
         baudRate: selectedRunBaud,
         debugRp2040: rp2040DebugTelemetryEnabled,
+        debugSyncHeartbeat: rp2040DebugTelemetryEnabled,
       });
 
       runStartGuardRef.current = false;
@@ -4791,6 +5002,34 @@ export default function SimulatorPage({ gamificationMode = false }) {
     runComponentUpdateCountsRef.current = {};
     runPinTransitionCountsRef.current = {};
     runLastBoardPinsRef.current = new Map();
+    renderPinsByBoardRef.current = {};
+    renderAnalogByBoardRef.current = {};
+    renderComponentsByBoardRef.current = {};
+    renderNeopixelsByBoardRef.current = {};
+
+    const neopixelOffStates = {};
+    const neopixelOffPixels = {};
+    components.forEach((comp) => {
+      if (!/(neopixel|ws2812|ws2821)/i.test(String(comp?.type || ''))) return;
+
+      const rows = Math.max(1, Number.parseInt(String(comp?.attrs?.rows ?? '8'), 10) || 1);
+      const cols = Math.max(1, Number.parseInt(String(comp?.attrs?.cols ?? '8'), 10) || 1);
+      const pixelCount = rows * cols;
+      const attrsState = (comp?.attrs && typeof comp.attrs === 'object') ? comp.attrs : {};
+
+      neopixelOffStates[comp.id] = {
+        ...attrsState,
+        rows: String(rows),
+        cols: String(cols),
+        pixels: new Array(pixelCount).fill(0),
+      };
+
+      const pixelTriples = [];
+      for (let index = 0; index < pixelCount; index++) {
+        pixelTriples.push([Math.floor(index / cols), index % cols, { r: 0, g: 0, b: 0 }]);
+      }
+      neopixelOffPixels[comp.id] = pixelTriples;
+    });
 
     if (workerRef.current) {
       workerRef.current.postMessage({ type: 'STOP' });
@@ -4803,8 +5042,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
     setRunStartedAtMs(null);
     setRunDurationSec(0);
     setPinStates({});
-    setNeopixelData({});
-    setOopStates({});
+    setNeopixelData(neopixelOffPixels);
+    setOopStates(neopixelOffStates);
     setSerialHistory([]);
     setPlotData([]);
     setSerialPaused(false);

@@ -1,4 +1,4 @@
-import { BoardRunner, createRunnerForBoard, LOGIC_REGISTRY, COMPONENT_PINS } from './execute';
+import { BoardRunner, createRunnerForBoard, LOGIC_REGISTRY, COMPONENT_PINS, buildFatFsImage, buildLittleFsImage } from './execute';
 import { BaseComponent } from '@openhw/emulator/src/components/BaseComponent.ts';
 import {
     isProgrammableBoardType,
@@ -11,6 +11,422 @@ let boardRunners: Map<string, BoardRunner> = new Map();
 let boardTypes: Map<string, string> = new Map();
 let mode: 'single' | 'multi' = 'single';
 let pinToNet: Map<string, number> = new Map();
+let boardSerialOutput: Map<string, string> = new Map();
+let syncValidationEnabled = false;
+let syncFrameByBoard: Map<string, number> = new Map();
+let syncSnapshotByBoard: Map<string, {
+    pins: Record<string, unknown>;
+    analog: unknown;
+    components: Record<string, unknown>;
+}> = new Map();
+let syncHeartbeatByBoard: Map<string, { frameId: number; hash: string; emittedAt: number }> = new Map();
+let syncMismatchCountByBoard: Map<string, number> = new Map();
+let syncFaultLatchedByBoard: Map<string, boolean> = new Map();
+
+const RP2040_LOGICAL_FLASH_BYTES = 2 * 1024 * 1024;
+const RP2040_MICROPYTHON_FS_OFFSET = 0xA0000;
+const RP2040_CIRCUITPYTHON_FS_OFFSET = 0xC0000;
+const RP2040_LITTLEFS_BLOCK_SIZE = 4096;
+
+function resetSyncValidationState() {
+    syncFrameByBoard.clear();
+    syncSnapshotByBoard.clear();
+    syncHeartbeatByBoard.clear();
+    syncMismatchCountByBoard.clear();
+    syncFaultLatchedByBoard.clear();
+}
+
+function normalizeHashValue(value: any, depth = 0): any {
+    if (value === null || value === undefined) return value;
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+
+    if (ArrayBuffer.isView(value)) {
+        const view = value as ArrayLike<number> & { length?: number };
+        const len = Number(view?.length || 0);
+        const preview: number[] = [];
+        for (let i = 0; i < Math.min(len, 24); i++) {
+            preview.push(Number(view[i] || 0));
+        }
+        return {
+            kind: 'typed-array',
+            length: len,
+            preview,
+        };
+    }
+
+    if (Array.isArray(value)) {
+        if (value.length > 64) {
+            return {
+                kind: 'array',
+                length: value.length,
+                preview: value.slice(0, 64).map((entry) => normalizeHashValue(entry, depth + 1)),
+            };
+        }
+        return value.map((entry) => normalizeHashValue(entry, depth + 1));
+    }
+
+    if (typeof value === 'object') {
+        const keys = Object.keys(value);
+        if (depth > 4 && keys.length > 24) {
+            return {
+                kind: 'object',
+                keys: keys.sort().slice(0, 24),
+                size: keys.length,
+            };
+        }
+
+        const out: Record<string, unknown> = {};
+        for (const key of keys.sort((a, b) => a.localeCompare(b))) {
+            out[key] = normalizeHashValue(value[key], depth + 1);
+        }
+        return out;
+    }
+
+    return String(value);
+}
+
+function fnv1aHash(input: string): string {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < input.length; i++) {
+        hash ^= input.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    return hash.toString(16).padStart(8, '0');
+}
+
+function computeSyncHash(payload: unknown): string {
+    const normalized = normalizeHashValue(payload, 0);
+    const serialized = JSON.stringify(normalized);
+    return fnv1aHash(serialized);
+}
+
+function ensureSyncSnapshot(boardId: string): {
+    pins: Record<string, unknown>;
+    analog: unknown;
+    components: Record<string, unknown>;
+} {
+    const id = String(boardId || '').trim() || 'default';
+    const existing = syncSnapshotByBoard.get(id);
+    if (existing) return existing;
+
+    const created = {
+        pins: {},
+        analog: [],
+        components: {},
+    };
+    syncSnapshotByBoard.set(id, created);
+    return created;
+}
+
+function applyStateToSyncSnapshot(boardId: string, stateObj: any) {
+    const snapshot = ensureSyncSnapshot(boardId);
+
+    if (stateObj?.pins && typeof stateObj.pins === 'object') {
+        snapshot.pins = {
+            ...snapshot.pins,
+            ...stateObj.pins,
+        };
+    }
+
+    if (stateObj && Object.prototype.hasOwnProperty.call(stateObj, 'analog')) {
+        snapshot.analog = stateObj.analog;
+    }
+
+    if (Array.isArray(stateObj?.components)) {
+        for (const comp of stateObj.components) {
+            const id = String(comp?.id || '').trim();
+            if (!id) continue;
+            snapshot.components[id] = comp?.state ?? {};
+        }
+    }
+
+    return snapshot;
+}
+
+function emitSyncHeartbeat(boardId: string, stateObj: any) {
+    if (!syncValidationEnabled) return;
+    if (!stateObj || stateObj.type !== 'state') return;
+
+    const id = String(boardId || stateObj?.boardId || 'default').trim() || 'default';
+    const snapshot = applyStateToSyncSnapshot(id, stateObj);
+    const frameId = Number(syncFrameByBoard.get(id) || 0) + 1;
+    const hash = computeSyncHash(snapshot);
+    const emittedAt = Date.now();
+
+    syncFrameByBoard.set(id, frameId);
+    syncHeartbeatByBoard.set(id, { frameId, hash, emittedAt });
+
+    postMessage({
+        type: 'sync_heartbeat',
+        boardId: id,
+        frameId,
+        hash,
+        simTime: frameId,
+        emittedAt,
+    });
+}
+
+type Rp2040RuntimeEnv = 'native' | 'micropython' | 'circuitpython';
+
+function normalizeRp2040RuntimeEnv(source: unknown): Rp2040RuntimeEnv {
+    const value = String(source || '').trim().toLowerCase();
+    if (!value || value === 'none' || value === 'native' || value === 'ino') return 'native';
+    if (value === 'cp' || value === 'circuitpy' || value === 'circuitpython' || value.startsWith('circuitpython')) {
+        return 'circuitpython';
+    }
+    if (value === 'py' || value === 'python' || value === 'micropython' || value.startsWith('micropython')) {
+        return 'micropython';
+    }
+    return 'native';
+}
+
+function isRp2040PythonRuntimeEnv(env: Rp2040RuntimeEnv): boolean {
+    return env === 'micropython' || env === 'circuitpython';
+}
+
+function getRp2040PythonFsOffset(env: Rp2040RuntimeEnv): number {
+    return env === 'circuitpython'
+        ? RP2040_CIRCUITPYTHON_FS_OFFSET
+        : RP2040_MICROPYTHON_FS_OFFSET;
+}
+
+function getRp2040PythonFsBytes(env: Rp2040RuntimeEnv): number {
+    const offset = getRp2040PythonFsOffset(env);
+    return Math.max(0, RP2040_LOGICAL_FLASH_BYTES - offset);
+}
+
+function getRp2040PythonEntryFileName(env: Rp2040RuntimeEnv): string {
+    return env === 'circuitpython' ? 'code.py' : 'main.py';
+}
+
+function normalizeRp2040RuntimePath(pathLike: unknown): string {
+    const normalized = String(pathLike || '')
+        .replace(/\\/g, '/')
+        .replace(/^\/+/, '')
+        .trim();
+    if (!normalized) return '';
+
+    const parts = normalized
+        .split('/')
+        .map((part) => part.trim())
+        .filter((part) => part && part !== '.' && part !== '..');
+
+    return parts.join('/');
+}
+
+function collectRp2040RuntimeFiles(
+    boardId: string,
+    env: Rp2040RuntimeEnv,
+    boardPythonFilesMap: any,
+    boardPythonMap: any
+): Array<{ path: string; data: string }> {
+    const filesByPath = new Map<string, string>();
+    const addFile = (rawPath: unknown, rawContent: unknown) => {
+        const path = normalizeRp2040RuntimePath(rawPath);
+        if (!path) return;
+        const content = typeof rawContent === 'string'
+            ? rawContent
+            : String(rawContent ?? '');
+        filesByPath.set(path, content);
+    };
+
+    const fromMap = boardPythonFilesMap?.[boardId];
+    if (Array.isArray(fromMap)) {
+        for (const entry of fromMap) {
+            if (!entry || typeof entry !== 'object') continue;
+            addFile((entry as any).path, (entry as any).content ?? (entry as any).data);
+        }
+    } else if (fromMap && typeof fromMap === 'object') {
+        for (const [filePath, content] of Object.entries(fromMap)) {
+            addFile(filePath, content);
+        }
+    }
+
+    const fallbackScript = typeof boardPythonMap?.[boardId] === 'string'
+        ? String(boardPythonMap[boardId] || '')
+        : '';
+    if (fallbackScript.trim()) {
+        const entryFile = getRp2040PythonEntryFileName(env);
+        const existing = String(filesByPath.get(entryFile) || '');
+        if (!existing.trim()) {
+            filesByPath.set(entryFile, fallbackScript);
+        }
+    }
+
+    return Array.from(filesByPath.entries()).map(([path, data]) => ({ path, data }));
+}
+
+function buildCircuitPythonInjectedScript(runtimeFiles: Array<{ path: string; data: string }>): string {
+    const files = Array.isArray(runtimeFiles) ? runtimeFiles : [];
+    if (files.length === 0) return '';
+
+    const normalizeModuleName = (runtimePath: string): string | null => {
+        const normalized = normalizeRp2040RuntimePath(runtimePath);
+        if (!normalized || !normalized.toLowerCase().endsWith('.py')) return null;
+        if (normalized.includes('/')) return null;
+        const stem = normalized.slice(0, -3);
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(stem)) return null;
+        if (stem === 'code' || stem === 'main') return null;
+        return stem;
+    };
+
+    const escapeRegExp = (value: string): string => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    const mainFile = files.find((file) => String(file.path || '').toLowerCase() === 'code.py')
+        || files.find((file) => String(file.path || '').toLowerCase() === 'main.py')
+        || files.find((file) => String(file.path || '').toLowerCase().endsWith('.py'))
+        || null;
+    if (!mainFile) return '';
+
+    let mainSource = String(mainFile.data || '');
+    const lines: string[] = [];
+
+    for (const file of files) {
+        const moduleName = normalizeModuleName(String(file.path || ''));
+        if (!moduleName) continue;
+
+        const importFromPattern = new RegExp(`^\\s*from\\s+${escapeRegExp(moduleName)}\\s+import\\s+.*$`, 'gm');
+        const importModulePattern = new RegExp(`^\\s*import\\s+${escapeRegExp(moduleName)}\\s*$`, 'gm');
+        mainSource = mainSource.replace(importFromPattern, '');
+        mainSource = mainSource.replace(importModulePattern, '');
+
+        lines.push(String(file.data || ''));
+        lines.push('');
+    }
+
+    lines.push(mainSource);
+    lines.push('');
+    return lines.join('\n');
+}
+
+function appendBoardSerialOutput(boardId: string, chunk: string) {
+    const id = String(boardId || '').trim();
+    if (!id || !chunk) return;
+    const prev = boardSerialOutput.get(id) || '';
+    const merged = `${prev}${chunk}`;
+    boardSerialOutput.set(id, merged.length > 8192 ? merged.slice(-8192) : merged);
+}
+
+function scheduleCircuitPythonInject(
+    target: BoardRunner,
+    boardId: string,
+    runtimeFiles: Array<{ path: string; data: string }>,
+    delayMs = 1800,
+) {
+    const script = buildCircuitPythonInjectedScript(runtimeFiles);
+    if (!script.trim()) return;
+
+    let transportSource: 'usb' | 'uart0' = 'usb';
+
+    const sendByte = (byte: number) => {
+        const targetAny = target as any;
+        if (typeof targetAny.serialRxByteFromSource === 'function') {
+            targetAny.serialRxByteFromSource(byte & 0xff, transportSource);
+        } else if (typeof targetAny.serialRxByte === 'function') {
+            targetAny.serialRxByte(byte & 0xff);
+        } else if (typeof targetAny.serialRx === 'function') {
+            targetAny.serialRx(String.fromCharCode(byte & 0xff));
+        }
+    };
+
+    const streamText = (text: string, chunkSize = 24, everyMs = 4) => {
+        const bytes = Array.from(String(text || ''), (ch) => ch.charCodeAt(0) & 0xff);
+        if (bytes.length === 0) return;
+
+        let index = 0;
+        const streamTimer = setInterval(() => {
+            const end = Math.min(index + chunkSize, bytes.length);
+            for (let i = index; i < end; i++) sendByte(bytes[i]);
+            index = end;
+            if (index >= bytes.length) {
+                clearInterval(streamTimer);
+            }
+        }, Math.max(1, Number(everyMs || 1)));
+    };
+
+    const startAt = Date.now();
+    let injected = false;
+    const pollTimer = setInterval(() => {
+        if (injected) return;
+
+        const usbReady = !!(target as any)?.usbCdcReady;
+        const waitedMs = Date.now() - startAt;
+        if (!usbReady && waitedMs < Math.max(9000, Number(delayMs || 0))) {
+            return;
+        }
+
+        transportSource = usbReady ? 'usb' : 'uart0';
+
+        injected = true;
+        clearInterval(pollTimer);
+
+        // Enter raw REPL first; send script only after prompt appears.
+        streamText('x\r\u0003\u0003', 1, 18);
+        setTimeout(() => {
+            streamText('\u0001', 1, 18);
+        }, 120);
+
+        const rawPromptStartedAt = Date.now();
+        let scriptDispatched = false;
+        const dispatchScript = () => {
+            if (scriptDispatched) return;
+            scriptDispatched = true;
+            streamText(`${script}\n\u0004`, 24, 4);
+        };
+
+        const rawPromptPoll = setInterval(() => {
+            if (scriptDispatched) {
+                clearInterval(rawPromptPoll);
+                return;
+            }
+
+            const waitedMs = Date.now() - rawPromptStartedAt;
+            const serialText = boardSerialOutput.get(String(boardId || '').trim()) || '';
+            if (/raw REPL; CTRL-B to exit/.test(serialText)) {
+                dispatchScript();
+                clearInterval(rawPromptPoll);
+                return;
+            }
+
+            if (waitedMs >= 2200) {
+                dispatchScript();
+                clearInterval(rawPromptPoll);
+            }
+        }, 80);
+    }, 120);
+}
+
+async function buildRp2040FlashPartitions(
+    boardId: string,
+    env: Rp2040RuntimeEnv,
+    boardPythonFilesMap: any,
+    boardPythonMap: any
+): Promise<Array<{ offset: number; data: Uint8Array }> | undefined> {
+    if (!isRp2040PythonRuntimeEnv(env)) return undefined;
+
+    const runtimeFiles = collectRp2040RuntimeFiles(boardId, env, boardPythonFilesMap, boardPythonMap);
+    if (runtimeFiles.length === 0) return undefined;
+
+    const fsOffset = getRp2040PythonFsOffset(env);
+    const fsBytes = getRp2040PythonFsBytes(env);
+    if (fsBytes <= 0) return undefined;
+
+    const image = env === 'circuitpython'
+        ? buildFatFsImage(runtimeFiles, {
+            sizeBytes: fsBytes,
+            volumeLabel: 'CIRCUITPY',
+        })
+        : await buildLittleFsImage(runtimeFiles, {
+            sizeBytes: fsBytes,
+            blockSize: RP2040_LITTLEFS_BLOCK_SIZE,
+        });
+    if (!image || image.length === 0) return undefined;
+
+    return [{
+        offset: fsOffset,
+        data: image,
+    }];
+}
 
 function buildMicroPythonPastePayload(scriptSource: string): string {
     const normalized = String(scriptSource || '')
@@ -199,6 +615,9 @@ function stopAllRunners() {
     boardRunners.clear();
     boardTypes.clear();
     pinToNet.clear();
+    boardSerialOutput.clear();
+    syncValidationEnabled = false;
+    resetSyncValidationState();
 }
 
 function endpointAliases(endpoint: string): string[] {
@@ -260,23 +679,30 @@ function resolveRp2040ExecutableRanges(boardComp: any, boardExecutableRangesMap:
 }
 
 function postRunnerState(stateObj: any, boardId: string) {
+    const resolvedBoardId = String(stateObj?.boardId || boardId || 'default').trim() || 'default';
+
     if (mode === 'single') {
-        postMessage(stateObj);
+        const msg = (stateObj && typeof stateObj === 'object')
+            ? { ...stateObj, boardId: resolvedBoardId }
+            : stateObj;
+        postMessage(msg);
+        emitSyncHeartbeat(resolvedBoardId, msg);
         return;
     }
 
     if (stateObj.type !== 'state') {
-        postMessage({ ...stateObj, boardId });
+        postMessage({ ...stateObj, boardId: resolvedBoardId });
         return;
     }
 
-    const msg: any = { type: 'state', boardId };
+    const msg: any = { type: 'state', boardId: resolvedBoardId };
 
     if (stateObj.pins) msg.pins = stateObj.pins;
 
     if (stateObj.analog) msg.analog = stateObj.analog;
     if (stateObj.components) msg.components = stateObj.components;
     postMessage(msg);
+    emitSyncHeartbeat(resolvedBoardId, msg);
 }
 
 function isSoftSerialLabel(label: string): boolean {
@@ -316,10 +742,26 @@ self.onmessage = async (e) => {
     const data = e.data;
 
     if (data.type === 'START') {
-        const { hex, components, wires, customLogics, boardHexMap, boardPythonMap, baudRate, boardBaudMap, boardExecutableRangesMap, debugRp2040 } = data;
+        const {
+            hex,
+            components,
+            wires,
+            customLogics,
+            boardHexMap,
+            boardPythonMap,
+            boardPythonFilesMap,
+            boardRuntimeEnvMap,
+            baudRate,
+            boardBaudMap,
+            boardExecutableRangesMap,
+            debugRp2040,
+            debugSyncHeartbeat,
+        } = data;
         const rp2040DebugEnabled = !!debugRp2040;
 
         stopAllRunners();
+        syncValidationEnabled = !!debugSyncHeartbeat;
+        resetSyncValidationState();
 
         // --- INJECT TEMPORARY SANDBOX LOGIC ---
         if (customLogics && Array.isArray(customLogics)) {
@@ -350,18 +792,38 @@ self.onmessage = async (e) => {
 
         if (programmableBoards.length <= 1) {
             mode = 'single';
-            const singleBoardType = String(programmableBoards[0]?.type || 'wokwi-arduino-uno');
-            const singleBoardId = programmableBoards[0]?.id;
-            const pyScript = singleBoardId ? (boardPythonMap?.[singleBoardId] || '') : '';
+            const singleBoardComp = programmableBoards[0] || null;
+            const singleBoardType = String(singleBoardComp?.type || 'wokwi-arduino-uno');
+            const singleBoardId = singleBoardComp?.id;
+            const pyScript = singleBoardId ? String(boardPythonMap?.[singleBoardId] || '') : '';
             const singleBoardIsRp2040 = /(rp2040|pico)/i.test(singleBoardType);
-            const singleBoardExecutableRanges = resolveRp2040ExecutableRanges(programmableBoards[0], boardExecutableRangesMap);
+            const singleBoardExecutableRanges = resolveRp2040ExecutableRanges(singleBoardComp, boardExecutableRangesMap);
+            const singleBoardRuntimeEnv: Rp2040RuntimeEnv = singleBoardIsRp2040
+                ? normalizeRp2040RuntimeEnv(boardRuntimeEnvMap?.[singleBoardId] ?? singleBoardComp?.attrs?.env)
+                : 'native';
+            const singleBoardRuntimeFiles = singleBoardIsRp2040 && singleBoardId && singleBoardRuntimeEnv !== 'native'
+                ? collectRp2040RuntimeFiles(singleBoardId, singleBoardRuntimeEnv, boardPythonFilesMap, boardPythonMap)
+                : [];
+
+            const singleBoardFlashPartitions = singleBoardIsRp2040 && singleBoardId
+                ? await buildRp2040FlashPartitions(singleBoardId, singleBoardRuntimeEnv, boardPythonFilesMap, boardPythonMap)
+                : undefined;
+
+            if (singleBoardIsRp2040 && singleBoardRuntimeEnv !== 'native' && (!singleBoardFlashPartitions || singleBoardFlashPartitions.length === 0)) {
+                console.warn(`[Worker] RP2040 Python filesystem unavailable for ${singleBoardId}; falling back where possible.`);
+            }
+
+            const shouldInjectPythonOverUart = singleBoardIsRp2040
+                && singleBoardRuntimeEnv !== 'native'
+                && (!singleBoardFlashPartitions || singleBoardFlashPartitions.length === 0)
+                && !!pyScript.trim();
 
             runner = createRunnerForBoard(
                 singleBoardType,
                 hex,
                 components,
                 wires,
-                (stateObj) => postMessage(stateObj),
+                (stateObj) => postRunnerState(stateObj, singleBoardId || 'default'),
                 {
                     boardId: singleBoardId,
                     serialBaudRate: Number(boardBaudMap?.[singleBoardId] ?? baudRate ?? 9600),
@@ -370,21 +832,28 @@ self.onmessage = async (e) => {
                     // Pass pyScript metadata so the worker can inject over UART0 after boot.
                     pyScript: typeof pyScript === 'string' ? pyScript : '',
                     onByteTransmit: ({ boardId, value, char, source }) => {
+                        appendBoardSerialOutput(String(boardId || ''), String(char || ''));
                         postMessage({ type: 'serial', data: char, boardId, value, source });
                     },
                     rp2040ExecutableRanges: singleBoardIsRp2040 ? singleBoardExecutableRanges : undefined,
+                    rp2040LogicalFlashBytes: singleBoardIsRp2040 ? RP2040_LOGICAL_FLASH_BYTES : undefined,
+                    rp2040FlashPartitions: singleBoardIsRp2040 ? singleBoardFlashPartitions : undefined,
                 }
             );
 
             if (singleBoardId) {
                 boardTypes.set(singleBoardId, singleBoardType);
-                if (pyScript?.trim() && (runner as any)?.cpu?.uart?.[0]) {
+                boardSerialOutput.set(singleBoardId, '');
+                if (shouldInjectPythonOverUart && (runner as any)?.cpu?.uart?.[0]) {
                     scheduleMicroPythonInject(
                         runner!,
                         singleBoardId,
                         pyScript,
                         Number(boardBaudMap?.[singleBoardId] ?? 115200)
                     );
+                }
+                if (singleBoardIsRp2040 && singleBoardRuntimeEnv === 'circuitpython' && singleBoardRuntimeFiles.length > 0) {
+                    scheduleCircuitPythonInject(runner!, singleBoardId, singleBoardRuntimeFiles);
                 }
             }
             return;
@@ -393,15 +862,43 @@ self.onmessage = async (e) => {
         mode = 'multi';
         buildNetIndex(wires || []);
 
-        programmableBoards.forEach((boardComp: any) => {
+        const uartInjectionScripts = new Map<string, string>();
+        const circuitPythonInjectionFiles = new Map<string, Array<{ path: string; data: string }>>();
+
+        for (const boardComp of programmableBoards) {
             const fwHex = boardHexMap?.[boardComp.id] || boardComp?.attrs?.firmwareHex || boardComp?.attrs?.hex;
             const executableRanges = resolveRp2040ExecutableRanges(boardComp, boardExecutableRangesMap);
             if (typeof fwHex !== 'string' || !fwHex.trim()) {
                 console.warn(`[Worker] Skipping board ${boardComp.id}: no board-specific firmware available.`);
-                return;
+                continue;
             }
             const runnerComponents = [boardComp, ...sharedPeripheralComponents];
-            const pyScript = boardPythonMap?.[boardComp.id] || '';
+            const pyScript = String(boardPythonMap?.[boardComp.id] || '');
+            const isRp2040Board = /(rp2040|pico)/i.test(String(boardComp.type || ''));
+            const rp2040RuntimeEnv: Rp2040RuntimeEnv = isRp2040Board
+                ? normalizeRp2040RuntimeEnv(boardRuntimeEnvMap?.[boardComp.id] ?? boardComp?.attrs?.env)
+                : 'native';
+            const rp2040RuntimeFiles = isRp2040Board && rp2040RuntimeEnv !== 'native'
+                ? collectRp2040RuntimeFiles(boardComp.id, rp2040RuntimeEnv, boardPythonFilesMap, boardPythonMap)
+                : [];
+            const rp2040FlashPartitions = isRp2040Board
+                ? await buildRp2040FlashPartitions(boardComp.id, rp2040RuntimeEnv, boardPythonFilesMap, boardPythonMap)
+                : undefined;
+
+            if (isRp2040Board && rp2040RuntimeEnv !== 'native' && (!rp2040FlashPartitions || rp2040FlashPartitions.length === 0)) {
+                console.warn(`[Worker] RP2040 Python filesystem unavailable for ${boardComp.id}; falling back where possible.`);
+            }
+            if (
+                isRp2040Board
+                && rp2040RuntimeEnv !== 'native'
+                && (!rp2040FlashPartitions || rp2040FlashPartitions.length === 0)
+                && pyScript.trim()
+            ) {
+                uartInjectionScripts.set(boardComp.id, pyScript);
+            }
+            if (isRp2040Board && rp2040RuntimeEnv === 'circuitpython' && rp2040RuntimeFiles.length > 0) {
+                circuitPythonInjectionFiles.set(boardComp.id, rp2040RuntimeFiles);
+            }
 
             const boardRunner = createRunnerForBoard(
                 String(boardComp.type || ''),
@@ -416,31 +913,39 @@ self.onmessage = async (e) => {
                     debugIntervalMs: /(rp2040|pico)/i.test(String(boardComp.type || '')) && rp2040DebugEnabled ? 1200 : 0,
                     pyScript: typeof pyScript === 'string' ? pyScript : '',
                     onByteTransmit: ({ boardId, value, char, source }) => {
+                        appendBoardSerialOutput(String(boardId || ''), String(char || ''));
                         postMessage({ type: 'serial', data: char, boardId, value, source });
                         routeUartByte(boardId, value, source || 'uart0');
                     },
-                    rp2040ExecutableRanges: /(rp2040|pico)/i.test(String(boardComp.type || '')) ? executableRanges : undefined,
+                    rp2040ExecutableRanges: isRp2040Board ? executableRanges : undefined,
+                    rp2040LogicalFlashBytes: isRp2040Board ? RP2040_LOGICAL_FLASH_BYTES : undefined,
+                    rp2040FlashPartitions: isRp2040Board ? rp2040FlashPartitions : undefined,
                 }
             );
 
             boardRunners.set(boardComp.id, boardRunner);
             boardTypes.set(boardComp.id, String(boardComp.type || ''));
-        });
+            boardSerialOutput.set(boardComp.id, '');
+        }
 
-        programmableBoards.forEach((boardComp: any) => {
-            const pyScript = boardPythonMap?.[boardComp.id];
-            if (typeof pyScript !== 'string' || !pyScript.trim()) return;
-            const target = boardRunners.get(boardComp.id);
-            if (!target) return;
+        for (const [boardId, pyScript] of uartInjectionScripts.entries()) {
+            const target = boardRunners.get(boardId);
+            if (!target) continue;
             if ((target as any)?.cpu?.uart?.[0]) {
                 scheduleMicroPythonInject(
                     target,
-                    boardComp.id,
+                    boardId,
                     pyScript,
-                    Number(boardBaudMap?.[boardComp.id] ?? 115200)
+                    Number(boardBaudMap?.[boardId] ?? 115200)
                 );
             }
-        });
+        }
+
+        for (const [boardId, runtimeFiles] of circuitPythonInjectionFiles.entries()) {
+            const target = boardRunners.get(boardId);
+            if (!target) continue;
+            scheduleCircuitPythonInject(target, boardId, runtimeFiles);
+        }
 
     } else if (data.type === 'STOP') {
         stopAllRunners();
@@ -464,6 +969,48 @@ self.onmessage = async (e) => {
             if (!delivered) {
                 console.warn(`[Worker] INTERACT target not found in any runner: ${data.compId}`);
             }
+        }
+    } else if (data.type === 'RENDER_REPORT') {
+        if (!syncValidationEnabled) {
+            return;
+        }
+
+        const boardId = String(data.boardId || '').trim() || 'default';
+        const renderedHash = String(data.hash || '').trim();
+        const reportedFrameId = Number(data.frameId);
+        if (!renderedHash) {
+            return;
+        }
+
+        const heartbeat = syncHeartbeatByBoard.get(boardId);
+        if (!heartbeat) {
+            return;
+        }
+
+        if (Number.isFinite(reportedFrameId) && reportedFrameId > 0 && reportedFrameId < heartbeat.frameId) {
+            return;
+        }
+
+        if (renderedHash === heartbeat.hash) {
+            syncMismatchCountByBoard.set(boardId, 0);
+            syncFaultLatchedByBoard.set(boardId, false);
+            return;
+        }
+
+        const mismatchCount = Number(syncMismatchCountByBoard.get(boardId) || 0) + 1;
+        syncMismatchCountByBoard.set(boardId, mismatchCount);
+
+        if (mismatchCount > 3 && !syncFaultLatchedByBoard.get(boardId)) {
+            syncFaultLatchedByBoard.set(boardId, true);
+            postMessage({
+                type: 'sync_fault',
+                boardId,
+                frameId: heartbeat.frameId,
+                mismatches: mismatchCount,
+                expectedHash: heartbeat.hash,
+                renderedHash,
+                emittedAt: Date.now(),
+            });
         }
     } else if (data.type === 'SERIAL_SET_BAUD') {
         const parsedBaud = Number(data.baudRate);
@@ -510,6 +1057,9 @@ self.onmessage = async (e) => {
                 if (typeof boardRunner.reset === 'function') boardRunner.reset();
                 else if (boardRunner.cpu) boardRunner.cpu.reset();
             });
+        }
+        if (syncValidationEnabled) {
+            resetSyncValidationState();
         }
     }
 };

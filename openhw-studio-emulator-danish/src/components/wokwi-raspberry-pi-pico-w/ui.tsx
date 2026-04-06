@@ -169,7 +169,7 @@ export const PicoWContextMenu = ({
         >
           <option value="">None (Compiled Code)</option>
           <option value="micropython-20241129-v1.24.1">MicroPython (v1.24.1)</option>
-          <option value="micropython-js">MicroPython (JS Runtime, recommended if UART is silent)</option>
+          <option value="circuitpython-8.2.7">CircuitPython (8.2.7)</option>
         </select>
       </div>
 
