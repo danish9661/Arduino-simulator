@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # OpenHW Studio CLI
 
 Terminal-first CLI for OpenHW Studio project management, headless simulation, serial monitoring, and library management.
@@ -154,3 +155,6 @@ npm run cli -- repl
 - `sim interact` can inject component events for interactive parts (e.g. LDR, potentiometer, pushbutton).
 - `mcp serve` starts a local Model Context Protocol server over stdio, including simulation trace/inspect tools for remote automation.
 - Default backend URL is `http://localhost:5001/api` and can be overridden with `--backend-url`.
+=======
+# OpenHW-studio--cli
+>>>>>>> origin/develop

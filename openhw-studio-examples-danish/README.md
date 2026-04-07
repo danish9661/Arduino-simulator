@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # OpenHW Examples
 
 Reference circuits and starter projects for OpenHW Studio.
@@ -20,3 +21,16 @@ Notable example folders:
 
 - Example assets are served through backend `/examples` static route.
 - Backend should have both `arduino:avr` and `rp2040:rp2040` cores installed for full board compatibility.
+=======
+﻿# openhw-studio-examples
+
+This repository contains sample projects for OpenHW Studio.
+Each example may include:
+- `diagram.json` for circuit topology
+- `sketch.ino` for demo code
+- `guide.json` for guide-page context
+
+## Available examples
+- `examples/led-blink`
+- `examples/rgb-led`
+>>>>>>> origin/main

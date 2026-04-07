@@ -23,9 +23,21 @@ import { COMPONENT_MAP } from '../../services/gamification/ComponentsConfig.js'
 import { compileCode, flashFirmware, fetchInstalledLibraries, searchLibraries, installLibrary, submitCustomComponent, fetchInstalledComponentsWithFiles } from '../../services/simulatorService.js'
 import { getCachedHex, setCachedHex, enqueueComponent, getQueuedComponents, dequeueComponent } from '../../services/offlineCache.js'
 import { saveProject, loadProject, listProjects, deleteProject, renameProject, generateProjectId, formatProjectDate } from '../../services/projectStore.js'
-import html2canvas from 'html2canvas'
 import JSZip from 'jszip';
-import * as Babel from '@babel/standalone';
+
+// ── Lazy loaders — heavy libs loaded on first use, NOT on page paint ──────────
+// @babel/standalone is ~800KB — loading it eagerly was causing the 3.73s LCP.
+// html2canvas is ~120KB — only needed for PNG export.
+let _babelMod = null;
+const getBabel = async () => {
+  if (!_babelMod) _babelMod = await import('@babel/standalone');
+  return _babelMod;
+};
+let _h2cMod = null;
+const getHtml2canvas = async () => {
+  if (!_h2cMod) _h2cMod = (await import('html2canvas')).default;
+  return _h2cMod;
+};
 
 import * as EmulatorComponents from "@openhw/emulator";
 
@@ -1165,6 +1177,95 @@ function validateCircuitLocally(components, wires) {
   return errors;
 }
 
+/**
+ * Helper to check if two category sets (strings or arrays) have any common elements.
+ */
+function hasCategoryIntersection(cat1, cat2) {
+  if (!cat1 || !cat2) return false;
+  const arr1 = Array.isArray(cat1) ? cat1 : [cat1];
+  const arr2 = Array.isArray(cat2) ? cat2 : [cat2];
+  return arr1.some(c => arr2.includes(c));
+}
+
+/**
+ * Determines the logical category (or categories) of a pin.
+ * Returns an array of strings, or null if no category matches.
+ */
+function getPinCategory(pId, pDesc, compType) {
+  const sId = String(pId || '').toLowerCase();
+  const sDesc = String(pDesc || '').toLowerCase();
+  const matches = (regex) => regex.test(sId) || regex.test(sDesc);
+  const categories = [];
+
+  // 1. GND
+  if (matches(/^([a-z0-9]+[._])?(gnd|vss|0v|ground|com)([._]?\d+)?$/i)) categories.push('GND');
+
+  // 2. POWER
+  if (matches(/^([a-z0-9]+[._])?(vcc|vdd|5v|3v3|3\.3v|v\+|power|vcc[12]|vbat|1\.8v|led|light|vout)([._]?\d+)?$/i)) {
+    if (compType?.includes('arduino') && (sId === 'vin' || sId.includes('vin.'))) {
+      categories.push('VIN');
+    } else {
+      categories.push('POWER');
+    }
+  }
+
+  // 3. I2C
+  if (matches(/^sda([._]?\d+)?$/i)) categories.push('I2C_SDA');
+  if (matches(/^scl([._]?\d+)?$/i)) categories.push('I2C_SCL');
+  if ((compType === 'wokwi-arduino-uno' || compType === 'wokwi-arduino-nano')) {
+    if (sId === 'a4') categories.push('I2C_SDA');
+    if (sId === 'a5') categories.push('I2C_SCL');
+  }
+
+  // 4. SPI
+  if (matches(/^(mosi|din|dn|sdi)([._]?\d+)?$/i)) categories.push('SPI_MOSI');
+  if (matches(/^(miso|dout|sdo)([._]?\d+)?$/i)) categories.push('SPI_MISO');
+  if (matches(/^(sck|sclk|clk|clock)([._]?\d+)?$/i)) categories.push('SPI_SCK');
+
+  // 5. ANALOG
+  if (matches(/^(a\d+|vrx|vry|an|adc|out)([._]?\d+)?$/i)) {
+    if (sId === 'vrx' || (compType?.includes('arduino') && sId === 'a0')) categories.push('ANALOG_X');
+    if (sId === 'vry' || (compType?.includes('arduino') && sId === 'a1')) categories.push('ANALOG_Y');
+    categories.push('ANALOG');
+  }
+
+  // 6. PWM
+  if (matches(/^(pwm|~)([._]?\d+)?$/i)) categories.push('PWM');
+  if ((compType === 'wokwi-arduino-uno' || compType === 'wokwi-arduino-nano') && ['3', '5', '6', '9', '10', '11'].includes(sId)) categories.push('PWM');
+  if (compType === 'wokwi-arduino-mega') {
+    const pinNum = parseInt(sId);
+    if ((pinNum >= 2 && pinNum <= 13) || [44, 45, 46].includes(pinNum)) categories.push('PWM');
+  }
+
+  // 7. Motor Driver / EN Special (Enable can be PWM or POWER)
+  if (matches(/^en([._]?\d+(,\d+)?)?$/i)) {
+    if (!categories.includes('PWM')) categories.push('PWM');
+    if (!categories.includes('POWER')) categories.push('POWER');
+  }
+
+  // 8. MOTOR OUTPUT
+  if (matches(/^(out\d+)([._]?\d+)?$/i) || ((compType === 'wokwi-motor' || compType === 'wokwi-stepper-motor') && /^\d+$/.test(sId))) {
+    categories.push('MOTOR');
+  }
+
+  // 9. DIGITAL
+  if (matches(/^(d\d+|io\d+|gpio\d+|sw|joy_sw|dc|rst|reset|cs|ce|sce|ss|rs|en|enable|in\d+|\d+)([._]?\d+)?$/i)) {
+    if (!(compType?.includes('arduino') && sId.startsWith('a'))) {
+      if (!categories.includes('DIGITAL')) categories.push('DIGITAL');
+    }
+  }
+
+  // 10. Breadboard
+  if (compType?.startsWith('wokwi-breadboard') && /^\d+[a-j]$/i.test(sId)) {
+    const colNum = sId.match(/^\d+/)[0];
+    const rowLetter = sId.slice(-1);
+    const rowHalf = 'abcde'.includes(rowLetter) ? 'top' : 'bottom';
+    categories.push(`BB_${colNum}_${rowHalf}`);
+  }
+
+  return categories.length > 0 ? categories : null;
+}
+
 export default function SimulatorPage({ gamificationMode = false }) {
   const { isAuthenticated, user, logout, loading: authLoading } = useAuth()
   const navigate = useNavigate()
@@ -1191,6 +1292,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
     'wokwi-hc-sr04':                'ultrasonic',
     'wokwi-servo':                  'servo',
     'wokwi-lcd1602':                'lcd',
+    'wokwi-analog-joystick':        'analog-joystick',
+    'wokwi-membrane-keypad':        'keypad',
   }), [])
 
   const isPaletteItemLocked = useCallback((itemType) => {
@@ -1286,6 +1389,13 @@ export default function SimulatorPage({ gamificationMode = false }) {
   const [blocklyXml, setBlocklyXml] = useState('')
   const [blocklyGeneratedCode, setBlocklyGeneratedCode] = useState('')
   const [useBlocklyCode, setUseBlocklyCode] = useState(false)
+  const [blocklyDisabled, setBlocklyDisabled] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ohw_blockly_disabled');
+      // Default is DISABLED (true) if never explicitly set
+      return saved === null ? true : saved === 'true';
+    } catch (_) { return true; }
+  })
   const [projectFiles, setProjectFiles] = useState([])
   const [openCodeTabs, setOpenCodeTabs] = useState([])
   const [activeCodeFileId, setActiveCodeFileId] = useState('')
@@ -1321,7 +1431,14 @@ export default function SimulatorPage({ gamificationMode = false }) {
   const [isCanvasLocked, setIsCanvasLocked] = useState(false)
   const isCanvasLockedRef = useRef(false)
   const [showGrid, setShowGrid] = useState(true)
+  const [isPinMappingExpanded, setIsPinMappingExpanded] = useState(false)
+  const [pendingPinColors, setPendingPinColors] = useState({}) // { [pinIdStr]: color }
   const [isFullscreen, setIsFullscreen] = useState(false)
+
+  // Reset Pin Mapping expansion when a new component is selected
+  useEffect(() => {
+    setIsPinMappingExpanded(false)
+  }, [selected])
   const [quickAdd, setQuickAdd] = useState(null)   // { screenX, screenY, canvasX, canvasY }
   const [quickAddSearch, setQuickAddSearch] = useState('')
   const [quickAddIdx, setQuickAddIdx] = useState(0)
@@ -1490,6 +1607,10 @@ export default function SimulatorPage({ gamificationMode = false }) {
   const [isExporting, setIsExporting] = useState(false);
   const [showFirmwareDownloadDialog, setShowFirmwareDownloadDialog] = useState(false);
   const [firmwareDownloadTarget, setFirmwareDownloadTarget] = useState('');
+  const [showFirmwareUploadDialog, setShowFirmwareUploadDialog] = useState(false);
+  const [firmwareUploadTarget, setFirmwareUploadTarget] = useState('');
+  const [firmwareUploadFile, setFirmwareUploadFile] = useState(null);
+  const [isApplyingFirmwareUpload, setIsApplyingFirmwareUpload] = useState(false);
   const [runStartedAtMs, setRunStartedAtMs] = useState(null);
   const [runDurationSec, setRunDurationSec] = useState(0);
   const simulationSpeed = 1;
@@ -1514,6 +1635,14 @@ export default function SimulatorPage({ gamificationMode = false }) {
     }
   }, [showFirmwareDownloadDialog, firmwareDownloadTarget, firmwareBoardOptions]);
 
+  useEffect(() => {
+    if (!showFirmwareUploadDialog) return;
+    const hasTarget = firmwareBoardOptions.some((opt) => opt.id === firmwareUploadTarget);
+    if (!hasTarget) {
+      setFirmwareUploadTarget(firmwareBoardOptions[0]?.id || '');
+    }
+  }, [showFirmwareUploadDialog, firmwareUploadTarget, firmwareBoardOptions]);
+
   const workerRef = useRef(null)
   const lastCompiledRef = useRef(null)
   const micropythonUf2PayloadRef = useRef(null)
@@ -1537,12 +1666,16 @@ export default function SimulatorPage({ gamificationMode = false }) {
   const serialPausedQueueRef = useRef([]);
 
   const canvasRef = useRef(null)
+  const innerCanvasRef = useRef(null)   // ref to the zoom-wrapper div — used for CSS-transform panning (Fix #4)
+  const rafMoveRef = useRef(null)       // pending rAF id for mousemove throttle (Fixes #1-#4)
+  const pendingMoveRef = useRef(null)   // latest computed move data, read by the rAF callback
   const svgRef = useRef(null)
   const viewPanelRef = useRef(null)
   const schematicSvgRef = useRef(null)
   const dragPayload = useRef(null)
   const movingComp = useRef(null)
   const componentZipInputRef = useRef(null);
+  const firmwareUploadInputRef = useRef(null);
   // Reactive refs — kept current every render so async effects get fresh values
   const getPinPosRef = useRef(null);
   const componentsRef = useRef([]);
@@ -1567,6 +1700,14 @@ export default function SimulatorPage({ gamificationMode = false }) {
   const [projContextMenu, setProjContextMenu] = useState(null); // { proj, x, y }
   const [renamingProjectId, setRenamingProjectId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(() => {
+    try {
+      const val = localStorage.getItem('ohw_autosave_enabled');
+      return val === null ? true : val === 'true';
+    } catch {
+      return true;
+    }
+  });
   const backupRestoreInputRef = useRef(null);
 
   const handleUploadZip = async (event) => {
@@ -1612,6 +1753,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
       }
 
       // --- ZERO-TOUCH SANDBOX INJECTION ---
+      const Babel = await getBabel();
       const transpileUI = Babel.transform(uiStr, { filename: 'ui.tsx', presets: ['react', 'typescript', 'env'] }).code;
       const transpileLogic = Babel.transform(logicStr, { filename: 'logic.ts', presets: ['typescript', 'env'] }).code;
 
@@ -1844,6 +1986,9 @@ export default function SimulatorPage({ gamificationMode = false }) {
 
   // ── Project: debounced auto-save whenever circuit changes ─────────────────
   useEffect(() => {
+    // Don't trigger auto-save if disabled
+    if (!autoSaveEnabled) return;
+
     // Don't trigger an empty-project save on initial render
     if (components.length === 0 && wires.length === 0 && code.trim() === '') return;
 
@@ -1875,7 +2020,15 @@ export default function SimulatorPage({ gamificationMode = false }) {
 
     return () => clearTimeout(autoSaveTimerRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [components, wires, code, blocklyXml, blocklyGeneratedCode, useBlocklyCode, board, projectFiles, openCodeTabs, activeCodeFileId]);
+  }, [components, wires, code, blocklyXml, blocklyGeneratedCode, useBlocklyCode, board, projectFiles, openCodeTabs, activeCodeFileId, autoSaveEnabled]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ohw_autosave_enabled', String(autoSaveEnabled));
+    } catch {
+      // no-op
+    }
+  }, [autoSaveEnabled]);
 
   useEffect(() => { canvasZoomRef.current = canvasZoom; }, [canvasZoom]);
   useEffect(() => { canvasOffsetRef.current = canvasOffset; }, [canvasOffset]);
@@ -1941,6 +2094,9 @@ export default function SimulatorPage({ gamificationMode = false }) {
 
       const compType = manifest.type || comp.id;
 
+      // Use async IIFE so await getBabel() is valid inside useEffect
+      (async () => {
+      const Babel = await getBabel();
       const transpileUI = Babel.transform(uiRaw, { filename: 'ui.tsx', presets: ['react', 'typescript', 'env'] }).code;
       const transpileLogic = Babel.transform(logicRaw, { filename: 'logic.ts', presets: ['typescript', 'env'] }).code;
 
@@ -1985,6 +2141,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
       setCustomCatalogCounter(c => c + 1);
       setPreviewBanner({ id: comp.id, label: manifest.label || comp.id });
       console.log(`[SimulatorPage] Admin preview: injected "${manifest.label}" (${compType}) into local registry.`);
+      })().catch(e => console.error('[SimulatorPage] Failed to inject admin preview component:', e.message));
     } catch (e) {
       console.error('[SimulatorPage] Failed to inject admin preview component:', e.message);
     }
@@ -2020,6 +2177,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
             // Already in registry — nothing to do this cycle
             if (COMPONENT_REGISTRY[compType]) continue;
 
+            const Babel = await getBabel();
             const transpileUI = Babel.transform(uiStr, { filename: 'ui.tsx', presets: ['react', 'typescript', 'env'] }).code;
             const transpileLogic = Babel.transform(logicStr, { filename: 'logic.ts', presets: ['typescript', 'env'] }).code;
 
@@ -2101,9 +2259,12 @@ export default function SimulatorPage({ gamificationMode = false }) {
       }
     };
 
-    // Run once immediately on mount, then poll every 12 seconds
+    // Run once immediately on mount, then poll every 60 seconds.
+    // Skip polling when the browser tab is hidden to avoid wasted work.
     syncComponents();
-    const syncInterval = setInterval(syncComponents, 12000);
+    const syncInterval = setInterval(() => {
+      if (!document.hidden) syncComponents();
+    }, 60000);
     return () => clearInterval(syncInterval); // cleanup on unmount
   }, []);
 
@@ -2271,7 +2432,9 @@ export default function SimulatorPage({ gamificationMode = false }) {
     'wokwi-motor-driver': 'Dual H-bridge motor driver (L293D). Controls speed and direction of two DC motors.',
     'wokwi-slide-potentiometer': 'Linear slide potentiometer. Provides variable analog voltage via sliding knob.',
     'wokwi-potentiometer': 'Rotary potentiometer. Variable resistor providing analog voltage proportional to rotation.',
+    'wokwi-analog-joystick': '2-axis analog joystick. Provides X and Y axis voltage limits along with a push button.',
     'shift_register': '74HC595 8-bit serial-in, parallel-out shift register. Expands digital outputs.',
+    'wokwi-membrane-keypad': '4x4 Membrane Keypad. Provides a matrix of 16 buttons for code input or navigation.',
   };
 
   // ── Apply NeoPixel pixel data to DOM elements ──────────────────────────────
@@ -3013,76 +3176,121 @@ export default function SimulatorPage({ gamificationMode = false }) {
   }, [])
 
   useEffect(() => {
+    // ───── RAF-throttled mousemove (Fixes #1 #2 #3 #4) ──────────────────────────
+    // Instead of calling React state setters on every raw mousemove (which can
+    // fire at 200Hz), we synchronously extract all needed data from the event,
+    // store it in a ref, then schedule one rAF callback to do all state updates.
+    // This caps React renders at 60fps regardless of mouse polling rate.
     const onMove = (e) => {
+      // ── Synchronously read event data (must happen in the event handler) ───
+      let compUpdate = null;
+      let wireUpdate = null;
+      let panUpdate = null;
+      let mousePosUpdate = null;
+
       if (movingComp.current) {
-        movingComp.current.moved = true
-        const { id, sx, sy, cx, cy } = movingComp.current
-        setComponents(prev => prev.map(c =>
-          c.id === id ? { ...c, x: cx + (e.clientX - sx) / canvasZoomRef.current, y: cy + (e.clientY - sy) / canvasZoomRef.current } : c
-        ))
+        // Fix #1 ─ component drag
+        movingComp.current.moved = true;
+        const { id, sx, sy, cx, cy } = movingComp.current;
+        const zoom = canvasZoomRef.current;
+        compUpdate = { id, newX: cx + (e.clientX - sx) / zoom, newY: cy + (e.clientY - sy) / zoom };
       }
-      // Segment handle drag
+
       const sd = segDragRef.current;
       if (sd && canvasRef.current) {
+        // Fix #2 ─ wire segment drag
         const rect = canvasRef.current.getBoundingClientRect();
         const mx = (e.clientX - rect.left - canvasOffsetRef.current.x) / canvasZoomRef.current;
         const my = (e.clientY - rect.top - canvasOffsetRef.current.y) / canvasZoomRef.current;
         const ddx = mx - sd.startMouseCanvas.x;
         const ddy = my - sd.startMouseCanvas.y;
-        if (Math.abs(ddx) < 1 && Math.abs(ddy) < 1) return; // ignore tiny jitter
-        sd.hasMoved = true;
-        const newPts = sd.startPts.map(pt => ({ ...pt }));
-        const { segIdx, isHoriz } = sd;
-        if (isHoriz) {
-          newPts[segIdx] = { ...newPts[segIdx], y: newPts[segIdx].y + ddy };
-          newPts[segIdx + 1] = { ...newPts[segIdx + 1], y: newPts[segIdx + 1].y + ddy };
-        } else {
-          newPts[segIdx] = { ...newPts[segIdx], x: newPts[segIdx].x + ddx };
-          newPts[segIdx + 1] = { ...newPts[segIdx + 1], x: newPts[segIdx + 1].x + ddx };
+        if (Math.abs(ddx) >= 1 || Math.abs(ddy) >= 1) {
+          sd.hasMoved = true;
+          const newPts = sd.startPts.map(pt => ({ ...pt }));
+          const { segIdx, isHoriz } = sd;
+          if (isHoriz) {
+            newPts[segIdx] = { ...newPts[segIdx], y: newPts[segIdx].y + ddy };
+            newPts[segIdx + 1] = { ...newPts[segIdx + 1], y: newPts[segIdx + 1].y + ddy };
+          } else {
+            newPts[segIdx] = { ...newPts[segIdx], x: newPts[segIdx].x + ddx };
+            newPts[segIdx + 1] = { ...newPts[segIdx + 1], x: newPts[segIdx + 1].x + ddx };
+          }
+          wireUpdate = { wireId: sd.wireId, cornerWaypoints: newPts.slice(1, -1).map(pt => ({ x: pt.x, y: pt.y, _corner: true })) };
         }
-        // Store internal corners (skip p1 and p2) as explicit corner waypoints
-        const cornerWaypoints = newPts.slice(1, -1).map(pt => ({ x: pt.x, y: pt.y, _corner: true }));
-        setWires(prev => prev.map(w => w.id === sd.wireId ? { ...w, waypoints: cornerWaypoints } : w));
-        return; // don't pan while segment-dragging
-      }
-      // Canvas panning
-      if (isPanningRef.current && !isCanvasLockedRef.current) {
-        const dx = e.clientX - panStartRef.current.x;
-        const dy = e.clientY - panStartRef.current.y;
-        if (!didPanRef.current && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
-          didPanRef.current = true;
-        }
-        if (didPanRef.current) {
-          const newOffset = { x: panStartRef.current.ox + dx, y: panStartRef.current.oy + dy };
-          setCanvasOffset(newOffset);
-          canvasOffsetRef.current = newOffset;
-        }
-      }
-      // Track mouse for wire preview (with pin snapping)
-      if (wireStart && canvasRef.current) {
-        const rect = canvasRef.current.getBoundingClientRect()
-        const rawX = (e.clientX - rect.left - canvasOffsetRef.current.x) / canvasZoomRef.current;
-        const rawY = (e.clientY - rect.top - canvasOffsetRef.current.y) / canvasZoomRef.current;
-        const snapRadius = 15;
-        let snapped = null;
-        const allComps = componentsRef.current;
-        const pinDefs = pinDefsRef.current;
-        const getPos = getPinPosRef.current;
-        if (getPos) {
-          for (let ci = 0; ci < allComps.length && !snapped; ci++) {
-            const c = allComps[ci];
-            if (c.id === wireStart.compId) continue;
-            const pins = pinDefs[c.type] || [];
-            for (let pi = 0; pi < pins.length && !snapped; pi++) {
-              const pp = getPos(c.id, pins[pi].id);
-              if (pp && Math.hypot(pp.x - rawX, pp.y - rawY) < snapRadius) snapped = pp;
+        // don't pan or track mouse while segment-dragging
+      } else {
+        // Fix #4 ─ canvas panning via direct DOM transform (zero React renders mid-pan)
+        if (isPanningRef.current && !isCanvasLockedRef.current) {
+          const dx = e.clientX - panStartRef.current.x;
+          const dy = e.clientY - panStartRef.current.y;
+          if (!didPanRef.current && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+            didPanRef.current = true;
+          }
+          if (didPanRef.current) {
+            const newOffset = { x: panStartRef.current.ox + dx, y: panStartRef.current.oy + dy };
+            canvasOffsetRef.current = newOffset;
+            // Apply transform directly to DOM — NO React state update mid-pan
+            if (innerCanvasRef.current) {
+              innerCanvasRef.current.style.transform =
+                `translate(${newOffset.x}px, ${newOffset.y}px) scale(${canvasZoomRef.current})`;
             }
+            panUpdate = newOffset; // stored so onUp can commit to React state
           }
         }
-        setMousePos(snapped || { x: rawX, y: rawY });
+
+        // Fix #3 ─ wire preview mouse tracking
+        if (wireStart && canvasRef.current) {
+          const rect = canvasRef.current.getBoundingClientRect();
+          const rawX = (e.clientX - rect.left - canvasOffsetRef.current.x) / canvasZoomRef.current;
+          const rawY = (e.clientY - rect.top - canvasOffsetRef.current.y) / canvasZoomRef.current;
+          const snapRadius = 15;
+          let snapped = null;
+          const allComps = componentsRef.current;
+          const pinDefs = pinDefsRef.current;
+          const getPos = getPinPosRef.current;
+          if (getPos) {
+            for (let ci = 0; ci < allComps.length && !snapped; ci++) {
+              const c = allComps[ci];
+              if (c.id === wireStart.compId) continue;
+              const pins = pinDefs[c.type] || [];
+              for (let pi = 0; pi < pins.length && !snapped; pi++) {
+                const pp = getPos(c.id, pins[pi].id);
+                if (pp && Math.hypot(pp.x - rawX, pp.y - rawY) < snapRadius) snapped = pp;
+              }
+            }
+          }
+          mousePosUpdate = snapped || { x: rawX, y: rawY };
+        }
       }
-    }
+
+      // ── Schedule a single rAF to flush state updates (cap at 60fps) ───────
+      pendingMoveRef.current = { compUpdate, wireUpdate, mousePosUpdate };
+      if (!rafMoveRef.current) {
+        rafMoveRef.current = requestAnimationFrame(() => {
+          rafMoveRef.current = null;
+          const { compUpdate, wireUpdate, mousePosUpdate } = pendingMoveRef.current || {};
+          if (compUpdate) {
+            const { id, newX, newY } = compUpdate;
+            setComponents(prev => prev.map(c => c.id === id ? { ...c, x: newX, y: newY } : c));
+          }
+          if (wireUpdate) {
+            const { wireId, cornerWaypoints } = wireUpdate;
+            setWires(prev => prev.map(w => w.id === wireId ? { ...w, waypoints: cornerWaypoints } : w));
+          }
+          if (mousePosUpdate) {
+            setMousePos(mousePosUpdate);
+          }
+          // Note: panUpdate is applied via direct DOM transform above — no setState here
+        });
+      }
+    };
     const onUp = () => {
+      // Cancel any pending rAF on mouse up to avoid a ghost render
+      if (rafMoveRef.current) { cancelAnimationFrame(rafMoveRef.current); rafMoveRef.current = null; }
+      // Fix #4 ─ commit final pan offset to React state once (1 render total for entire pan)
+      if (isPanningRef.current && canvasOffsetRef.current) {
+        setCanvasOffset({ ...canvasOffsetRef.current });
+      }
       if (movingComp.current?.moved) {
         const origComps = movingComp.current.originalComps;
         const movedId = movingComp.current.id;
@@ -3619,18 +3827,129 @@ export default function SimulatorPage({ gamificationMode = false }) {
 
   // ─── Project Save / Load Handlers ───────────────────────────────────────────
 
+  const sanitizeDownloadStem = useCallback((value, fallback = 'firmware') => {
+    const cleaned = String(value || '')
+      .replace(/\.[a-z0-9]+$/i, '')
+      .replace(/[^a-zA-Z0-9._-]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    return cleaned || fallback;
+  }, []);
+
+  const resolveFirmwareBoardFileStem = useCallback((boardId = '') => {
+    const normalizedBoardId = String(boardId || '').trim();
+    if (!normalizedBoardId) return '';
+
+    const boardComp = boardComponentMap.get(normalizedBoardId);
+    const boardLabel = String(boardComp?.label || '').trim();
+    return sanitizeDownloadStem(boardLabel || normalizedBoardId, 'firmware');
+  }, [boardComponentMap, sanitizeDownloadStem]);
+
+  const buildSimulationJsonPayload = useCallback(() => {
+    return buildProjectPayload({
+      name: currentProjectName,
+      board,
+      components,
+      wires,
+      code,
+      blocklyXml,
+      blocklyGeneratedCode,
+      useBlocklyCode,
+      projectFiles,
+      openCodeTabs,
+      activeCodeFileId,
+      exportedAt: new Date().toISOString(),
+    });
+  }, [
+    currentProjectName,
+    board,
+    components,
+    wires,
+    code,
+    blocklyXml,
+    blocklyGeneratedCode,
+    useBlocklyCode,
+    projectFiles,
+    openCodeTabs,
+    activeCodeFileId,
+  ]);
+
+  const downloadSimulationJson = useCallback(() => {
+    try {
+      const payload = buildSimulationJsonPayload();
+      const fileBase = sanitizeDownloadStem(currentProjectName || 'simulation', 'simulation');
+      const fileName = `${fileBase}.json`;
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = fileName;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      appendConsoleEntry('info', `Simulation JSON downloaded: ${fileName}`, 'simulator');
+    } catch (err) {
+      appendConsoleEntry('error', `Simulation JSON download failed: ${err?.message || 'Unknown error'}`, 'simulator');
+    }
+  }, [appendConsoleEntry, buildSimulationJsonPayload, currentProjectName, sanitizeDownloadStem]);
+
+  const parseFirmwareUploadFile = useCallback((file) => {
+    return new Promise((resolve, reject) => {
+      if (!(file instanceof File)) {
+        reject(new Error('No firmware file selected.'));
+        return;
+      }
+
+      const rawExt = fileExt(file.name).toLowerCase();
+      if (rawExt !== '.hex' && rawExt !== '.uf2') {
+        reject(new Error('Unsupported firmware file. Use .hex (all boards) or .uf2 (RP2040).'));
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error(`Unable to read ${file.name}.`));
+      reader.onload = () => {
+        try {
+          if (rawExt === '.uf2') {
+            const buffer = reader.result;
+            if (!(buffer instanceof ArrayBuffer)) {
+              throw new Error('UF2 payload read failed.');
+            }
+            const payload = `${UF2_PAYLOAD_PREFIX}${arrayBufferToBase64(buffer)}`;
+            resolve({ payload, ext: rawExt, fileName: file.name });
+            return;
+          }
+
+          const payload = String(reader.result || '').trim();
+          resolve({ payload, ext: rawExt, fileName: file.name });
+        } catch (err) {
+          reject(err instanceof Error ? err : new Error('Failed to parse firmware file.'));
+        }
+      };
+
+      if (rawExt === '.uf2') reader.readAsArrayBuffer(file);
+      else reader.readAsText(file);
+    });
+  }, []);
+
   const normalizeFirmwareFileName = useCallback((artifactName, boardId, firmwarePayload) => {
     const cleaned = String(artifactName || '').trim();
     const isUf2 = typeof firmwarePayload === 'string' && firmwarePayload.startsWith(UF2_PAYLOAD_PREFIX);
     const defaultExt = isUf2 ? '.uf2' : '.hex';
 
-    if (cleaned) {
-      return /\.[a-z0-9]+$/i.test(cleaned) ? cleaned : `${cleaned}${defaultExt}`;
+    const boardStem = resolveFirmwareBoardFileStem(boardId);
+    if (boardStem) {
+      return `${boardStem}${defaultExt}`;
     }
 
-    const safeBoard = String(boardId || 'firmware').replace(/[^a-zA-Z0-9_-]/g, '_') || 'firmware';
-    return `${safeBoard}-firmware${defaultExt}`;
-  }, []);
+    if (cleaned) {
+      return /\.[a-z0-9]+$/i.test(cleaned)
+        ? sanitizeDownloadStem(cleaned, 'firmware') + cleaned.match(/\.[a-z0-9]+$/i)[0]
+        : `${sanitizeDownloadStem(cleaned, 'firmware')}${defaultExt}`;
+    }
+
+    return `firmware${defaultExt}`;
+  }, [resolveFirmwareBoardFileStem, sanitizeDownloadStem]);
 
   const triggerFirmwareDownload = useCallback((firmwarePayload, fileName) => {
     if (!firmwarePayload) return;
@@ -3779,6 +4098,86 @@ export default function SimulatorPage({ gamificationMode = false }) {
     setFirmwareDownloadTarget(firmwareBoardOptions[0]?.id || '__latest__');
     setShowFirmwareDownloadDialog(true);
   }, [firmwareBoardOptions]);
+
+  const openFirmwareUploadDialog = useCallback(() => {
+    setFirmwareUploadTarget(firmwareBoardOptions[0]?.id || '');
+    setFirmwareUploadFile(null);
+    setShowFirmwareUploadDialog(true);
+    if (firmwareUploadInputRef.current) {
+      firmwareUploadInputRef.current.value = '';
+    }
+  }, [firmwareBoardOptions]);
+
+  const applyUploadedFirmwareToBoard = useCallback(async () => {
+    const targetBoardId = String(firmwareUploadTarget || '').trim();
+    if (!targetBoardId) {
+      appendConsoleEntry('warn', 'Pick a board target before uploading firmware.', 'simulator');
+      return;
+    }
+    if (!(firmwareUploadFile instanceof File)) {
+      appendConsoleEntry('warn', 'Select a firmware file before uploading.', 'simulator');
+      return;
+    }
+
+    const targetBoardComp = boardComponentMap.get(targetBoardId);
+    if (!targetBoardComp) {
+      appendConsoleEntry('error', `Board ${targetBoardId} is no longer available on canvas.`, 'simulator');
+      return;
+    }
+
+    setIsApplyingFirmwareUpload(true);
+    try {
+      const parsed = await parseFirmwareUploadFile(firmwareUploadFile);
+      const boardKind = normalizeBoardKind(targetBoardComp.type);
+      if (boardKind !== 'rp2040' && parsed.ext !== '.hex') {
+        throw new Error('Only RP2040 boards support UF2 firmware uploads. Use .hex for this board.');
+      }
+      if (!parsed.payload) {
+        throw new Error('Firmware file is empty.');
+      }
+
+      saveHistory();
+      setComponents((prev) => prev.map((comp) => {
+        if (comp.id !== targetBoardId) return comp;
+        return {
+          ...comp,
+          attrs: {
+            ...(comp.attrs || {}),
+            firmwareHex: parsed.payload,
+            hex: parsed.payload,
+            firmwareArtifactName: String(parsed.fileName || ''),
+          },
+        };
+      }));
+
+      lastCompiledRef.current = null;
+
+      const boardLabel = boardCompToDisplayName(targetBoardComp, boardKind);
+      const firmwareKind = parsed.ext === '.uf2' ? 'UF2' : 'HEX';
+      appendConsoleEntry(
+        'info',
+        `Assigned ${firmwareKind} firmware (${parsed.fileName}) to ${boardLabel}. The next run will use this firmware.`,
+        'simulator',
+      );
+
+      setShowFirmwareUploadDialog(false);
+      setFirmwareUploadFile(null);
+      if (firmwareUploadInputRef.current) {
+        firmwareUploadInputRef.current.value = '';
+      }
+    } catch (err) {
+      appendConsoleEntry('error', `Firmware upload failed: ${err?.message || 'Unknown error'}`, 'simulator');
+    } finally {
+      setIsApplyingFirmwareUpload(false);
+    }
+  }, [
+    appendConsoleEntry,
+    boardComponentMap,
+    firmwareUploadTarget,
+    firmwareUploadFile,
+    parseFirmwareUploadFile,
+    saveHistory,
+  ]);
 
   const handleStartGDB = () => {
     appendConsoleEntry('info', 'Connecting to GDB Session...', 'simulator');
@@ -4320,6 +4719,27 @@ export default function SimulatorPage({ gamificationMode = false }) {
           boardBaudMap[boardComp.id] = selectedRunBoardId
             ? (boardComp.id === selectedRunBoardId ? selectedRunBaud : defaultBaud)
             : selectedRunBaud;
+
+          const uploadedFirmware = String(
+            resolveComponentAttrString(boardComp?.attrs, 'firmwareHex', '')
+            || resolveComponentAttrString(boardComp?.attrs, 'hex', ''),
+          ).trim();
+          if (uploadedFirmware) {
+            boardHexMap[boardComp.id] = uploadedFirmware;
+            const uploadKind = uploadedFirmware.startsWith(UF2_PAYLOAD_PREFIX) ? 'UF2' : 'HEX';
+            appendConsoleEntry(
+              'info',
+              `Using uploaded ${uploadKind} firmware for ${boardCompToDisplayName(boardComp, kind)}.`,
+              'simulator',
+            );
+            if (!result) {
+              result = {
+                hex: uploadedFirmware,
+                artifactName: normalizeFirmwareFileName('', boardComp.id, uploadedFirmware),
+              };
+            }
+            continue;
+          }
 
           const firmwareAssets = getBoardFirmwareAssets(boardComp.id);
           const activeFilePath = String(activeCodeFile?.path || '');
@@ -5244,6 +5664,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
 
       let circuitCanvas;
       try {
+        const html2canvas = await getHtml2canvas();
         circuitCanvas = await html2canvas(canvasEl, {
           backgroundColor: '#070b14',
           scale: SCALE,
@@ -5957,6 +6378,10 @@ export default function SimulatorPage({ gamificationMode = false }) {
       if (remoteState && remoteState.angle !== undefined) {
         attrs.angle = remoteState.angle.toString();
       }
+    } else if (comp.type === 'wokwi-stepper-motor') {
+      if (remoteState && remoteState.angle !== undefined) {
+        attrs.angle = remoteState.angle.toString();
+      }
     } else if (comp.type === 'wokwi-buzzer') {
       if (remoteState && remoteState.isBuzzing) {
         // Wokwi buzzer visual indicator (if supported) can be driven here
@@ -6547,7 +6972,9 @@ export default function SimulatorPage({ gamificationMode = false }) {
           }}
         >
           {/* Zoom Wrapper — scales all circuit content */}
-          <div style={{
+          {/* Fix #4: innerCanvasRef is used to apply CSS transform directly during panning.
+               React state (canvasOffset) is only committed once on mouseup. */}
+          <div ref={innerCanvasRef} style={{
             position: 'absolute', top: 0, left: 0,
             width: '10000px', height: '8000px',
             transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px) scale(${canvasZoom})`, transformOrigin: '0 0',
@@ -6985,10 +7412,24 @@ export default function SimulatorPage({ gamificationMode = false }) {
                     const isHovered = hoveredPin === pinStrRef;
                     const isWireStartPin = wireStart?.compId === comp.id && wireStart?.pinId === pin.id;
 
+                    // Hovered pin's category for passive highlighting
+                    const hoverCompId = hoveredPin?.split(':')[0];
+                    const hoverPinId = hoveredPin?.split(':')[1];
+                    const hoverComp = hoverCompId ? components.find(c => c.id === hoverCompId) : null;
+                    const hoverCat = (hoverComp && hoverPinId) ? getPinCategory(hoverPinId, '', hoverComp.type) : null;
+
+                    const startCat = wireStart ? getPinCategory(wireStart.pinId, wireStart.pinLabel, wireStart.compType) : null;
+                    const currentCat = getPinCategory(pin.id, pin.description, comp.type);
+
+                    const isSuggested = startCat && currentCat && hasCategoryIntersection(startCat, currentCat) && !isWireStartPin;
+                    const isRelated = hoverCat && currentCat && hasCategoryIntersection(hoverCat, currentCat) && !isHovered;
+
+                    const isHighlight = isWireStartPin || isHovered || isSuggested || isRelated;
+
                     // Check if a wire is connected to this pin
                     const connectedWire = wires.find(w => w.from === pinStrRef || w.to === pinStrRef);
-                    const pinColor = connectedWire ? connectedWire.color : (isWireStartPin || isHovered ? '#f1c40f' : 'rgba(255,255,255,0.2)');
-                    const pinBorder = connectedWire ? connectedWire.color : (isHovered || isWireStartPin ? '#fff' : 'rgba(255,255,255,0.8)');
+                    const pinColor = connectedWire ? connectedWire.color : (isHighlight ? '#f1c40f' : 'rgba(255,255,255,0.2)');
+                    const pinBorder = connectedWire ? connectedWire.color : (isHighlight ? '#fff' : 'rgba(255,255,255,0.8)');
 
                     return (
                       <div
@@ -7002,10 +7443,11 @@ export default function SimulatorPage({ gamificationMode = false }) {
                           border: `1px solid ${pinBorder}`,
                           borderRadius: '0%', /* matching task3.html */
                           cursor: 'crosshair',
-                          zIndex: isHovered ? 30 : 20, /* matching task3.html hover and port z-index */
-                          transform: `translate(-50%, -50%)${isHovered ? ' scale(1.5)' : ''}`, /* matching task3.html scale */
+                          zIndex: isHovered || isSuggested ? 30 : 20, /* matching task3.html hover and port z-index */
+                          transform: `translate(-50%, -50%)${isHovered || isSuggested ? ' scale(1.5)' : ''}`, /* matching task3.html scale */
                           transition: '0.2s', /* matching task3.html transition */
                           pointerEvents: 'all', /* Fix hit detection */
+                          boxShadow: isSuggested ? '0 0 8px #f1c40f' : 'none',
                         }}
                         onMouseEnter={() => setHoveredPin(pinStrRef)}
                         onMouseLeave={() => setHoveredPin(null)}
@@ -7104,33 +7546,286 @@ export default function SimulatorPage({ gamificationMode = false }) {
               style={{ position: 'absolute', top: 12, right: 12, zIndex: 90, width: 220, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.35)', overflow: 'hidden' }}
             >
               {/* Header */}
-              <div style={{ padding: '10px 12px 8px', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 3 }}>{selectedComponentInfo.label}</div>
-                <div style={{ display: 'inline-block', fontSize: 10, color: 'var(--text3)', background: `${GROUP_COLORS[selectedComponentInfo.group] || 'var(--accent)'}22`, border: `1px solid ${GROUP_COLORS[selectedComponentInfo.group] || 'var(--accent)'}55`, borderRadius: 4, padding: '1px 6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {selectedComponentInfo.group}
+              <div style={{
+                padding: '16px 16px 14px',
+                borderBottom: '1px solid var(--border)',
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 12,
+                background: 'linear-gradient(to bottom, var(--bg2), var(--bg1))'
+              }}>
+                <div style={{
+                  fontSize: 15,
+                  fontWeight: 800,
+                  color: 'var(--text)',
+                  letterSpacing: '-0.02em',
+                  lineHeight: '1.1'
+                }}>
+                  {selectedComponentInfo.label}
+                </div>
+
+                {/* Description - Preserved from Local */}
+                <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
+                  {COMPONENT_REGISTRY[selectedComponentInfo.type]?.manifest?.description || COMPONENT_DESCRIPTIONS[selectedComponentInfo.type] || `${selectedComponentInfo.type} component`}
+                </div>
+
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}>
+                  {/* Category Chip */}
+                  <div style={{
+                    height: 24,
+                    fontSize: 9,
+                    fontWeight: 800,
+                    color: GROUP_COLORS[selectedComponentInfo.group] || 'var(--accent)',
+                    background: `${GROUP_COLORS[selectedComponentInfo.group] || 'var(--accent)'}12`,
+                    borderRadius: 6,
+                    padding: '0 10px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: `1px solid ${GROUP_COLORS[selectedComponentInfo.group] || 'var(--accent)'}22`
+                  }}>
+                    {selectedComponentInfo.group}
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      const doc = COMPONENT_REGISTRY[selectedComponentInfo.type]?.doc;
+                      if (doc) {
+                        const b = new Blob([doc], { type: 'text/html' });
+                        window.open(URL.createObjectURL(b), '_blank');
+                      } else {
+                        window.open(`https://wokwi.com/docs/parts/${selectedComponentInfo.type}`, '_blank');
+                      }
+                    }}
+                    style={{
+                      height: 24,
+                      background: 'var(--bg3)',
+                      border: '1px solid var(--border)',
+                      padding: '0 12px',
+                      color: 'var(--text2)',
+                      fontSize: 10,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      borderRadius: 6,
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'var(--bg4)';
+                      e.currentTarget.style.borderColor = 'var(--accent)';
+                      e.currentTarget.style.color = 'var(--accent)';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'var(--bg3)';
+                      e.currentTarget.style.borderColor = 'var(--border)';
+                      e.currentTarget.style.color = 'var(--text2)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
+                    }}
+                  >
+                    <svg
+                      width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    </svg>
+                    Documentation
+                  </button>
                 </div>
               </div>
 
-              {/* Description */}
-              <div style={{ padding: '10px 12px 8px', fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
-                {COMPONENT_REGISTRY[selectedComponentInfo.type]?.manifest?.description || COMPONENT_DESCRIPTIONS[selectedComponentInfo.type] || `${selectedComponentInfo.type} component`}
-              </div>
-
-              {/* Doc link */}
-              <div style={{ padding: '0 12px 10px' }}>
-                <button
-                  onClick={() => {
-                    const doc = COMPONENT_REGISTRY[selectedComponentInfo.type]?.doc;
-                    if (doc) {
-                      const b = new Blob([doc], { type: 'text/html' });
-                      window.open(URL.createObjectURL(b), '_blank');
-                    } else {
-                      window.open(`https://wokwi.com/docs/parts/${selectedComponentInfo.type}`, '_blank');
-                    }
+              {/* Pin Wiring Dropdowns */}
+              <div className="panel-scroll" style={{ padding: '10px 12px', flex: 1, overflowY: 'auto' }}>
+                <div
+                  onClick={() => setIsPinMappingExpanded(!isPinMappingExpanded)}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 'bold',
+                    color: 'var(--text3)',
+                    textTransform: 'uppercase',
+                    letterSpacing: 1,
+                    marginBottom: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    padding: '4px 0'
                   }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text2)', cursor: 'pointer', fontSize: 11 }}>
-                  📖 Component Documentation
-                </button>
+                  onMouseEnter={e => e.currentTarget.style.color = 'var(--text2)'}
+                  onMouseLeave={e => e.currentTarget.style.color = 'var(--text3)'}
+                >
+                  <span>Pin Mapping</span>
+                  <svg
+                    width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
+                    style={{
+                      transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      transform: isPinMappingExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                      opacity: 0.6
+                    }}
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </div>
+                {isPinMappingExpanded && (() => {
+                  const compPins = LOCAL_PIN_DEFS[selectedComponentInfo.type] || [];
+                  if (compPins.length === 0) {
+                    return <div style={{ fontSize: 12, color: 'var(--text3)' }}>No pins exposed.</div>;
+                  }
+
+                  // Gather ALL components for destination endpoints (excluding self)
+                  const validTargets = components.filter(c => c.id !== selectedComponentInfo.id);
+                  const targetOptions = [];
+                  validTargets.forEach(b => {
+                    const bPins = LOCAL_PIN_DEFS[b.type] || [];
+                    bPins.forEach(p => targetOptions.push({
+                      id: `${b.id}:${p.id}`,
+                      label: `${b.label || b.id} : ${p.id}`,
+                      type: b.type,
+                      description: p.description
+                    }));
+                  });
+
+                  return compPins.map(pin => {
+                    const pinIdStr = `${selectedComponentInfo.id}:${pin.id}`;
+                    const currentPinCat = getPinCategory(pin.id, pin.description, selectedComponentInfo.type);
+
+                    // Filter target options to show only compatible pins for special categories (GND, POWER, etc.)
+                    const filteredOptions = targetOptions.filter(opt => {
+                      if (!currentPinCat) return true; // Show all for unmapped/general pins
+                      const targetPinCat = getPinCategory(opt.id.split(':')[1], opt.description, opt.type);
+                      return hasCategoryIntersection(currentPinCat, targetPinCat);
+                    });
+
+                    // Find if any wire is connected to this pin specifically
+                    const connectedWire = wires.find(w => w.from === pinIdStr || w.to === pinIdStr);
+                    // Determine current dropdown value
+                    let currentVal = '';
+                    if (connectedWire) {
+                      currentVal = connectedWire.from === pinIdStr ? connectedWire.to : connectedWire.from;
+                    }
+
+                    const pinPreferredColor = pendingPinColors[pinIdStr] || (connectedWire ? connectedWire.color : wireColor(pin.id));
+
+                    return (
+                      <div key={pin.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 4 }}>
+                        <span style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 0, width: 44 }} title={pin.description || pin.id}>
+                          {pin.id}
+                        </span>
+
+                        {/* Interactive Arrow & Color Picker */}
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const picker = e.currentTarget.querySelector('input[type="color"]');
+                            if (picker) picker.click();
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            opacity: connectedWire ? 1 : 0.6,
+                            transition: 'all 0.2s ease',
+                            position: 'relative',
+                            padding: '0 4px',
+                            flexShrink: 0
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.opacity = '1';
+                            e.currentTarget.style.transform = 'scale(1.1)';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.opacity = connectedWire ? '1' : '0.6';
+                            e.currentTarget.style.transform = 'scale(1)';
+                          }}
+                          title={connectedWire ? "Change wire color" : "Set wire color before connecting"}
+                        >
+                          <svg
+                            width="14" height="14" viewBox="0 0 24 24" fill="none"
+                            stroke={pinPreferredColor}
+                            strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
+                          >
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                          </svg>
+                          <input
+                            type="color"
+                            value={pinPreferredColor}
+                            onChange={(e) => {
+                              const newColor = e.target.value;
+                              setPendingPinColors(prev => ({ ...prev, [pinIdStr]: newColor }));
+                              if (connectedWire) {
+                                updateWireColor(connectedWire.id, newColor);
+                              }
+                            }}
+                            style={{
+                              position: 'absolute',
+                              top: 0, left: 0, width: 0, height: 0, opacity: 0, padding: 0, border: 'none', pointerEvents: 'none'
+                            }}
+                          />
+                        </div>
+
+                        <select
+                          value={currentVal}
+                          onChange={(e) => {
+                            const selectedTarget = e.target.value;
+                            setWires(prev => {
+                              // 1. Generate the exact same wire syntax as manual mapping
+                              const toPinLabel = selectedTarget ? (selectedTarget.includes(':') ? selectedTarget.split(':').slice(1).join(':') : '') : '';
+                              const finalColor = pendingPinColors[pinIdStr] || wireColor(toPinLabel);
+
+                              const newWire = selectedTarget ? {
+                                id: `w${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+                                from: pinIdStr,
+                                to: selectedTarget,
+                                fromLabel: pin.id,
+                                toLabel: toPinLabel,
+                                color: finalColor,
+                                waypoints: []
+                              } : null;
+
+                              // 2. Filter cleanly using a map proxy to avoid reference staleness
+                              const filtered = prev.filter(w => w.from !== pinIdStr && w.to !== pinIdStr);
+
+                              setWireStart(null); // Cancel manual wire draw
+                              return newWire ? [...filtered, newWire] : filtered;
+                            });
+                          }}
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            padding: '3px 6px',
+                            background: 'var(--card)',
+                            border: '1px solid var(--border)',
+                            color: currentVal ? 'var(--accent)' : 'var(--text2)',
+                            borderRadius: 4,
+                            fontSize: 10,
+                            fontFamily: 'JetBrains Mono, monospace',
+                            cursor: 'pointer',
+                            outline: 'none'
+                          }}
+                        >
+                          <option value="">-- Disconnected --</option>
+                          {filteredOptions.map(opt => (
+                            <option key={opt.id} value={opt.id}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
           )}
@@ -7243,6 +7938,18 @@ export default function SimulatorPage({ gamificationMode = false }) {
                   }}>{wirepointsEnabled ? 'Disable Wire Waypoints' : 'Enable Wire Waypoints'}</button>
                   <button className="canvas-menu-item" onClick={() => { setShowComponentDesc(d => !d); setShowCanvasMenu(false); }}>{showComponentDesc ? 'Hide Component Info' : 'Show Component Info'}</button>
                   <button className="canvas-menu-item" onClick={() => { setShowConnectionsPanel(p => !p); setShowCanvasMenu(false); }}>{showConnectionsPanel ? 'Hide Connections Panel' : 'Show Connections Panel'}</button>
+                  <button
+                    className="canvas-menu-item"
+                    onClick={() => {
+                      const next = !blocklyDisabled;
+                      setBlocklyDisabled(next);
+                      try { localStorage.setItem('ohw_blockly_disabled', String(next)); } catch (_) {}
+                      setShowCanvasMenu(false);
+                    }}
+                    title={blocklyDisabled ? 'Re-enable block code editor (uses more CPU)' : 'Disable block code editor to improve canvas performance'}
+                  >
+                    {blocklyDisabled ? 'Enable Block Coding' : 'Disable Block Coding'}
+                  </button>
                   <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
                   <button className="canvas-menu-item canvas-menu-item--danger" onClick={() => { if (!isRunning) { saveHistory(); setComponents([]); setWires([]); setSelected(null); } setShowCanvasMenu(false); }}>Clear Canvas</button>
                 </div>
@@ -7364,6 +8071,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
           blocklyXml={blocklyXml} setBlocklyXml={setBlocklyXml}
           blocklyGeneratedCode={blocklyGeneratedCode} setBlocklyGeneratedCode={setBlocklyGeneratedCode}
           useBlocklyCode={useBlocklyCode} setUseBlocklyCode={setUseBlocklyCode}
+          blocklyDisabled={blocklyDisabled} setBlocklyDisabled={setBlocklyDisabled}
           projectFiles={projectFiles} openCodeTabs={openCodeTabs} activeCodeFileId={activeCodeFileId} showCodeExplorer={showCodeExplorer}
           onToggleCodeExplorer={() => setShowCodeExplorer(v => !v)} onOpenCodeFile={openCodeFile} onCloseCodeTab={closeCodeTab}
           onSaveCodeFile={saveCodeFile} onDuplicateCodeFile={duplicateCodeFile} onRenameCodeFile={renameCodeFile} onDeleteCodeFile={deleteCodeFile} onDownloadCodeFile={downloadCodeFile}
@@ -7372,7 +8080,6 @@ export default function SimulatorPage({ gamificationMode = false }) {
           libQuery={libQuery} setLibQuery={setLibQuery} handleSearchLibraries={handleSearchLibraries} isSearchingLib={isSearchingLib} libMessage={libMessage} libInstalled={libInstalled} libResults={libResults} handleInstallLibrary={handleInstallLibrary} installingLib={installingLib}
           serialPaused={serialPaused} setSerialPaused={setSerialPaused} isRunning={isRunning} serialHistory={serialHistory} setSerialHistory={setSerialHistory} serialOutputRef={serialOutputRef} serialInput={serialInput} setSerialInput={setSerialInput} sendSerialInput={sendSerialInput} clearSerialMonitor={clearSerialMonitor}
           serialViewMode={serialViewMode} setSerialViewMode={setSerialViewMode} serialBoardFilter={serialBoardFilter} setSerialBoardFilter={setSerialBoardFilter} serialBoardOptions={serialBoardOptions} serialBoardLabels={serialBoardLabels} serialBoardKinds={serialBoardKinds} serialBoardSourceModes={rp2040BoardSourceModes} serialBaudRate={serialBaudRate} setSerialBaudRate={setSerialBaudRate} serialBaudOptions={serialBaudOptions} serialLineEnding={serialLineEnding} setSerialLineEnding={setSerialLineEnding}
-          rp2040DebugTelemetryEnabled={rp2040DebugTelemetryEnabled} setRp2040DebugTelemetryEnabled={setRp2040DebugTelemetryEnabled}
           hardwareConnected={hardwareConnected}
           plotterPaused={plotterPaused} setPlotterPaused={setPlotterPaused} plotData={plotData} setPlotData={setPlotData} selectedPlotPins={selectedPlotPins} setSelectedPlotPins={setSelectedPlotPins} plotterCanvasRef={plotterCanvasRef} serialPlotLabelsRef={serialPlotLabelsRef}
           showConnectionsPanel={showConnectionsPanel} wires={wires} updateWireColor={updateWireColor} deleteWire={deleteWire}
@@ -7511,6 +8218,21 @@ export default function SimulatorPage({ gamificationMode = false }) {
 
                 {projectsSidebarTab === 'settings' && (
                   <div className="flex flex-col gap-2 py-1">
+                    <div className="text-[11px] font-bold text-[var(--text3)] uppercase tracking-wider px-1 py-1.5">Preferences</div>
+                    <div className="flex items-center justify-between bg-[var(--card)] border border-[var(--border)] rounded-lg px-3 py-2.5 shadow-sm">
+                      <div className="flex flex-col">
+                        <span className="text-[12px] font-bold text-[var(--text)]">Auto-save Projects</span>
+                        <span className="text-[9px] text-[var(--text3)]">Saves changes every 2.5s</span>
+                      </div>
+                      <button 
+                        onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
+                        className={`w-9 h-5 rounded-full relative transition-all duration-300 ${autoSaveEnabled ? 'bg-[var(--accent)]' : 'bg-[var(--bg3)]'}`}
+                      >
+                        <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full shadow-sm transition-transform duration-300 ${autoSaveEnabled ? 'translate-x-4' : ''}`} />
+                      </button>
+                    </div>
+
+                    <div className="h-px bg-[var(--border)] my-1 opacity-50" />
                     <div className="text-[11px] font-bold text-[var(--text3)] uppercase tracking-wider px-1 py-1.5">Data Management</div>
                     <button className="w-full flex items-center gap-2.5 bg-[var(--card)] border border-[var(--border)] text-[var(--text)] rounded-lg px-3 py-2.5 text-[13px]" onClick={handleBackupWorkflow}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
@@ -7789,6 +8511,61 @@ export default function SimulatorPage({ gamificationMode = false }) {
         </div>
       )}
 
+      {/* ── FIRMWARE UPLOAD DIALOG ───────────────────────────────────────── */}
+      {showFirmwareUploadDialog && (
+        <div className="fixed inset-0 bg-[rgba(0,0,0,.55)] flex items-center justify-center z-[9999]" onClick={() => setShowFirmwareUploadDialog(false)}>
+          <div className="bg-[var(--bg2)] border border-[var(--border)] rounded-xl p-6 w-[420px] shadow-[0_8px_40px_rgba(0,0,0,.4)]" onClick={e => e.stopPropagation()}>
+            <div className="text-base font-bold mb-2 text-[var(--text)]">Upload Firmware to Board</div>
+            <div className="text-xs text-[var(--text3)] mb-4">
+              Upload a firmware artifact for a specific board on canvas. Use <strong>.hex</strong> for Arduino/ESP32/STM32 and <strong>.uf2</strong> (or .hex) for RP2040.
+              Uploaded firmware is used on the next simulation run for that board.
+            </div>
+
+            <label className="text-xs font-semibold text-[var(--text2)] block mb-2">Board target</label>
+            <select
+              className="w-full bg-[var(--card)] border border-[var(--border)] text-[var(--text)] px-3 py-2 rounded-lg text-sm mb-4"
+              value={firmwareUploadTarget}
+              onChange={(e) => setFirmwareUploadTarget(e.target.value)}
+              disabled={firmwareBoardOptions.length === 0}
+            >
+              {firmwareBoardOptions.length === 0 ? (
+                <option value="">No programmable board on canvas</option>
+              ) : firmwareBoardOptions.map((option) => (
+                <option key={option.id} value={option.id}>{option.label}</option>
+              ))}
+            </select>
+
+            <input
+              ref={firmwareUploadInputRef}
+              type="file"
+              accept=".hex,.uf2"
+              style={{ display: 'none' }}
+              onChange={(e) => setFirmwareUploadFile(e.target.files?.[0] || null)}
+            />
+
+            <div className="mb-4" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Btn onClick={() => firmwareUploadInputRef.current?.click()} disabled={firmwareBoardOptions.length === 0}>
+                Choose Firmware File
+              </Btn>
+              <div className="text-xs text-[var(--text3)]" style={{ minHeight: 18 }}>
+                {firmwareUploadFile?.name || 'No file selected'}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <Btn onClick={() => setShowFirmwareUploadDialog(false)}>Cancel</Btn>
+              <Btn
+                color="var(--accent)"
+                disabled={!firmwareUploadTarget || !firmwareUploadFile || isApplyingFirmwareUpload}
+                onClick={applyUploadedFirmwareToBoard}
+              >
+                {isApplyingFirmwareUpload ? 'Applying...' : 'Upload & Use'}
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* F1 MENU */}
       {showF1Menu && (
         <div 
@@ -7796,11 +8573,20 @@ export default function SimulatorPage({ gamificationMode = false }) {
           onClick={() => setShowF1Menu(false)}
         >
           <div 
-            className="bg-[var(--bg2)] border border-[var(--border)] rounded-xl p-6 w-[380px] shadow-[0_8px_40px_rgba(0,0,0,.4)]"
+            className="bg-[var(--bg2)] border border-[var(--border)] rounded-xl p-6 w-[420px] shadow-[0_8px_40px_rgba(0,0,0,.4)]"
             onClick={e => e.stopPropagation()}
           >
             <div className="text-base font-bold mb-4 text-[var(--text)]">Quick Actions (F1)</div>
             <div className="flex flex-col gap-2">
+              <button 
+                className="w-full px-4 py-3 text-left text-sm font-medium rounded-lg border border-[var(--border)] hover:bg-[var(--card)] transition-colors text-[var(--text2)] hover:text-[var(--text)]"
+                onClick={() => {
+                  downloadSimulationJson();
+                  setShowF1Menu(false);
+                }}
+              >
+                🧾 Download Simulation JSON
+              </button>
               <button 
                 className="w-full px-4 py-3 text-left text-sm font-medium rounded-lg border border-[var(--border)] hover:bg-[var(--card)] transition-colors text-[var(--text2)] hover:text-[var(--text)]"
                 onClick={() => {
@@ -7809,6 +8595,24 @@ export default function SimulatorPage({ gamificationMode = false }) {
                 }}
               >
                 📥 Download Firmware
+              </button>
+              <button 
+                className="w-full px-4 py-3 text-left text-sm font-medium rounded-lg border border-[var(--border)] hover:bg-[var(--card)] transition-colors text-[var(--text2)] hover:text-[var(--text)]"
+                onClick={() => {
+                  openFirmwareUploadDialog();
+                  setShowF1Menu(false);
+                }}
+              >
+                📤 Upload Firmware to Board
+              </button>
+              <button
+                className="w-full px-4 py-3 text-left text-sm font-medium rounded-lg border border-[var(--border)] hover:bg-[var(--card)] transition-colors text-[var(--text2)] hover:text-[var(--text)]"
+                onClick={() => {
+                  setRp2040DebugTelemetryEnabled((prev) => !prev);
+                  setShowF1Menu(false);
+                }}
+              >
+                {rp2040DebugTelemetryEnabled ? '🐞 Disable RP2040 dbg Telemetry' : '🐞 Enable RP2040 dbg Telemetry'}
               </button>
               <button 
                 className="w-full px-4 py-3 text-left text-sm font-medium rounded-lg border border-[var(--border)] hover:bg-[var(--card)] transition-colors text-[var(--text2)] hover:text-[var(--text)]"

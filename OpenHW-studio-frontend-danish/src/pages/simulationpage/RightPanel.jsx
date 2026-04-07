@@ -7,7 +7,9 @@ import 'prismjs/components/prism-cpp';
 import 'prismjs/components/prism-python';
 import 'prismjs/components/prism-json';
 import { Btn } from './Btn';
-import BlocklyEditor from '../../components/BlocklyEditor.jsx';
+
+// Lazy-load the heavy Blockly editor to improve initial LCP metrics
+const BlocklyEditor = React.lazy(() => import('../../components/BlocklyEditor.jsx'));
 
 const DISABLED_FILE_SUFFIX = '.disabled';
 
@@ -26,11 +28,11 @@ export function RightPanel(props) {
     libQuery, setLibQuery, handleSearchLibraries, isSearchingLib, libMessage, libInstalled, libResults, handleInstallLibrary, installingLib,
     serialPaused, setSerialPaused, isRunning, serialHistory, setSerialHistory, serialOutputRef, serialInput, setSerialInput, sendSerialInput, clearSerialMonitor,
     serialViewMode, setSerialViewMode, serialBoardFilter, setSerialBoardFilter, serialBoardOptions, serialBoardLabels, serialBoardKinds, serialBoardSourceModes, serialBaudRate, setSerialBaudRate, serialBaudOptions, serialLineEnding, setSerialLineEnding,
-    rp2040DebugTelemetryEnabled, setRp2040DebugTelemetryEnabled,
     hardwareConnected,
     plotterPaused, setPlotterPaused, plotData, setPlotData, selectedPlotPins, setSelectedPlotPins, plotterCanvasRef, serialPlotLabelsRef,
     showConnectionsPanel, wires, updateWireColor, deleteWire,
-    selected, setSelected
+    selected, setSelected,
+    blocklyDisabled, setBlocklyDisabled,
   } = props;
 
   const [fileMenu, setFileMenu] = React.useState(null); // { x, y, fileId }
@@ -42,6 +44,16 @@ export function RightPanel(props) {
   const [showSendTargetMenu, setShowSendTargetMenu] = React.useState(false);
   const [isLibPanelOpen, setIsLibPanelOpen] = React.useState(false);
   const sendMenuRef = React.useRef(null);
+
+  // ── Block Editor enable/disable toggle (persisted via props from SimulatorPage) ─
+  const toggleBlocklyDisabled = React.useCallback(() => {
+    if (!setBlocklyDisabled) return;
+    setBlocklyDisabled(prev => {
+      const next = !prev;
+      try { localStorage.setItem('ohw_blockly_disabled', String(next)); } catch (_) {}
+      return next;
+    });
+  }, [setBlocklyDisabled]);
 
 
   React.useEffect(() => {
@@ -994,18 +1006,59 @@ export function RightPanel(props) {
                 })()}
               </div>
             )}
-            <div style={{ display: codeTab === 'block' ? 'flex' : 'none', flex: 1, flexDirection: 'column', overflow: 'hidden' }}>
-              <BlocklyEditor 
-                onExportCode={(generated) => { setCode(generated); setCodeTab('code'); }} 
-                onChange={(generated) => setBlocklyGeneratedCode(generated)}
-                xml={blocklyXml}
-                onXmlChange={setBlocklyXml}
-                useBlocklyCode={useBlocklyCode}
-                onToggleUseBlocklyCode={() => setUseBlocklyCode(!useBlocklyCode)}
-                visible={codeTab === 'block'}
-                boardKind={(serialBoardFilter && serialBoardFilter !== 'all') ? (serialBoardKinds?.[serialBoardFilter] || 'arduino_uno') : (Object.values(serialBoardKinds || {})[0] || 'arduino_uno')}
-              />
-            </div>
+            {codeTab === 'block' && (
+              <div style={{ display: 'flex', flex: 1, flexDirection: 'column', overflow: 'hidden' }}>
+                {blocklyDisabled ? (
+                  /* ── Block editor disabled placeholder ─────────────── */
+                  <div style={{
+                    flex: 1, display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center',
+                    gap: 12, padding: 24, textAlign: 'center',
+                    background: 'var(--bg)',
+                  }}>
+                    <span style={{ fontSize: 36, opacity: 0.4 }}>🧱</span>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text2)' }}>Block Editor is disabled</div>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', maxWidth: 220, lineHeight: 1.5 }}>
+                      Block coding is turned off to improve canvas performance.
+                    </div>
+                    <button
+                      onClick={toggleBlocklyDisabled}
+                      style={{
+                        marginTop: 4,
+                        padding: '7px 18px',
+                        background: 'var(--accent)',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 8,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      Enable Block Editor
+                    </button>
+                  </div>
+                ) : (
+                  /* ── Block editor enabled ───────────────────────────── */
+                  /* NOTE: Performance is managed here by unmounting Blockly entirely. 
+                     Do not use global CSS (display: none) to hide Blockly elements, 
+                     as it breaks the editor's internal layout engine. */
+                  <React.Suspense fallback={<div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 13, fontFamily: 'JetBrains Mono, monospace' }}>Loading Block Editor...</div>}>
+                    <BlocklyEditor
+                      onExportCode={(generated) => { setCode(generated); setCodeTab('code'); }}
+                      onChange={(generated) => setBlocklyGeneratedCode(generated)}
+                      xml={blocklyXml}
+                      onXmlChange={setBlocklyXml}
+                      useBlocklyCode={useBlocklyCode}
+                      onToggleUseBlocklyCode={() => setUseBlocklyCode(!useBlocklyCode)}
+                      visible={true}
+                      boardKind={(serialBoardFilter && serialBoardFilter !== 'all') ? (serialBoardKinds?.[serialBoardFilter] || 'arduino_uno') : (Object.values(serialBoardKinds || {})[0] || 'arduino_uno')}
+                    />
+                  </React.Suspense>
+                )}
+              </div>
+            )}
             {codeTab === 'serial' && (
               <div style={{ display: 'flex', flexDirection: 'column', flex: 1, background: 'var(--bg)', overflow: 'hidden' }}>
                 {/* Serial panel toolbar */}
@@ -1152,17 +1205,6 @@ export function RightPanel(props) {
                     >
                       🗑 Clear
                     </button>
-                    {serialViewMode === 'monitor' && (
-                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text3)', cursor: 'pointer' }} title="RP2040 debug telemetry">
-                        <input
-                          type="checkbox"
-                          checked={!!rp2040DebugTelemetryEnabled}
-                          onChange={(e) => setRp2040DebugTelemetryEnabled(e.target.checked)}
-                          style={{ margin: 0 }}
-                        />
-                        RP2040 dbg
-                      </label>
-                    )}
                   </div>
                 </div>
                 {serialViewMode === 'monitor' ? (
