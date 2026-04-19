@@ -59,14 +59,19 @@ if (!isDbConnected) {
 const app = express();
 const SESSION_SECRET = process.env.SESSION_SECRET;
 if (!SESSION_SECRET) {
-  console.error('Missing required SESSION_SECRET environment variable.');
+  console.error('Missing required SESSION_SECRET. Set SESSION_SECRET in openhw-studio-backend-danish/.env or your runtime environment.');
   process.exit(1);
 }
 
-const allowedOrigins = (process.env.FRONTEND_URLS || process.env.FRONTEND_URL || 'http://localhost:5173,http://127.0.0.1:5173')
-  .split(',')
-  .map(origin => origin.trim())
-  .filter(Boolean);
+const allowedOrigins = new Set(
+  [
+    ...(process.env.FRONTEND_URLS || '').split(','),
+    process.env.FRONTEND_URL || 'http://localhost:5173',
+    'http://127.0.0.1:5173',
+  ]
+    .map(origin => origin.trim())
+    .filter(Boolean)
+);
 
 app.use(session({
     secret: SESSION_SECRET,
@@ -79,7 +84,7 @@ app.use(passport.session());
 
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.has(origin)) {
       callback(null, true);
       return;
     }

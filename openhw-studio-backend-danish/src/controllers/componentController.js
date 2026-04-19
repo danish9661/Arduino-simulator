@@ -46,25 +46,33 @@ const EMULATOR_COMPONENTS_PATH = emulatorComponentsPath;
 const NORMALIZED_COMPONENTS_ROOT = path.resolve(EMULATOR_COMPONENTS_PATH);
 const COMPONENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
-const isValidComponentId = (id) => typeof id === 'string' && COMPONENT_ID_PATTERN.test(id);
+const sanitizeComponentId = (id) => {
+    if (typeof id !== 'string') return null;
+    const normalizedId = id.trim();
+    if (!normalizedId || !COMPONENT_ID_PATTERN.test(normalizedId)) return null;
+    if (path.basename(normalizedId) !== normalizedId) return null;
+    return normalizedId;
+};
+
+const isValidComponentId = (id) => Boolean(sanitizeComponentId(id));
 
 const resolveSafeComponentDir = (id) => {
-    if (!isValidComponentId(id)) {
-        const err = new Error('Invalid component id format.');
+    const safeId = sanitizeComponentId(id);
+    if (!safeId) {
+        const err = new Error('Invalid component id. Use 1-64 characters, start with a letter/number, and only use letters, numbers, hyphens, or underscores.');
         err.statusCode = 400;
         throw err;
     }
 
-    const componentDir = path.resolve(NORMALIZED_COMPONENTS_ROOT, id);
-    const relativePath = path.relative(NORMALIZED_COMPONENTS_ROOT, componentDir);
-    const escapesRoot = relativePath.startsWith('..') || path.isAbsolute(relativePath) || relativePath === '';
-    if (escapesRoot) {
-        const err = new Error('Resolved component path is outside the allowed components directory.');
+    const componentDir = path.normalize(path.join(NORMALIZED_COMPONENTS_ROOT, safeId));
+    const withinRoot = componentDir === NORMALIZED_COMPONENTS_ROOT || componentDir.startsWith(`${NORMALIZED_COMPONENTS_ROOT}${path.sep}`);
+    if (!withinRoot) {
+        const err = new Error('Invalid component id path characters.');
         err.statusCode = 400;
         throw err;
     }
 
-    return componentDir;
+    return { safeId, componentDir };
 };
 
 // Ensure the directory exists to prevent ENOENT crashes
@@ -81,7 +89,7 @@ export const submitComponent = (req, res) => {
     try {
         const { id, manifest, ui, logic, validation, index } = req.body;
         if (!id || !manifest) return res.status(400).json({ error: 'Invalid component submission.' });
-        if (!isValidComponentId(id)) return res.status(400).json({ error: 'Invalid component id format.' });
+        if (!isValidComponentId(id)) return res.status(400).json({ error: 'Invalid component id. Use 1-64 characters, start with a letter/number, and only use letters, numbers, hyphens, or underscores.' });
 
         // submissionId is unique per upload so rejecting one copy never drops other submissions
         const submissionId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -127,7 +135,7 @@ export const approveComponent = async (req, res) => {
             return res.status(400).json({ error: 'Missing required component files. Ensure submissionId, id, manifest, ui, logic, and index are provided.' });
         }
 
-        const componentDir = resolveSafeComponentDir(id);
+        const { safeId, componentDir } = resolveSafeComponentDir(id);
 
         // 1. Create directory if not exists
         if (!fs.existsSync(componentDir)) {
@@ -155,9 +163,9 @@ export const approveComponent = async (req, res) => {
         }
 
         // Clean ID for valid ES6 export identifier
-        const safeExportName = (manifest.exportName || id).replace(/-([a-z0-9])/g, (g) => g[1].toUpperCase()).replace(/[^a-zA-Z0-9]/g, '');
-        const exportLine = `export { default as ${safeExportName} } from './${id}';`;
-        if (!indexContent.includes(`./${id}'`) && !indexContent.includes(`./${id}"`)) {
+        const safeExportName = (manifest.exportName || safeId).replace(/-([a-z0-9])/g, (g) => g[1].toUpperCase()).replace(/[^a-zA-Z0-9]/g, '');
+        const exportLine = `export { default as ${safeExportName} } from './${safeId}';`;
+        if (!indexContent.includes(`./${safeId}'`) && !indexContent.includes(`./${safeId}"`)) {
             indexContent += `\n${exportLine}\n`;
             fs.writeFileSync(mainIndexFile, indexContent);
         }
@@ -165,7 +173,7 @@ export const approveComponent = async (req, res) => {
         // 4. Remove from pending store
         pendingComponentsStore = pendingComponentsStore.filter(c => c.submissionId !== submissionId);
 
-        return res.json({ success: true, message: `Successfully installed component ${id} to backend.` });
+        return res.json({ success: true, message: `Successfully installed component ${safeId} to backend.` });
     } catch (error) {
         console.error('CRITICAL: Component approval error:', error);
         const statusCode = error.statusCode || 500;
@@ -205,7 +213,7 @@ export const getInstalledComponents = (req, res) => {
 export const deleteInstalledComponent = (req, res) => {
     try {
         const { id } = req.params;
-        const componentDir = resolveSafeComponentDir(id);
+        const { safeId, componentDir } = resolveSafeComponentDir(id);
         if (fs.existsSync(componentDir)) {
             fs.rmSync(componentDir, { recursive: true, force: true });
         }
@@ -213,14 +221,15 @@ export const deleteInstalledComponent = (req, res) => {
         const mainIndexFile = path.join(EMULATOR_COMPONENTS_PATH, 'index.ts');
         if (fs.existsSync(mainIndexFile)) {
             let indexContent = fs.readFileSync(mainIndexFile, 'utf8');
-            const lines = indexContent.split('\n').filter(line => !line.includes(`'./${id}'`) && !line.includes(`"./${id}"`));
+            const lines = indexContent.split('\n').filter(line => !line.includes(`'./${safeId}'`) && !line.includes(`"./${safeId}"`));
             fs.writeFileSync(mainIndexFile, lines.join('\n'));
         }
 
-        return res.json({ success: true, message: `Component ${id} deleted successfully.` });
+        return res.json({ success: true, message: `Component ${safeId} deleted successfully.` });
     } catch (error) {
         console.error('CRITICAL: Delete component error:', error);
-        return res.status(500).json({
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({
             error: 'Failed to delete component.',
             details: error.message
         });
