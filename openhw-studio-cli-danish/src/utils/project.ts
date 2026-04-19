@@ -582,9 +582,27 @@ export function getCodeForBoard(project: OpenHwProject, boardId: string): { sour
     throw new Error(`Board component not found: ${boardId}`);
   }
 
+  const envRaw = String((boardComp.attrs as any)?.env || '').trim().toLowerCase();
+  const preferPython =
+    envRaw === 'py'
+    || envRaw === 'python'
+    || envRaw === 'micropython'
+    || envRaw.startsWith('micropython')
+    || envRaw === 'cp'
+    || envRaw === 'circuitpy'
+    || envRaw === 'circuitpython'
+    || envRaw.startsWith('circuitpython');
+
   const boardFiles = project.projectFiles
     .filter((f) => String(f.path || '').startsWith(`project/${boardId}/`))
     .filter((f) => !isFileDisabled(f.path));
+
+  if (preferPython) {
+    const pyPreferred = boardFiles.find((f) => f.path.toLowerCase().endsWith('.py') && String(f.content || '').trim());
+    if (pyPreferred) {
+      return { source: pyPreferred.content || '', filePath: pyPreferred.path, isPython: true };
+    }
+  }
 
   const ino = boardFiles.find((f) => f.path.toLowerCase().endsWith('.ino') && String(f.content || '').trim());
   if (ino) {

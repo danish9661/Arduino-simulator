@@ -1,0 +1,81 @@
+{
+  "caseId": "case15-pico-micropython-oled-display",
+  "name": "Pico MicroPython OLED Display",
+  "board": "pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "micropython",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 80,
+      "y": 90
+    },
+    {
+      "id": "oled1",
+      "type": "wokwi-ssd1306-oled",
+      "attrs": {},
+      "w": 150,
+      "h": 140,
+      "rotation": 0,
+      "label": "SSD1306 OLED",
+      "x": 360,
+      "y": 120
+    }
+  ],
+  "connections": [
+    {
+      "from": "pico1:GND",
+      "to": "oled1:GND",
+      "id": "w1"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "oled1:VCC",
+      "id": "w2"
+    },
+    {
+      "from": "pico1:GP1",
+      "to": "oled1:SCL",
+      "id": "w3"
+    },
+    {
+      "from": "pico1:GP0",
+      "to": "oled1:SDA",
+      "id": "w4"
+    }
+  ],
+  "code": "from machine import I2C, Pin\nfrom time import sleep_ms\n\nADDR = 0x3C\ni2c = I2C(0, scl=Pin(1), sda=Pin(0), freq=100000)\n\ndef i2c_write(payload, retries=14):\n    last_exc = None\n    data = bytes(payload)\n    for _ in range(retries):\n        try:\n            i2c.writeto(ADDR, data)\n            return\n        except Exception as exc:\n            last_exc = exc\n            sleep_ms(2)\n    raise last_exc\n\ndef oled_cmd(cmd):\n    i2c_write((0x00, cmd & 0xFF), retries=16)\n\ndef oled_data(payload):\n    i2c_write(b\"\\x40\" + bytes(payload), retries=20)\n\ndef oled_init():\n    for cmd in (0xAE, 0x20, 0x00, 0x21, 0x00, 0x7F, 0x22, 0x00, 0x07, 0xAF):\n        oled_cmd(cmd)\n\nprint(\"MP_OLED_BOOT\")\ninit_ok = True\ntry:\n    oled_init()\nexcept Exception as exc:\n    init_ok = False\n    print(\"MP_OLED_INIT_ERR\", exc)\n\nprint(\"MP_OLED_INIT\", 1 if init_ok else 0)\n\nfor i in range(1):\n    pattern = 0x18 if (i % 2 == 0) else 0xE7\n    step_ok = True\n    try:\n        oled_cmd(0xB0 + (i % 8))\n        oled_cmd(0x00)\n        oled_cmd(0x10)\n        oled_data(bytes([pattern]) * 16)\n    except Exception as exc:\n        step_ok = False\n        print(\"MP_OLED_WRITE_ERR\", exc)\n    print(\"MP_OLED_STEP\", i, \"OK\", 1 if step_ok else 0)\n    sleep_ms(80)\n\nprint(\"MP_OLED_DONE\")\n",
+  "projectFiles": [
+    {
+      "id": "project/pico1/main.py",
+      "path": "project/pico1/main.py",
+      "name": "main.py",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "from machine import I2C, Pin\nfrom time import sleep_ms\n\nADDR = 0x3C\ni2c = I2C(0, scl=Pin(1), sda=Pin(0), freq=100000)\n\ndef i2c_write(payload, retries=14):\n    last_exc = None\n    data = bytes(payload)\n    for _ in range(retries):\n        try:\n            i2c.writeto(ADDR, data)\n            return\n        except Exception as exc:\n            last_exc = exc\n            sleep_ms(2)\n    raise last_exc\n\ndef oled_cmd(cmd):\n    i2c_write((0x00, cmd & 0xFF), retries=16)\n\ndef oled_data(payload):\n    i2c_write(b\"\\x40\" + bytes(payload), retries=20)\n\ndef oled_init():\n    for cmd in (0xAE, 0x20, 0x00, 0x21, 0x00, 0x7F, 0x22, 0x00, 0x07, 0xAF):\n        oled_cmd(cmd)\n\nprint(\"MP_OLED_BOOT\")\ninit_ok = True\ntry:\n    oled_init()\nexcept Exception as exc:\n    init_ok = False\n    print(\"MP_OLED_INIT_ERR\", exc)\n\nprint(\"MP_OLED_INIT\", 1 if init_ok else 0)\n\nfor i in range(1):\n    pattern = 0x18 if (i % 2 == 0) else 0xE7\n    step_ok = True\n    try:\n        oled_cmd(0xB0 + (i % 8))\n        oled_cmd(0x00)\n        oled_cmd(0x10)\n        oled_data(bytes([pattern]) * 16)\n    except Exception as exc:\n        step_ok = False\n        print(\"MP_OLED_WRITE_ERR\", exc)\n    print(\"MP_OLED_STEP\", i, \"OK\", 1 if step_ok else 0)\n    sleep_ms(80)\n\nprint(\"MP_OLED_DONE\")\n",
+      "dirty": false
+    },
+    {
+      "id": "project/pico1/pico1.ino",
+      "path": "project/pico1/pico1.ino",
+      "name": "pico1.ino",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/pico1/main.py"
+  ],
+  "activeCodeFileId": "project/pico1/main.py"
+}

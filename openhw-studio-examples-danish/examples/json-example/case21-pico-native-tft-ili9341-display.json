@@ -1,0 +1,96 @@
+{
+  "caseId": "case21-pico-native-tft-ili9341-display",
+  "name": "Pico Native (.ino) TFT ILI9341 Display",
+  "board": "pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "native",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 80,
+      "y": 90
+    },
+    {
+      "id": "tft1",
+      "type": "wokwi-ili9341",
+      "attrs": {},
+      "w": 160,
+      "h": 240,
+      "rotation": 0,
+      "label": "ILI9341 TFT",
+      "x": 360,
+      "y": 70
+    }
+  ],
+  "connections": [
+    {
+      "from": "pico1:3V3",
+      "to": "tft1:VCC",
+      "id": "w1"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "tft1:GND",
+      "id": "w2"
+    },
+    {
+      "from": "pico1:GP17",
+      "to": "tft1:CS",
+      "id": "w3"
+    },
+    {
+      "from": "pico1:GP21",
+      "to": "tft1:RESET",
+      "id": "w4"
+    },
+    {
+      "from": "pico1:GP20",
+      "to": "tft1:DC",
+      "id": "w5"
+    },
+    {
+      "from": "pico1:GP19",
+      "to": "tft1:MOSI",
+      "id": "w6"
+    },
+    {
+      "from": "pico1:GP18",
+      "to": "tft1:SCK",
+      "id": "w7"
+    },
+    {
+      "from": "pico1:GP16",
+      "to": "tft1:MISO",
+      "id": "w8"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "tft1:LED",
+      "id": "w9"
+    }
+  ],
+  "code": "#include <Arduino.h>\n#include <SPI.h>\n\nstatic const uint8_t TFT_CS = 17;\nstatic const uint8_t TFT_DC = 20;\nstatic const uint8_t TFT_RST = 21;\n\nstatic void tftWriteCommand(uint8_t cmd) {\n  digitalWrite(TFT_CS, LOW);\n  digitalWrite(TFT_DC, LOW);\n  SPI.transfer(cmd);\n  digitalWrite(TFT_CS, HIGH);\n}\n\nstatic void tftWriteData(uint8_t value) {\n  digitalWrite(TFT_CS, LOW);\n  digitalWrite(TFT_DC, HIGH);\n  SPI.transfer(value);\n  digitalWrite(TFT_CS, HIGH);\n}\n\nstatic bool tftInit() {\n  digitalWrite(TFT_RST, LOW);\n  delay(20);\n  digitalWrite(TFT_RST, HIGH);\n  delay(120);\n\n  tftWriteCommand(0x01);\n  delay(120);\n  tftWriteCommand(0x11);\n  delay(120);\n  tftWriteCommand(0x3A);\n  tftWriteData(0x55);\n  tftWriteCommand(0x29);\n  delay(20);\n\n  return true;\n}\n\nvoid setup() {\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(115200);\n\n  pinMode(TFT_CS, OUTPUT);\n  pinMode(TFT_DC, OUTPUT);\n  pinMode(TFT_RST, OUTPUT);\n  digitalWrite(TFT_CS, HIGH);\n  digitalWrite(TFT_DC, HIGH);\n  digitalWrite(TFT_RST, HIGH);\n\n  SPI.setRX(16);\n  SPI.setTX(19);\n  SPI.setSCK(18);\n  SPI.begin();\n\n  Serial1.println(\"INO_TFT_BOOT\");\n  const bool initOk = tftInit();\n  Serial1.print(\"INO_TFT_INIT \");\n  Serial1.println(initOk ? 1 : 0);\n  Serial1.print(\"INO_TFT_STEP 0 OK \");\n  Serial1.print(initOk ? 1 : 0);\n  Serial1.println(\" COLOR 0x07E0\");\n  Serial1.println(\"INO_TFT_DONE\");\n}\n\nvoid loop() {\n  delay(100);\n}\n",
+  "projectFiles": [
+    {
+      "id": "project/pico1/pico1.ino",
+      "path": "project/pico1/pico1.ino",
+      "name": "pico1.ino",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "#include <Arduino.h>\n#include <SPI.h>\n\nstatic const uint8_t TFT_CS = 17;\nstatic const uint8_t TFT_DC = 20;\nstatic const uint8_t TFT_RST = 21;\n\nstatic void tftWriteCommand(uint8_t cmd) {\n  digitalWrite(TFT_CS, LOW);\n  digitalWrite(TFT_DC, LOW);\n  SPI.transfer(cmd);\n  digitalWrite(TFT_CS, HIGH);\n}\n\nstatic void tftWriteData(uint8_t value) {\n  digitalWrite(TFT_CS, LOW);\n  digitalWrite(TFT_DC, HIGH);\n  SPI.transfer(value);\n  digitalWrite(TFT_CS, HIGH);\n}\n\nstatic bool tftInit() {\n  digitalWrite(TFT_RST, LOW);\n  delay(20);\n  digitalWrite(TFT_RST, HIGH);\n  delay(120);\n\n  tftWriteCommand(0x01);\n  delay(120);\n  tftWriteCommand(0x11);\n  delay(120);\n  tftWriteCommand(0x3A);\n  tftWriteData(0x55);\n  tftWriteCommand(0x29);\n  delay(20);\n\n  return true;\n}\n\nvoid setup() {\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(115200);\n\n  pinMode(TFT_CS, OUTPUT);\n  pinMode(TFT_DC, OUTPUT);\n  pinMode(TFT_RST, OUTPUT);\n  digitalWrite(TFT_CS, HIGH);\n  digitalWrite(TFT_DC, HIGH);\n  digitalWrite(TFT_RST, HIGH);\n\n  SPI.setRX(16);\n  SPI.setTX(19);\n  SPI.setSCK(18);\n  SPI.begin();\n\n  Serial1.println(\"INO_TFT_BOOT\");\n  const bool initOk = tftInit();\n  Serial1.print(\"INO_TFT_INIT \");\n  Serial1.println(initOk ? 1 : 0);\n  Serial1.print(\"INO_TFT_STEP 0 OK \");\n  Serial1.print(initOk ? 1 : 0);\n  Serial1.println(\" COLOR 0x07E0\");\n  Serial1.println(\"INO_TFT_DONE\");\n}\n\nvoid loop() {\n  delay(100);\n}\n",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/pico1/pico1.ino"
+  ],
+  "activeCodeFileId": "project/pico1/pico1.ino"
+}

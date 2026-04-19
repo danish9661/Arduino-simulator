@@ -1,0 +1,136 @@
+{
+  "schemaVersion": "openhw-project-v2",
+  "board": "pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "label": "Raspberry Pi Pico",
+      "x": 90,
+      "y": 90,
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "attrs": {
+        "env": "native",
+        "builder": "arduino-pico"
+      }
+    },
+    {
+      "id": "servo1",
+      "type": "wokwi-servo",
+      "label": "Servo Motor",
+      "x": 420,
+      "y": 90,
+      "w": 96,
+      "h": 64,
+      "rotation": 0,
+      "attrs": {}
+    },
+    {
+      "id": "pot1",
+      "type": "wokwi-slide-potentiometer",
+      "label": "Slide Potentiometer",
+      "x": 430,
+      "y": 250,
+      "w": 90,
+      "h": 74,
+      "rotation": 0,
+      "attrs": {
+        "value": 72
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "w1",
+      "from": "pico1:GND",
+      "to": "servo1:GND",
+      "color": "#6ee7b7",
+      "waypoints": [],
+      "isBelow": false,
+      "fromLabel": "GND",
+      "toLabel": "GND"
+    },
+    {
+      "id": "w2",
+      "from": "pico1:3V3",
+      "to": "servo1:V+",
+      "color": "#6ee7b7",
+      "waypoints": [],
+      "isBelow": false,
+      "fromLabel": "3V3",
+      "toLabel": "V+"
+    },
+    {
+      "id": "w3",
+      "from": "pico1:GP15",
+      "to": "servo1:PWM",
+      "color": "#6ee7b7",
+      "waypoints": [],
+      "isBelow": false,
+      "fromLabel": "GP15",
+      "toLabel": "PWM"
+    },
+    {
+      "id": "w4",
+      "from": "pico1:GND",
+      "to": "pot1:GND",
+      "color": "#6ee7b7",
+      "waypoints": [],
+      "isBelow": false,
+      "fromLabel": "GND",
+      "toLabel": "GND"
+    },
+    {
+      "id": "w5",
+      "from": "pico1:3V3",
+      "to": "pot1:VCC",
+      "color": "#6ee7b7",
+      "waypoints": [],
+      "isBelow": false,
+      "fromLabel": "3V3",
+      "toLabel": "VCC"
+    },
+    {
+      "id": "w6",
+      "from": "pico1:GP26",
+      "to": "pot1:SIG",
+      "color": "#6ee7b7",
+      "waypoints": [],
+      "isBelow": false,
+      "fromLabel": "GP26",
+      "toLabel": "SIG"
+    }
+  ],
+  "blocklyXml": "",
+  "blocklyGeneratedCode": "",
+  "useBlocklyCode": false,
+  "projectFiles": [
+    {
+      "id": "project/pico1/pico1.ino",
+      "path": "project/pico1/pico1.ino",
+      "name": "pico1.ino",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "#include <Arduino.h>\n#include <Servo.h>\n\nstatic const int SERVO_PIN = 15;\nstatic const int POT_PIN = A0;\nServo myServo;\n\nvoid setup() {\n  myServo.attach(SERVO_PIN);\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(115200);\n  Serial1.println(\"SERVO_POT_HARDWARE_READY\");\n}\n\nvoid loop() {\n  const int raw = analogRead(POT_PIN);\n  // Map 0-1023 (10-bit ADC) to 0-180 degrees\n  const int angle = map(raw, 0, 1023, 0, 180);\n  \n  myServo.write(angle);\n  \n  static uint32_t lastLog = 0;\n  if (millis() - lastLog > 100) {\n    Serial1.print(\"POT=\");\n    Serial1.print(raw);\n    Serial1.print(\" ANG=\");\n    Serial1.println(angle);\n    lastLog = millis();\n  }\n  delay(20);\n}\n",
+      "dirty": false
+    },
+    {
+      "id": "project/library.txt",
+      "path": "project/library.txt",
+      "name": "library.txt",
+      "kind": "root",
+      "content": "Adafruit MCP23017 Arduino Library\nServo\nAdafruit BusIO\nSparkFun MAX3010x Pulse and Proximity Sensor Library\nAdafruit TSC2007\nAdafruit ILI9341\nAdafruit SH110X\nLiquidCrystal I2C\nAdafruit NeoPixel\nAdafruit STMPE610\nAdafruit SSD1306\nAdafruit LiquidCrystal\nAdafruit TouchScreen\n107-Arduino-Servo-RP2040\nAdafruit GFX Library\n107-Arduino-24LCxx",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/pico1/pico1.ino"
+  ],
+  "activeCodeFileId": "project/pico1/pico1.ino",
+  "code": "#include <Arduino.h>\n#include <Servo.h>\n\nstatic const int SERVO_PIN = 15;\nstatic const int POT_PIN = A0;\nServo myServo;\n\nvoid setup() {\n  myServo.attach(SERVO_PIN);\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(115200);\n  Serial1.println(\"SERVO_POT_HARDWARE_READY\");\n}\n\nvoid loop() {\n  const int raw = analogRead(POT_PIN);\n  // Map 0-1023 (10-bit ADC) to 0-180 degrees\n  const int angle = map(raw, 0, 1023, 0, 180);\n  \n  myServo.write(angle);\n  \n  static uint32_t lastLog = 0;\n  if (millis() - lastLog > 100) {\n    Serial1.print(\"POT=\");\n    Serial1.print(raw);\n    Serial1.print(\" ANG=\");\n    Serial1.println(angle);\n    lastLog = millis();\n  }\n  delay(20);\n}\n",
+  "name": "Untitled",
+  "exportedAt": "2026-04-07T13:20:41.428Z"
+}

@@ -1,0 +1,106 @@
+{
+  "caseId": "case18-pico-circuitpython-tft-ili9341-display",
+  "name": "Pico CircuitPython TFT ILI9341 Display",
+  "board": "pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "circuitpython",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 80,
+      "y": 90
+    },
+    {
+      "id": "tft1",
+      "type": "wokwi-ili9341",
+      "attrs": {},
+      "w": 160,
+      "h": 240,
+      "rotation": 0,
+      "label": "ILI9341 TFT",
+      "x": 360,
+      "y": 70
+    }
+  ],
+  "connections": [
+    {
+      "from": "pico1:3V3",
+      "to": "tft1:VCC",
+      "id": "w1"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "tft1:GND",
+      "id": "w2"
+    },
+    {
+      "from": "pico1:GP17",
+      "to": "tft1:CS",
+      "id": "w3"
+    },
+    {
+      "from": "pico1:GP21",
+      "to": "tft1:RESET",
+      "id": "w4"
+    },
+    {
+      "from": "pico1:GP20",
+      "to": "tft1:DC",
+      "id": "w5"
+    },
+    {
+      "from": "pico1:GP19",
+      "to": "tft1:MOSI",
+      "id": "w6"
+    },
+    {
+      "from": "pico1:GP18",
+      "to": "tft1:SCK",
+      "id": "w7"
+    },
+    {
+      "from": "pico1:GP16",
+      "to": "tft1:MISO",
+      "id": "w8"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "tft1:LED",
+      "id": "w9"
+    }
+  ],
+  "code": "import time\nimport board\nimport busio\nimport digitalio\n\nprint(\"CP_TFT_BOOT\")\n\nspi = busio.SPI(clock=board.GP18, MOSI=board.GP19, MISO=board.GP16)\ncs = digitalio.DigitalInOut(board.GP17)\ndc = digitalio.DigitalInOut(board.GP20)\nrst = digitalio.DigitalInOut(board.GP21)\n\nfor pin in (cs, dc, rst):\n    pin.direction = digitalio.Direction.OUTPUT\n\ncs.value = True\ndc.value = True\nrst.value = True\n\ndef wait_spi_lock(timeout_s=0.35):\n    deadline = time.monotonic() + timeout_s\n    while not spi.try_lock():\n        if time.monotonic() >= deadline:\n            return False\n    return True\n\nspi_locked = wait_spi_lock()\nif spi_locked:\n    spi.configure(baudrate=4000000, polarity=0, phase=0)\nelse:\n    print(\"CP_TFT_SPI_LOCK_TIMEOUT\")\n\ndef spi_write(payload, is_data):\n    if not spi_locked:\n        return False\n    dc.value = bool(is_data)\n    cs.value = False\n    try:\n        spi.write(bytes(payload))\n        return True\n    except Exception as exc:\n        print(\"CP_TFT_SPI_ERR\", exc)\n        return False\n    finally:\n        cs.value = True\n\ndef tft_cmd(cmd):\n    return spi_write((cmd & 0xFF,), False)\n\ndef tft_data(payload):\n    return spi_write(payload, True)\n\ndef tft_init():\n    rst.value = False\n    time.sleep(0.02)\n    rst.value = True\n    time.sleep(0.12)\n\n    ok = tft_cmd(0x01)\n    time.sleep(0.15)\n    ok = tft_cmd(0x11) and ok\n    time.sleep(0.12)\n    ok = tft_cmd(0x3A) and ok\n    ok = tft_data((0x55,)) and ok\n    ok = tft_cmd(0x29) and ok\n    time.sleep(0.02)\n    return ok\n\ninit_ok = tft_init()\nprint(\"CP_TFT_INIT\", 1 if init_ok else 0)\nprint(\"CP_TFT_STEP\", 0, \"OK\", 1 if init_ok else 0, \"COLOR\", 0x07E0)\nprint(\"CP_TFT_DONE\")\n",
+  "projectFiles": [
+    {
+      "id": "project/pico1/code.py",
+      "path": "project/pico1/code.py",
+      "name": "code.py",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "import time\nimport board\nimport busio\nimport digitalio\n\nprint(\"CP_TFT_BOOT\")\n\nspi = busio.SPI(clock=board.GP18, MOSI=board.GP19, MISO=board.GP16)\ncs = digitalio.DigitalInOut(board.GP17)\ndc = digitalio.DigitalInOut(board.GP20)\nrst = digitalio.DigitalInOut(board.GP21)\n\nfor pin in (cs, dc, rst):\n    pin.direction = digitalio.Direction.OUTPUT\n\ncs.value = True\ndc.value = True\nrst.value = True\n\ndef wait_spi_lock(timeout_s=0.35):\n    deadline = time.monotonic() + timeout_s\n    while not spi.try_lock():\n        if time.monotonic() >= deadline:\n            return False\n    return True\n\nspi_locked = wait_spi_lock()\nif spi_locked:\n    spi.configure(baudrate=4000000, polarity=0, phase=0)\nelse:\n    print(\"CP_TFT_SPI_LOCK_TIMEOUT\")\n\ndef spi_write(payload, is_data):\n    if not spi_locked:\n        return False\n    dc.value = bool(is_data)\n    cs.value = False\n    try:\n        spi.write(bytes(payload))\n        return True\n    except Exception as exc:\n        print(\"CP_TFT_SPI_ERR\", exc)\n        return False\n    finally:\n        cs.value = True\n\ndef tft_cmd(cmd):\n    return spi_write((cmd & 0xFF,), False)\n\ndef tft_data(payload):\n    return spi_write(payload, True)\n\ndef tft_init():\n    rst.value = False\n    time.sleep(0.02)\n    rst.value = True\n    time.sleep(0.12)\n\n    ok = tft_cmd(0x01)\n    time.sleep(0.15)\n    ok = tft_cmd(0x11) and ok\n    time.sleep(0.12)\n    ok = tft_cmd(0x3A) and ok\n    ok = tft_data((0x55,)) and ok\n    ok = tft_cmd(0x29) and ok\n    time.sleep(0.02)\n    return ok\n\ninit_ok = tft_init()\nprint(\"CP_TFT_INIT\", 1 if init_ok else 0)\nprint(\"CP_TFT_STEP\", 0, \"OK\", 1 if init_ok else 0, \"COLOR\", 0x07E0)\nprint(\"CP_TFT_DONE\")\n",
+      "dirty": false
+    },
+    {
+      "id": "project/pico1/pico1.ino",
+      "path": "project/pico1/pico1.ino",
+      "name": "pico1.ino",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/pico1/code.py"
+  ],
+  "activeCodeFileId": "project/pico1/code.py"
+}

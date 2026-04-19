@@ -1,0 +1,120 @@
+{
+  "caseId": "case22-pico-native-lcd2004-i2c-display",
+  "name": "Pico Native (.ino) LCD2004 I2C Display",
+  "board": "pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "native",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 80,
+      "y": 90
+    },
+    {
+      "id": "lcd1",
+      "type": "wokwi-lcd2004-i2c",
+      "attrs": {
+        "color": "blue",
+        "pins": "i2c"
+      },
+      "w": 120,
+      "h": 80,
+      "rotation": 0,
+      "label": "LCD2004 I2C",
+      "x": 360,
+      "y": 140
+    },
+    {
+      "id": "r_sda",
+      "type": "wokwi-resistor",
+      "attrs": {
+        "value": "4.7k"
+      },
+      "w": 40,
+      "h": 20,
+      "rotation": 90,
+      "label": "SDA Pull-up",
+      "x": 220,
+      "y": 170
+    },
+    {
+      "id": "r_scl",
+      "type": "wokwi-resistor",
+      "attrs": {
+        "value": "4.7k"
+      },
+      "w": 40,
+      "h": 20,
+      "rotation": 90,
+      "label": "SCL Pull-up",
+      "x": 220,
+      "y": 220
+    }
+  ],
+  "connections": [
+    {
+      "from": "pico1:GND",
+      "to": "lcd1:GND",
+      "id": "w1"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "lcd1:VCC",
+      "id": "w2"
+    },
+    {
+      "from": "pico1:GP5",
+      "to": "lcd1:SCL",
+      "id": "w3"
+    },
+    {
+      "from": "pico1:GP4",
+      "to": "lcd1:SDA",
+      "id": "w4"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "r_sda:p1",
+      "id": "w5"
+    },
+    {
+      "from": "r_sda:p2",
+      "to": "lcd1:SDA",
+      "id": "w6"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "r_scl:p1",
+      "id": "w7"
+    },
+    {
+      "from": "r_scl:p2",
+      "to": "lcd1:SCL",
+      "id": "w8"
+    }
+  ],
+  "code": "#include <Arduino.h>\n#include <Wire.h>\n\nstatic const uint8_t LCD_ADDR = 0x27;\nstatic const uint8_t BL = 0x08;\n\nstatic bool expanderWrite(uint8_t value) {\n  Wire.beginTransmission(LCD_ADDR);\n  Wire.write((uint8_t)(value | BL));\n  const int err = Wire.endTransmission();\n  return err == 0;\n}\n\nvoid setup() {\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(115200);\n  Serial1.println(\"INO_LCD_BOOT\");\n\n  Wire.setSDA(4);\n  Wire.setSCL(5);\n  Wire.begin();\n  Serial1.println(\"INO_LCD_I2C_READY\");\n\n  int ping = -1;\n  for (int i = 0; i < 3; ++i) {\n    Wire.beginTransmission(LCD_ADDR);\n    Wire.write((uint8_t)BL);\n    ping = Wire.endTransmission();\n    if (ping == 0) break;\n    delay(5);\n  }\n\n  Serial1.print(\"INO_LCD_PING \");\n  Serial1.println(ping);\n\n  const bool initOk = (ping == 0);\n  bool stepOk = false;\n  if (initOk) {\n    stepOk = expanderWrite(0x00);\n  }\n\n  Serial1.print(\"INO_LCD_INIT \");\n  Serial1.println(initOk ? 1 : 0);\n  Serial1.print(\"INO_LCD_STEP 0 OK \");\n  Serial1.println(stepOk ? 1 : 0);\n  Serial1.println(\"INO_LCD_DONE\");\n}\n\nvoid loop() {\n  delay(100);\n}",
+  "projectFiles": [
+    {
+      "id": "project/pico1/pico1.ino",
+      "path": "project/pico1/pico1.ino",
+      "name": "pico1.ino",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "#include <Arduino.h>\n#include <Wire.h>\n\nstatic const uint8_t LCD_ADDR = 0x27;\nstatic const uint8_t BL = 0x08;\n\nstatic bool expanderWrite(uint8_t value) {\n  Wire.beginTransmission(LCD_ADDR);\n  Wire.write((uint8_t)(value | BL));\n  const int err = Wire.endTransmission();\n  return err == 0;\n}\n\nvoid setup() {\n  Serial1.setTX(0);\n  Serial1.setRX(1);\n  Serial1.begin(115200);\n  Serial1.println(\"INO_LCD_BOOT\");\n\n  Wire.setSDA(4);\n  Wire.setSCL(5);\n  Wire.begin();\n  Serial1.println(\"INO_LCD_I2C_READY\");\n\n  int ping = -1;\n  for (int i = 0; i < 3; ++i) {\n    Wire.beginTransmission(LCD_ADDR);\n    Wire.write((uint8_t)BL);\n    ping = Wire.endTransmission();\n    if (ping == 0) break;\n    delay(5);\n  }\n\n  Serial1.print(\"INO_LCD_PING \");\n  Serial1.println(ping);\n\n  const bool initOk = (ping == 0);\n  bool stepOk = false;\n  if (initOk) {\n    stepOk = expanderWrite(0x00);\n  }\n\n  Serial1.print(\"INO_LCD_INIT \");\n  Serial1.println(initOk ? 1 : 0);\n  Serial1.print(\"INO_LCD_STEP 0 OK \");\n  Serial1.println(stepOk ? 1 : 0);\n  Serial1.println(\"INO_LCD_DONE\");\n}\n\nvoid loop() {\n  delay(100);\n}",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/pico1/pico1.ino"
+  ],
+  "activeCodeFileId": "project/pico1/pico1.ino"
+}

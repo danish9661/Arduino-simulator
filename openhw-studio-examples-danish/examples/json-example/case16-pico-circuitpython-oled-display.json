@@ -1,0 +1,127 @@
+{
+  "caseId": "case16-pico-circuitpython-oled-display",
+  "name": "Pico CircuitPython OLED Display",
+  "board": "pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "circuitpython",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 80,
+      "y": 90
+    },
+    {
+      "id": "oled1",
+      "type": "wokwi-ssd1306-oled",
+      "attrs": {},
+      "w": 150,
+      "h": 140,
+      "rotation": 0,
+      "label": "SSD1306 OLED",
+      "x": 360,
+      "y": 120
+    },
+    {
+      "id": "r_sda",
+      "type": "wokwi-resistor",
+      "attrs": {
+        "value": "4.7k"
+      },
+      "w": 40,
+      "h": 20,
+      "rotation": 90,
+      "label": "SDA Pull-up",
+      "x": 220,
+      "y": 170
+    },
+    {
+      "id": "r_scl",
+      "type": "wokwi-resistor",
+      "attrs": {
+        "value": "4.7k"
+      },
+      "w": 40,
+      "h": 20,
+      "rotation": 90,
+      "label": "SCL Pull-up",
+      "x": 220,
+      "y": 220
+    }
+  ],
+  "connections": [
+    {
+      "from": "pico1:GND",
+      "to": "oled1:GND",
+      "id": "w1"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "oled1:VCC",
+      "id": "w2"
+    },
+    {
+      "from": "pico1:GP5",
+      "to": "oled1:SCL",
+      "id": "w3"
+    },
+    {
+      "from": "pico1:GP4",
+      "to": "oled1:SDA",
+      "id": "w4"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "r_sda:p1",
+      "id": "w5"
+    },
+    {
+      "from": "r_sda:p2",
+      "to": "oled1:SDA",
+      "id": "w6"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "r_scl:p1",
+      "id": "w7"
+    },
+    {
+      "from": "r_scl:p2",
+      "to": "oled1:SCL",
+      "id": "w8"
+    }
+  ],
+  "code": "import time\nimport board\nimport busio\n\nADDR = 0x3C\ni2c = None\n\nprint(\"CP_OLED_BOOT\")\ntry:\n    i2c = busio.I2C(board.GP5, board.GP4, frequency=100000)\nexcept Exception as exc:\n    print(\"CP_OLED_I2C_INIT_ERR\", exc)\n\ndef i2c_write(payload):\n    if i2c is None:\n        return False\n    deadline = time.monotonic() + 0.15\n    while not i2c.try_lock():\n        if time.monotonic() >= deadline:\n            return False\n    try:\n        i2c.writeto(ADDR, bytes(payload))\n        return True\n    except Exception as exc:\n        print(\"CP_OLED_I2C_ERR\", exc)\n        return False\n    finally:\n        i2c.unlock()\n\ndef oled_cmd(cmd):\n    return i2c_write((0x00, cmd & 0xFF))\n\ndef oled_data(payload):\n    return i2c_write(bytes([0x40]) + bytes(payload))\n\ndef oled_init():\n    ok = True\n    for cmd in (0xAE, 0x20, 0x00, 0x21, 0x00, 0x7F, 0x22, 0x00, 0x07, 0xAF):\n        ok = oled_cmd(cmd) and ok\n    return ok\n\ninit_ok = oled_init()\nprint(\"CP_OLED_INIT\", 1 if init_ok else 0)\n\nfor i in range(2):\n    pattern = 0x18 if (i % 2 == 0) else 0xE7\n    step_ok = oled_cmd(0xB0 + (i % 8))\n    step_ok = oled_cmd(0x00) and step_ok\n    step_ok = oled_cmd(0x10) and step_ok\n    step_ok = oled_data(bytes([pattern]) * 16) and step_ok\n    print(\"CP_OLED_STEP\", i, \"OK\", 1 if step_ok else 0)\n    time.sleep(0.06)\n\nprint(\"CP_OLED_DONE\")\n",
+  "projectFiles": [
+    {
+      "id": "project/pico1/code.py",
+      "path": "project/pico1/code.py",
+      "name": "code.py",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "import time\nimport board\nimport busio\n\nADDR = 0x3C\ni2c = None\n\nprint(\"CP_OLED_BOOT\")\ntry:\n    i2c = busio.I2C(board.GP5, board.GP4, frequency=100000)\nexcept Exception as exc:\n    print(\"CP_OLED_I2C_INIT_ERR\", exc)\n\ndef i2c_write(payload):\n    if i2c is None:\n        return False\n    deadline = time.monotonic() + 0.15\n    while not i2c.try_lock():\n        if time.monotonic() >= deadline:\n            return False\n    try:\n        i2c.writeto(ADDR, bytes(payload))\n        return True\n    except Exception as exc:\n        print(\"CP_OLED_I2C_ERR\", exc)\n        return False\n    finally:\n        i2c.unlock()\n\ndef oled_cmd(cmd):\n    return i2c_write((0x00, cmd & 0xFF))\n\ndef oled_data(payload):\n    return i2c_write(bytes([0x40]) + bytes(payload))\n\ndef oled_init():\n    ok = True\n    for cmd in (0xAE, 0x20, 0x00, 0x21, 0x00, 0x7F, 0x22, 0x00, 0x07, 0xAF):\n        ok = oled_cmd(cmd) and ok\n    return ok\n\ninit_ok = oled_init()\nprint(\"CP_OLED_INIT\", 1 if init_ok else 0)\n\nfor i in range(2):\n    pattern = 0x18 if (i % 2 == 0) else 0xE7\n    step_ok = oled_cmd(0xB0 + (i % 8))\n    step_ok = oled_cmd(0x00) and step_ok\n    step_ok = oled_cmd(0x10) and step_ok\n    step_ok = oled_data(bytes([pattern]) * 16) and step_ok\n    print(\"CP_OLED_STEP\", i, \"OK\", 1 if step_ok else 0)\n    time.sleep(0.06)\n\nprint(\"CP_OLED_DONE\")\n",
+      "dirty": false
+    },
+    {
+      "id": "project/pico1/pico1.ino",
+      "path": "project/pico1/pico1.ino",
+      "name": "pico1.ino",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/pico1/code.py"
+  ],
+  "activeCodeFileId": "project/pico1/code.py"
+}

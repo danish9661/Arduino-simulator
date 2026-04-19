@@ -29,7 +29,7 @@ let boardInjectSessions: Map<string, {
 
 const RP2040_LOGICAL_FLASH_BYTES = 2 * 1024 * 1024;
 const RP2040_MICROPYTHON_FS_OFFSET = 0xA0000;
-const RP2040_CIRCUITPYTHON_FS_OFFSET = 0xC0000;
+const RP2040_CIRCUITPYTHON_FS_OFFSET = 0x100000;
 const RP2040_LITTLEFS_BLOCK_SIZE = 4096;
 
 function resetSyncValidationState() {
@@ -820,7 +820,9 @@ self.onmessage = async (e) => {
             boardExecutableRangesMap,
             debugRp2040,
             debugSyncHeartbeat,
+            speed,
         } = data;
+        const initialSpeed = Number(speed ?? 1.0);
         const rp2040DebugEnabled = !!debugRp2040;
 
         stopAllRunners();
@@ -893,6 +895,7 @@ self.onmessage = async (e) => {
                     serialBaudRate: Number(boardBaudMap?.[singleBoardId] ?? baudRate ?? 9600),
                     debugEnabled: singleBoardIsRp2040 && rp2040DebugEnabled,
                     debugIntervalMs: singleBoardIsRp2040 && rp2040DebugEnabled ? 1200 : 0,
+                    speed: initialSpeed,
                     // Pass pyScript metadata so the worker can inject over UART0 after boot.
                     pyScript: typeof pyScript === 'string' ? pyScript : '',
                     onByteTransmit: ({ boardId, value, char, source }) => {
@@ -916,7 +919,12 @@ self.onmessage = async (e) => {
                         Number(boardBaudMap?.[singleBoardId] ?? 115200)
                     );
                 }
-                if (singleBoardIsRp2040 && singleBoardRuntimeEnv === 'circuitpython' && singleBoardRuntimeFiles.length > 0) {
+                if (
+                    singleBoardIsRp2040
+                    && singleBoardRuntimeEnv === 'circuitpython'
+                    && singleBoardRuntimeFiles.length > 0
+                    && (!singleBoardFlashPartitions || singleBoardFlashPartitions.length === 0)
+                ) {
                     scheduleCircuitPythonInject(runner!, singleBoardId, singleBoardRuntimeFiles);
                 }
             }
@@ -960,7 +968,12 @@ self.onmessage = async (e) => {
             ) {
                 uartInjectionScripts.set(boardComp.id, pyScript);
             }
-            if (isRp2040Board && rp2040RuntimeEnv === 'circuitpython' && rp2040RuntimeFiles.length > 0) {
+            if (
+                isRp2040Board
+                && rp2040RuntimeEnv === 'circuitpython'
+                && rp2040RuntimeFiles.length > 0
+                && (!rp2040FlashPartitions || rp2040FlashPartitions.length === 0)
+            ) {
                 circuitPythonInjectionFiles.set(boardComp.id, rp2040RuntimeFiles);
             }
 
@@ -975,6 +988,7 @@ self.onmessage = async (e) => {
                     serialBaudRate: Number(boardBaudMap?.[boardComp.id] ?? baudRate ?? 9600),
                     debugEnabled: /(rp2040|pico)/i.test(String(boardComp.type || '')) && rp2040DebugEnabled,
                     debugIntervalMs: /(rp2040|pico)/i.test(String(boardComp.type || '')) && rp2040DebugEnabled ? 1200 : 0,
+                    speed: initialSpeed,
                     pyScript: typeof pyScript === 'string' ? pyScript : '',
                     onByteTransmit: ({ boardId, value, char, source }) => {
                         appendBoardSerialOutput(String(boardId || ''), String(char || ''));
@@ -1017,13 +1031,18 @@ self.onmessage = async (e) => {
         console.log(`[Worker] Received INTERACT for ${data.compId}: ${data.event}`);
 
         if (mode === 'single' && runner) {
-            runner.onEvent(data.compId, data.event);
+            const inst = runner.instances.get(data.compId);
+            if (inst) {
+                inst.onEvent(data.event);
+            } else {
+                console.warn(`[Worker] INTERACT target not found in single runner: ${data.compId}`);
+            }
         } else {
             let delivered = false;
             for (const boardRunner of boardRunners.values()) {
                 const inst = boardRunner.instances.get(data.compId);
                 if (inst) {
-                    boardRunner.onEvent(data.compId, data.event);
+                    inst.onEvent(data.event);
                     delivered = true;
                 }
             }
@@ -1072,6 +1091,15 @@ self.onmessage = async (e) => {
                 renderedHash,
                 emittedAt: Date.now(),
             });
+        }
+    } else if (data.type === 'SET_SPEED') {
+        const nextSpeed = Number(data.speed);
+        if (Number.isFinite(nextSpeed) && nextSpeed > 0) {
+            if (mode === 'single' && runner) {
+                runner.setSpeed(nextSpeed);
+            } else {
+                boardRunners.forEach((br) => br.setSpeed(nextSpeed));
+            }
         }
     } else if (data.type === 'SERIAL_SET_BAUD') {
         const parsedBaud = Number(data.baudRate);

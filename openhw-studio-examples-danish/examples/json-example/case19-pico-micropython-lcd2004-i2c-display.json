@@ -1,0 +1,84 @@
+{
+  "caseId": "case19-pico-micropython-lcd2004-i2c-display",
+  "name": "Pico MicroPython LCD2004 I2C Display",
+  "board": "pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "micropython",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 80,
+      "y": 90
+    },
+    {
+      "id": "lcd1",
+      "type": "wokwi-lcd2004-i2c",
+      "attrs": {
+        "color": "blue",
+        "pins": "i2c"
+      },
+      "w": 120,
+      "h": 80,
+      "rotation": 0,
+      "label": "LCD2004 I2C",
+      "x": 360,
+      "y": 140
+    }
+  ],
+  "connections": [
+    {
+      "from": "pico1:GND",
+      "to": "lcd1:GND",
+      "id": "w1"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "lcd1:VCC",
+      "id": "w2"
+    },
+    {
+      "from": "pico1:GP0",
+      "to": "lcd1:SDA",
+      "id": "w3"
+    },
+    {
+      "from": "pico1:GP1",
+      "to": "lcd1:SCL",
+      "id": "w4"
+    }
+  ],
+  "code": "from machine import I2C, Pin\nfrom time import sleep_ms, sleep_us\n\nADDR = 0x27\nBL = 0x08\nEN = 0x04\nRS = 0x01\n\ni2c = I2C(0, scl=Pin(1), sda=Pin(0), freq=50000)\n\ndef expander_write(value, retries=20):\n    payload = bytes((value | BL,))\n    last_exc = None\n    for _ in range(retries):\n        try:\n            i2c.writeto(ADDR, payload)\n            return\n        except Exception as exc:\n            last_exc = exc\n            sleep_us(500)\n    raise last_exc\n\ndef pulse_enable(value):\n    expander_write(value | EN)\n    sleep_us(2)\n    expander_write(value & ~EN)\n    sleep_us(80)\n\ndef write4(nibble, rs=False):\n    value = (nibble & 0xF0) | (RS if rs else 0)\n    pulse_enable(value)\n\ndef write8(value, rs=False):\n    write4(value & 0xF0, rs)\n    write4((value << 4) & 0xF0, rs)\n\ndef lcd_cmd(cmd):\n    write8(cmd, rs=False)\n\ndef lcd_char(ch):\n    write8(ord(ch), rs=True)\n\ndef lcd_text(text):\n    for ch in text[:4]:\n        lcd_char(ch)\n\ndef lcd_set_cursor(col, row):\n    row_addr = (0x00, 0x40, 0x14, 0x54)\n    lcd_cmd(0x80 | (row_addr[row] + col))\n\ndef lcd_init():\n    sleep_ms(20)\n    write4(0x30)\n    sleep_ms(5)\n    write4(0x30)\n    sleep_us(400)\n    write4(0x30)\n    write4(0x20)\n    lcd_cmd(0x28)\n    lcd_cmd(0x0C)\n    lcd_cmd(0x06)\n    lcd_cmd(0x01)\n    sleep_ms(3)\n\nprint(\"MP_LCD_BOOT\")\ninit_ok = True\ntry:\n    lcd_init()\nexcept Exception as exc:\n    init_ok = False\n    print(\"MP_LCD_INIT_ERR\", exc)\n\nprint(\"MP_LCD_INIT\", 1 if init_ok else 0)\nstep_ok = True\ntry:\n    lcd_set_cursor(0, 0)\n    lcd_text(\"OK\")\nexcept Exception as exc:\n    step_ok = False\n    print(\"MP_LCD_WRITE_ERR\", exc)\n\nprint(\"MP_LCD_STEP\", 0, \"OK\", 1 if step_ok else 0)\nprint(\"MP_LCD_DONE\")\n",
+  "projectFiles": [
+    {
+      "id": "project/pico1/main.py",
+      "path": "project/pico1/main.py",
+      "name": "main.py",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "from machine import I2C, Pin\nfrom time import sleep_ms, sleep_us\n\nADDR = 0x27\nBL = 0x08\nEN = 0x04\nRS = 0x01\n\ni2c = I2C(0, scl=Pin(1), sda=Pin(0), freq=50000)\n\ndef expander_write(value, retries=20):\n    payload = bytes((value | BL,))\n    last_exc = None\n    for _ in range(retries):\n        try:\n            i2c.writeto(ADDR, payload)\n            return\n        except Exception as exc:\n            last_exc = exc\n            sleep_us(500)\n    raise last_exc\n\ndef pulse_enable(value):\n    expander_write(value | EN)\n    sleep_us(2)\n    expander_write(value & ~EN)\n    sleep_us(80)\n\ndef write4(nibble, rs=False):\n    value = (nibble & 0xF0) | (RS if rs else 0)\n    pulse_enable(value)\n\ndef write8(value, rs=False):\n    write4(value & 0xF0, rs)\n    write4((value << 4) & 0xF0, rs)\n\ndef lcd_cmd(cmd):\n    write8(cmd, rs=False)\n\ndef lcd_char(ch):\n    write8(ord(ch), rs=True)\n\ndef lcd_text(text):\n    for ch in text[:4]:\n        lcd_char(ch)\n\ndef lcd_set_cursor(col, row):\n    row_addr = (0x00, 0x40, 0x14, 0x54)\n    lcd_cmd(0x80 | (row_addr[row] + col))\n\ndef lcd_init():\n    sleep_ms(20)\n    write4(0x30)\n    sleep_ms(5)\n    write4(0x30)\n    sleep_us(400)\n    write4(0x30)\n    write4(0x20)\n    lcd_cmd(0x28)\n    lcd_cmd(0x0C)\n    lcd_cmd(0x06)\n    lcd_cmd(0x01)\n    sleep_ms(3)\n\nprint(\"MP_LCD_BOOT\")\ninit_ok = True\ntry:\n    lcd_init()\nexcept Exception as exc:\n    init_ok = False\n    print(\"MP_LCD_INIT_ERR\", exc)\n\nprint(\"MP_LCD_INIT\", 1 if init_ok else 0)\nstep_ok = True\ntry:\n    lcd_set_cursor(0, 0)\n    lcd_text(\"OK\")\nexcept Exception as exc:\n    step_ok = False\n    print(\"MP_LCD_WRITE_ERR\", exc)\n\nprint(\"MP_LCD_STEP\", 0, \"OK\", 1 if step_ok else 0)\nprint(\"MP_LCD_DONE\")\n",
+      "dirty": false
+    },
+    {
+      "id": "project/pico1/pico1.ino",
+      "path": "project/pico1/pico1.ino",
+      "name": "pico1.ino",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/pico1/main.py"
+  ],
+  "activeCodeFileId": "project/pico1/main.py"
+}

@@ -1,0 +1,130 @@
+{
+  "caseId": "case20-pico-circuitpython-lcd2004-i2c-display",
+  "name": "Pico CircuitPython LCD2004 I2C Display",
+  "board": "pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "circuitpython",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 80,
+      "y": 90
+    },
+    {
+      "id": "lcd1",
+      "type": "wokwi-lcd2004-i2c",
+      "attrs": {
+        "color": "blue",
+        "pins": "i2c"
+      },
+      "w": 120,
+      "h": 80,
+      "rotation": 0,
+      "label": "LCD2004 I2C",
+      "x": 360,
+      "y": 140
+    },
+    {
+      "id": "r_sda",
+      "type": "wokwi-resistor",
+      "attrs": {
+        "value": "4.7k"
+      },
+      "w": 40,
+      "h": 20,
+      "rotation": 90,
+      "label": "SDA Pull-up",
+      "x": 220,
+      "y": 170
+    },
+    {
+      "id": "r_scl",
+      "type": "wokwi-resistor",
+      "attrs": {
+        "value": "4.7k"
+      },
+      "w": 40,
+      "h": 20,
+      "rotation": 90,
+      "label": "SCL Pull-up",
+      "x": 220,
+      "y": 220
+    }
+  ],
+  "connections": [
+    {
+      "from": "pico1:GND",
+      "to": "lcd1:GND",
+      "id": "w1"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "lcd1:VCC",
+      "id": "w2"
+    },
+    {
+      "from": "pico1:GP5",
+      "to": "lcd1:SCL",
+      "id": "w3"
+    },
+    {
+      "from": "pico1:GP4",
+      "to": "lcd1:SDA",
+      "id": "w4"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "r_sda:p1",
+      "id": "w5"
+    },
+    {
+      "from": "r_sda:p2",
+      "to": "lcd1:SDA",
+      "id": "w6"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "r_scl:p1",
+      "id": "w7"
+    },
+    {
+      "from": "r_scl:p2",
+      "to": "lcd1:SCL",
+      "id": "w8"
+    }
+  ],
+  "code": "import time\nimport board\nimport busio\n\nADDR = 0x27\nBL = 0x08\nEN = 0x04\nRS = 0x01\ni2c = None\n\nprint(\"CP_LCD_BOOT\")\ntry:\n    i2c = busio.I2C(board.GP5, board.GP4, frequency=100000)\nexcept Exception as exc:\n    print(\"CP_LCD_I2C_INIT_ERR\", exc)\n\ndef i2c_write_byte(value, retries=10):\n    if i2c is None:\n        return False\n    payload = bytes((value | BL,))\n    for _ in range(retries):\n        deadline = time.monotonic() + 0.12\n        while not i2c.try_lock():\n            if time.monotonic() >= deadline:\n                break\n        else:\n            try:\n                i2c.writeto(ADDR, payload)\n                return True\n            except Exception:\n                pass\n            finally:\n                i2c.unlock()\n        time.sleep(0.003)\n    return False\n\ndef pulse_enable(value):\n    ok = i2c_write_byte(value | EN)\n    time.sleep(0.00002)\n    ok = i2c_write_byte(value & ~EN) and ok\n    time.sleep(0.00006)\n    return ok\n\ndef write4(nibble, rs=False):\n    value = (nibble & 0xF0) | (RS if rs else 0)\n    return pulse_enable(value)\n\ndef write8(value, rs=False):\n    ok = write4(value & 0xF0, rs)\n    ok = write4((value << 4) & 0xF0, rs) and ok\n    return ok\n\ndef lcd_cmd(cmd):\n    return write8(cmd, rs=False)\n\ndef lcd_text(text):\n    ok = True\n    for ch in text:\n        ok = write8(ord(ch), rs=True) and ok\n    return ok\n\ndef lcd_set_cursor(col, row):\n    row_addr = (0x00, 0x40, 0x14, 0x54)\n    return lcd_cmd(0x80 | (row_addr[row] + col))\n\ndef lcd_init():\n    time.sleep(0.02)\n    ok = write4(0x30)\n    time.sleep(0.005)\n    ok = write4(0x30) and ok\n    time.sleep(0.001)\n    ok = write4(0x30) and ok\n    ok = write4(0x20) and ok\n    ok = lcd_cmd(0x28) and ok\n    ok = lcd_cmd(0x0C) and ok\n    ok = lcd_cmd(0x06) and ok\n    ok = lcd_cmd(0x01) and ok\n    time.sleep(0.003)\n    return ok\n\ninit_ok = lcd_init()\nprint(\"CP_LCD_INIT\", 1 if init_ok else 0)\n\nstep_ok = lcd_set_cursor(0, 0)\nstep_ok = lcd_text(\"CP OK\") and step_ok\nprint(\"CP_LCD_STEP\", 0, \"OK\", 1 if step_ok else 0)\nprint(\"CP_LCD_DONE\")\n",
+  "projectFiles": [
+    {
+      "id": "project/pico1/code.py",
+      "path": "project/pico1/code.py",
+      "name": "code.py",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "import time\nimport board\nimport busio\n\nADDR = 0x27\nBL = 0x08\nEN = 0x04\nRS = 0x01\ni2c = None\n\nprint(\"CP_LCD_BOOT\")\ntry:\n    i2c = busio.I2C(board.GP5, board.GP4, frequency=100000)\nexcept Exception as exc:\n    print(\"CP_LCD_I2C_INIT_ERR\", exc)\n\ndef i2c_write_byte(value, retries=10):\n    if i2c is None:\n        return False\n    payload = bytes((value | BL,))\n    for _ in range(retries):\n        deadline = time.monotonic() + 0.12\n        while not i2c.try_lock():\n            if time.monotonic() >= deadline:\n                break\n        else:\n            try:\n                i2c.writeto(ADDR, payload)\n                return True\n            except Exception:\n                pass\n            finally:\n                i2c.unlock()\n        time.sleep(0.003)\n    return False\n\ndef pulse_enable(value):\n    ok = i2c_write_byte(value | EN)\n    time.sleep(0.00002)\n    ok = i2c_write_byte(value & ~EN) and ok\n    time.sleep(0.00006)\n    return ok\n\ndef write4(nibble, rs=False):\n    value = (nibble & 0xF0) | (RS if rs else 0)\n    return pulse_enable(value)\n\ndef write8(value, rs=False):\n    ok = write4(value & 0xF0, rs)\n    ok = write4((value << 4) & 0xF0, rs) and ok\n    return ok\n\ndef lcd_cmd(cmd):\n    return write8(cmd, rs=False)\n\ndef lcd_text(text):\n    ok = True\n    for ch in text:\n        ok = write8(ord(ch), rs=True) and ok\n    return ok\n\ndef lcd_set_cursor(col, row):\n    row_addr = (0x00, 0x40, 0x14, 0x54)\n    return lcd_cmd(0x80 | (row_addr[row] + col))\n\ndef lcd_init():\n    time.sleep(0.02)\n    ok = write4(0x30)\n    time.sleep(0.005)\n    ok = write4(0x30) and ok\n    time.sleep(0.001)\n    ok = write4(0x30) and ok\n    ok = write4(0x20) and ok\n    ok = lcd_cmd(0x28) and ok\n    ok = lcd_cmd(0x0C) and ok\n    ok = lcd_cmd(0x06) and ok\n    ok = lcd_cmd(0x01) and ok\n    time.sleep(0.003)\n    return ok\n\ninit_ok = lcd_init()\nprint(\"CP_LCD_INIT\", 1 if init_ok else 0)\n\nstep_ok = lcd_set_cursor(0, 0)\nstep_ok = lcd_text(\"CP OK\") and step_ok\nprint(\"CP_LCD_STEP\", 0, \"OK\", 1 if step_ok else 0)\nprint(\"CP_LCD_DONE\")\n",
+      "dirty": false
+    },
+    {
+      "id": "project/pico1/pico1.ino",
+      "path": "project/pico1/pico1.ino",
+      "name": "pico1.ino",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/pico1/code.py"
+  ],
+  "activeCodeFileId": "project/pico1/code.py"
+}

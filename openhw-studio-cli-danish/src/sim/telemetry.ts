@@ -132,6 +132,90 @@ function mergeStatus(
   return 'ok';
 }
 
+function healthIcon(status: 'ok' | 'warn' | 'error'): string {
+  if (status === 'error') return '🔴';
+  if (status === 'warn') return '🟡';
+  return '🟢';
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function formatTimingSummary(metrics: Record<string, unknown> | undefined): string {
+  const timing = asRecord(metrics?.timing);
+  if (!timing) return '';
+
+  const avgMs = Number(timing.avgMs);
+  const maxMs = Number(timing.maxMs);
+  const count = Number(timing.count);
+  if (!Number.isFinite(avgMs) && !Number.isFinite(maxMs)) return '';
+
+  const avgText = Number.isFinite(avgMs) ? `${avgMs.toFixed(3)}ms` : 'n/a';
+  const maxText = Number.isFinite(maxMs) ? `${maxMs.toFixed(3)}ms` : 'n/a';
+  const countText = Number.isFinite(count) ? `${Math.max(0, Math.round(count))}` : '0';
+  return `timing(avg=${avgText}, max=${maxText}, n=${countText})`;
+}
+
+function summarizeCustomTelemetry(type: string, custom: Record<string, unknown> | null): string {
+  if (!custom) return '';
+  const t = String(type || '').toLowerCase();
+
+  if (t.includes('lcd2004')) {
+    const text = String(custom.textContent || '').replace(/\s+/g, ' ').trim();
+    if (text) {
+      return `LCD text="${text.slice(0, 80)}${text.length > 80 ? '...' : ''}"`;
+    }
+  }
+
+  if (t.includes('neopixel')) {
+    const active = Number(custom.activePixels || 0);
+    const total = Number(custom.totalPixels || 0);
+    const pattern = String(custom.pattern || '').trim();
+    const avg = String(custom.averageColor || '').trim();
+    const pieces = [`Neopixel ${active}/${total} active`];
+    if (pattern) pieces.push(`pattern=${pattern}`);
+    if (avg) pieces.push(`avg=${avg}`);
+    return pieces.join(' ');
+  }
+
+  if (t.includes('servo')) {
+    const pulseUs = Number(custom.pulseWidthUs || 0);
+    const freqHz = Number(custom.frequencyHz || 0);
+    const delta = Number(custom.distanceToTarget || 0);
+    return `Servo pulse=${pulseUs.toFixed(1)}us freq=${freqHz.toFixed(2)}Hz delta=${delta.toFixed(2)}deg`;
+  }
+
+  if (t.includes('max30102')) {
+    const rate = Number(custom.sampleRateHz || 0);
+    const fifo = Number(custom.fifoBufferDepth || 0);
+    const hr = String(custom.heartRate || '--');
+    const spo2 = String(custom.spo2 || '--');
+    return `MAX30102 rate=${rate}Hz fifo=${fifo} HR=${hr} SpO2=${spo2}`;
+  }
+
+  if (t.includes('potentiometer')) {
+    const ratio = Number(custom.resistanceRatio || 0);
+    const voltage = Number(custom.signalVoltage || 0);
+    return `Pot ratio=${ratio.toFixed(3)} signal=${voltage.toFixed(3)}V`;
+  }
+
+  if (t.includes('ldr')) {
+    const lux = Number(custom.lux || 0);
+    const ao = Number(custom.analogOutV || 0);
+    return `LDR lux=${lux} AO=${ao.toFixed(2)}V`;
+  }
+
+  if (t.includes('joystick')) {
+    const pos = String(custom.position || '').trim();
+    const pressed = Boolean(custom.buttonPressed);
+    return `Joystick pos=${pos || '(n/a)'} pressed=${pressed ? 'yes' : 'no'}`;
+  }
+
+  return '';
+}
+
 function formatTemplateValue(value: unknown): string {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string') return value;
@@ -408,21 +492,61 @@ export class SimulationTelemetryCollector {
         a.localeCompare(b)
       );
       const state = compactStateForReport(this.componentStates.get(componentId) || {});
-      const telemetryData = compactStateForReport(this.componentTelemetryData.get(componentId) || {});
+      const telemetrySource = this.componentTelemetryData.get(componentId) || {};
+      const sourceRecord = telemetrySource as Record<string, unknown>;
+      const rawTelemetryData = compactStateForReport(telemetrySource);
+      const telemetryData: Record<string, unknown> = {
+        ...(rawTelemetryData as Record<string, unknown>),
+      };
+
+      const sourceMetrics = asRecord(sourceRecord._metrics);
+      const sourceHeuristics = asRecord(sourceRecord._heuristics);
+      if (sourceMetrics) telemetryData._metrics = sourceMetrics;
+      if (sourceHeuristics) telemetryData._heuristics = sourceHeuristics;
+
+      const universalMetrics = sourceMetrics
+        ?? (telemetryData._metrics && typeof telemetryData._metrics === 'object'
+          ? (telemetryData._metrics as Record<string, unknown>)
+          : undefined);
+      const heuristics = sourceHeuristics
+        ?? ((telemetryData._heuristics && typeof telemetryData._heuristics === 'object')
+          ? (telemetryData._heuristics as Record<string, unknown>)
+          : null);
+
+      const customTelemetry = asRecord(
+        telemetryData.customTelemetry
+          ?? telemetryData.custom
+          ?? (universalMetrics ? (universalMetrics as Record<string, unknown>).custom : undefined)
+      );
+      if (customTelemetry) {
+        telemetryData.customTelemetry = customTelemetry;
+      }
+
+      if (!telemetryData._component || typeof telemetryData._component !== 'object') {
+        telemetryData._component = {
+          role: meta.role,
+          updates,
+          changedKeys: changedKeys.length,
+          stateKeys: Object.keys(state).length,
+          hasRuntimeState: updates > 0,
+        };
+      }
+
+      if (Object.keys(telemetryData).length === 1) {
+        telemetryData._fallbackGenerated = true;
+      }
+
       const decentralizedSummary = String(this.componentTelemetrySummary.get(componentId) || '').trim();
       const notes: string[] = [];
 
       let status: 'ok' | 'warn' | 'error' = 'ok';
 
-      const asRecord = state as Record<string, unknown>;
-      if (asRecord.burnedOut === true || asRecord.error === true || asRecord.fault === true) {
+      const stateRecord = state as Record<string, unknown>;
+      if (stateRecord.burnedOut === true || stateRecord.error === true || stateRecord.fault === true) {
         status = 'error';
         notes.push('Component reported error/fault state.');
       }
 
-      const heuristics = (telemetryData._heuristics && typeof telemetryData._heuristics === 'object')
-        ? (telemetryData._heuristics as Record<string, unknown>)
-        : null;
       const heuristicStatus = String(heuristics?.status || '').toLowerCase();
       if (heuristicStatus === 'error' || heuristicStatus === 'warn') {
         status = mergeStatus(status, heuristicStatus as 'warn' | 'error');
@@ -478,11 +602,18 @@ export class SimulationTelemetryCollector {
       const templatedSummary = meta.telemetryTemplate
         ? renderTelemetryTemplate(meta.telemetryTemplate, { state, attr: meta.attrs })
         : '';
-      const outputSummary = decentralizedSummary || templatedSummary || summarizeOutputState(meta.type, state, updates);
+      const baselineSummary = decentralizedSummary || templatedSummary || summarizeOutputState(meta.type, state, updates);
+      const customSummary = summarizeCustomTelemetry(meta.type, customTelemetry);
+      const timingSummary = formatTimingSummary(universalMetrics);
 
-      const universalMetrics = telemetryData._metrics && typeof telemetryData._metrics === 'object'
-        ? (telemetryData._metrics as Record<string, unknown>)
-        : undefined;
+      const outputSummary = [customSummary || baselineSummary, timingSummary]
+        .filter((part) => String(part || '').trim().length > 0)
+        .join(' | ');
+
+      telemetryData._health = {
+        icon: healthIcon(status),
+        status,
+      };
 
       components.push({
         id: componentId,

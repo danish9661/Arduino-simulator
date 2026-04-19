@@ -1,0 +1,106 @@
+{
+  "caseId": "case17-pico-micropython-tft-ili9341-display",
+  "name": "Pico MicroPython TFT ILI9341 Display",
+  "board": "pico",
+  "components": [
+    {
+      "id": "pico1",
+      "type": "wokwi-raspberry-pi-pico",
+      "attrs": {
+        "env": "micropython",
+        "builder": "arduino-pico"
+      },
+      "w": 220,
+      "h": 320,
+      "rotation": 0,
+      "label": "Raspberry Pi Pico",
+      "x": 80,
+      "y": 90
+    },
+    {
+      "id": "tft1",
+      "type": "wokwi-ili9341",
+      "attrs": {},
+      "w": 160,
+      "h": 240,
+      "rotation": 0,
+      "label": "ILI9341 TFT",
+      "x": 360,
+      "y": 70
+    }
+  ],
+  "connections": [
+    {
+      "from": "pico1:3V3",
+      "to": "tft1:VCC",
+      "id": "w1"
+    },
+    {
+      "from": "pico1:GND",
+      "to": "tft1:GND",
+      "id": "w2"
+    },
+    {
+      "from": "pico1:GP17",
+      "to": "tft1:CS",
+      "id": "w3"
+    },
+    {
+      "from": "pico1:GP21",
+      "to": "tft1:RESET",
+      "id": "w4"
+    },
+    {
+      "from": "pico1:GP20",
+      "to": "tft1:DC",
+      "id": "w5"
+    },
+    {
+      "from": "pico1:GP19",
+      "to": "tft1:MOSI",
+      "id": "w6"
+    },
+    {
+      "from": "pico1:GP18",
+      "to": "tft1:SCK",
+      "id": "w7"
+    },
+    {
+      "from": "pico1:GP16",
+      "to": "tft1:MISO",
+      "id": "w8"
+    },
+    {
+      "from": "pico1:3V3",
+      "to": "tft1:LED",
+      "id": "w9"
+    }
+  ],
+  "code": "from machine import Pin, SPI\nfrom time import sleep_ms\n\nspi = SPI(0, baudrate=8000000, polarity=0, phase=0, sck=Pin(18), mosi=Pin(19), miso=Pin(16))\ncs = Pin(17, Pin.OUT, value=1)\ndc = Pin(20, Pin.OUT, value=1)\nrst = Pin(21, Pin.OUT, value=1)\n\ndef tft_cmd(cmd):\n    cs.off()\n    dc.off()\n    spi.write(bytes((cmd & 0xFF,)))\n    cs.on()\n\ndef tft_data(payload):\n    cs.off()\n    dc.on()\n    spi.write(payload)\n    cs.on()\n\ndef tft_init():\n    rst.off()\n    sleep_ms(20)\n    rst.on()\n    sleep_ms(120)\n    tft_cmd(0x01)\n    sleep_ms(120)\n    tft_cmd(0x11)\n    sleep_ms(120)\n    tft_cmd(0x3A)\n    tft_data(bytes((0x55,)))\n    tft_cmd(0x29)\n    sleep_ms(20)\n\nprint(\"MP_TFT_BOOT\")\ninit_ok = True\ntry:\n    tft_init()\nexcept Exception as exc:\n    init_ok = False\n    print(\"MP_TFT_INIT_ERR\", exc)\n\nprint(\"MP_TFT_INIT\", 1 if init_ok else 0)\nprint(\"MP_TFT_STEP\", 0, \"OK\", 1 if init_ok else 0, \"COLOR\", 0x07E0)\nprint(\"MP_TFT_DONE\")\n",
+  "projectFiles": [
+    {
+      "id": "project/pico1/main.py",
+      "path": "project/pico1/main.py",
+      "name": "main.py",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "from machine import Pin, SPI\nfrom time import sleep_ms\n\nspi = SPI(0, baudrate=8000000, polarity=0, phase=0, sck=Pin(18), mosi=Pin(19), miso=Pin(16))\ncs = Pin(17, Pin.OUT, value=1)\ndc = Pin(20, Pin.OUT, value=1)\nrst = Pin(21, Pin.OUT, value=1)\n\ndef tft_cmd(cmd):\n    cs.off()\n    dc.off()\n    spi.write(bytes((cmd & 0xFF,)))\n    cs.on()\n\ndef tft_data(payload):\n    cs.off()\n    dc.on()\n    spi.write(payload)\n    cs.on()\n\ndef tft_init():\n    rst.off()\n    sleep_ms(20)\n    rst.on()\n    sleep_ms(120)\n    tft_cmd(0x01)\n    sleep_ms(120)\n    tft_cmd(0x11)\n    sleep_ms(120)\n    tft_cmd(0x3A)\n    tft_data(bytes((0x55,)))\n    tft_cmd(0x29)\n    sleep_ms(20)\n\nprint(\"MP_TFT_BOOT\")\ninit_ok = True\ntry:\n    tft_init()\nexcept Exception as exc:\n    init_ok = False\n    print(\"MP_TFT_INIT_ERR\", exc)\n\nprint(\"MP_TFT_INIT\", 1 if init_ok else 0)\nprint(\"MP_TFT_STEP\", 0, \"OK\", 1 if init_ok else 0, \"COLOR\", 0x07E0)\nprint(\"MP_TFT_DONE\")\n",
+      "dirty": false
+    },
+    {
+      "id": "project/pico1/pico1.ino",
+      "path": "project/pico1/pico1.ino",
+      "name": "pico1.ino",
+      "kind": "code",
+      "boardId": "pico1",
+      "boardKind": "rp2040",
+      "content": "",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/pico1/main.py"
+  ],
+  "activeCodeFileId": "project/pico1/main.py"
+}

@@ -57,6 +57,16 @@ export async function fetchDefaultPicoMicroPythonUf2(baseUrl: string): Promise<B
   return Buffer.from(arrayBuffer);
 }
 
+export async function fetchDefaultPicoCircuitPythonUf2(baseUrl: string): Promise<Buffer> {
+  const response = await fetch(buildUrl(baseUrl, 'compile/pico/circuitpython-uf2'));
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(text || `Failed to fetch default Pico CircuitPython UF2 (${response.status})`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
 export async function listBackendPorts(baseUrl: string, showAll = false): Promise<any[]> {
   const url = new URL(buildUrl(baseUrl, 'compile/ports'));
   if (showAll) {

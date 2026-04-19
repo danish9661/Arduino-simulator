@@ -39,6 +39,90 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
 }
 
+function healthIcon(status: 'ok' | 'warn' | 'error'): string {
+  if (status === 'error') return '🔴';
+  if (status === 'warn') return '🟡';
+  return '🟢';
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function formatTelemetryLeaf(value: unknown): string {
+  if (value === null || value === undefined) return 'null';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) return `[${value.length}]`;
+  if (typeof value === 'object') {
+    const keys = Object.keys(value as Record<string, unknown>);
+    return `{${keys.slice(0, 5).join(',')}${keys.length > 5 ? ',...' : ''}}`;
+  }
+  return String(value);
+}
+
+function formatCustomTelemetry(custom: Record<string, unknown> | null): string {
+  if (!custom) return '';
+  const parts: string[] = [];
+  for (const [key, value] of Object.entries(custom)) {
+    parts.push(`${key}=${formatTelemetryLeaf(value)}`);
+    if (parts.length >= 6) break;
+  }
+  return parts.join(', ');
+}
+
+function formatTiming(universalMetrics?: Record<string, unknown>): string {
+  const timing = asRecord(universalMetrics?.timing);
+  if (!timing) return '';
+  const avgMs = Number(timing.avgMs);
+  const maxMs = Number(timing.maxMs);
+  if (!Number.isFinite(avgMs) && !Number.isFinite(maxMs)) return '';
+  const avgText = Number.isFinite(avgMs) ? avgMs.toFixed(3) : 'n/a';
+  const maxText = Number.isFinite(maxMs) ? maxMs.toFixed(3) : 'n/a';
+  return `avg=${avgText}ms max=${maxText}ms`;
+}
+
+function printTelemetryTextReport(
+  telemetry: SimulationTelemetryReport,
+  projectFile: string,
+  outputFile?: string
+): void {
+  const problematic = telemetry.components.filter((c) => c.status !== 'ok');
+  process.stdout.write(`Telemetry report for ${relToCwd(resolveWorkspacePath(projectFile))}\n`);
+  process.stdout.write(
+    `Components=${telemetry.components.length} Boards=${telemetry.boards.length} Faults=${telemetry.faults} SerialChars=${telemetry.serialChars} Problematic=${problematic.length}\n`
+  );
+  if (outputFile) {
+    process.stdout.write(`Output=${relToCwd(resolveWorkspacePath(outputFile))}\n`);
+  }
+
+  for (const component of telemetry.components) {
+    const icon = healthIcon(component.status);
+    const timing = formatTiming(component.universalMetrics);
+
+    const telemetryData = asRecord(component.telemetryData);
+    const custom = asRecord(
+      telemetryData?.customTelemetry
+      ?? telemetryData?.custom
+      ?? asRecord(component.universalMetrics)?.custom
+    );
+    const customText = formatCustomTelemetry(custom);
+    const summary = String(component.outputSummary || component.telemetrySummary || '').trim();
+
+    process.stdout.write(`${icon} ${component.id} (${component.type})${timing ? ` [${timing}]` : ''}\n`);
+    if (summary) {
+      process.stdout.write(`  summary: ${summary}\n`);
+    }
+    if (customText) {
+      process.stdout.write(`  custom: ${customText}\n`);
+    }
+    if (component.notes.length > 0) {
+      process.stdout.write(`  notes: ${component.notes.join(' | ')}\n`);
+    }
+  }
+}
+
 function parseCsvList(input: string | undefined): string[] {
   return String(input || '')
     .split(',')
@@ -586,6 +670,8 @@ export function registerSimCommands(program: Command, getBackendUrl: () => strin
     .option('--duration-ms <ms>', 'Run duration before telemetry report', '2500')
     .option('--debug <mode>', 'Debug mode: off|text|json', 'off')
     .option('--baud <baud>', 'Serial baud override')
+    .option('--watch', 'Stream one-line component telemetry updates until Ctrl+C')
+    .option('--interval-ms <ms>', 'Refresh interval for --watch mode', '1000')
     .option('--json', 'Print telemetry only as JSON')
     .option('--output <file>', 'Write telemetry report to JSON file')
     .option('--fail-on-warn', 'Exit non-zero when any component status is warn/error')
@@ -608,33 +694,76 @@ export function registerSimCommands(program: Command, getBackendUrl: () => strin
         baudRate: resolveDefaultBaud(selectedBoard?.type || project.board, options.baud),
       };
 
-      const { telemetry } = await runForDuration(project, runOptions);
+      if (!options.watch) {
+        const { telemetry } = await runForDuration(project, runOptions);
+
+        if (options.output) {
+          await writeOutputFile(options.output, `${JSON.stringify(telemetry, null, 2)}\n`);
+        }
+
+        if (options.json) {
+          printJson(telemetry);
+        } else {
+          printTelemetryTextReport(telemetry, projectFile, options.output);
+        }
+
+        if (options.failOnWarn && telemetry.components.some((c) => c.status !== 'ok')) {
+          process.exitCode = 1;
+        }
+        return;
+      }
+
+      const intervalMs = Math.max(250, parsePositiveInt(options.intervalMs, 1000));
+      const controller = await startSimulation(
+        project,
+        {
+          ...runOptions,
+          durationMs: 0,
+        },
+        {
+          suppressConsoleOutput: true,
+        }
+      );
+
+      let latestTelemetry = controller.getTelemetryReport();
+      const render = () => {
+        latestTelemetry = controller.getTelemetryReport();
+        if (options.json) {
+          printJson(latestTelemetry);
+          return;
+        }
+        console.clear();
+        printTelemetryTextReport(latestTelemetry, projectFile, options.output);
+      };
+
+      if (!options.json) {
+        process.stdout.write('Telemetry watch mode active. Press Ctrl+C to stop.\n');
+      }
+      render();
+      const timer = setInterval(render, intervalMs);
+
+      await new Promise<void>((resolve) => {
+        const onSigint = () => {
+          process.off('SIGINT', onSigint);
+          resolve();
+        };
+        process.on('SIGINT', onSigint);
+      });
+
+      clearInterval(timer);
+      controller.stop();
+      latestTelemetry = controller.getTelemetryReport();
 
       if (options.output) {
-        await writeOutputFile(options.output, `${JSON.stringify(telemetry, null, 2)}\n`);
+        await writeOutputFile(options.output, `${JSON.stringify(latestTelemetry, null, 2)}\n`);
       }
 
-      if (options.json) {
-        printJson(telemetry);
-      } else {
-        const problematic = telemetry.components.filter((c) => c.status !== 'ok');
-        printJson({
-          ok: true,
-          action: 'sim.telemetry',
-          file: relToCwd(resolveWorkspacePath(projectFile)),
-          summary: {
-            components: telemetry.components.length,
-            boards: telemetry.boards.length,
-            faults: telemetry.faults,
-            serialChars: telemetry.serialChars,
-            problematic: problematic.map((c) => ({ id: c.id, status: c.status, notes: c.notes })),
-          },
-          telemetry,
-          output: options.output ? relToCwd(resolveWorkspacePath(options.output)) : null,
-        });
+      if (!options.json) {
+        process.stdout.write('\nTelemetry watch stopped. Final snapshot:\n');
+        printTelemetryTextReport(latestTelemetry, projectFile, options.output);
       }
 
-      if (options.failOnWarn && telemetry.components.some((c) => c.status !== 'ok')) {
+      if (options.failOnWarn && latestTelemetry.components.some((c) => c.status !== 'ok')) {
         process.exitCode = 1;
       }
     });
