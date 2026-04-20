@@ -316,7 +316,16 @@ function readEditCopyPayloadFromStorage() {
   }
 }
 
+const UNSAFE_DYNAMIC_CODE_PATTERN = /\b(?:importScripts|XMLHttpRequest|WebSocket|EventSource|SharedWorker|Worker|navigator\.sendBeacon|document\.cookie|localStorage|sessionStorage|indexedDB)\b|(?:\bfetch\s*\()|(?:\beval\s*\()|(?:\bnew\s+Function\b)/i
+
+function assertSafeDynamicModule(code, label) {
+  if (UNSAFE_DYNAMIC_CODE_PATTERN.test(String(code || ''))) {
+    throw new Error(`${label} uses blocked browser APIs in sandbox mode`)
+  }
+}
+
 function evalTranspiledReactModule(transformedCode) {
+  assertSafeDynamicModule(transformedCode, 'ui.tsx')
   const exportsObj = {}
   const normalizeChildrenKeys = (value) => {
     if (!Array.isArray(value)) return value
@@ -686,12 +695,19 @@ function DragResizeBox({ bx=0, by=0, bw=100, bh=100, scale=1, color='#4ade80', l
 function SvgPreview({ svgCode, compW, compH, zoom=1, style }) {
   const w = Number(compW)||100, h = Number(compH)||80
   const fluid = useMemo(()=>svgToFluid(svgCode),[svgCode])
+  const svgDataUrl = useMemo(
+    () => (fluid ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(fluid)}` : ''),
+    [fluid]
+  )
   return (
     <div style={{ position:'relative', width:w*zoom, height:h*zoom, flexShrink:0, overflow:'hidden', ...style }}>
       {fluid
         ? <div style={{ position:'absolute', top:0, left:0, width:w, height:h, transform:`scale(${zoom})`, transformOrigin:'top left', pointerEvents:'none' }}>
-            <div style={{ position:'absolute', inset:0 }}
-              dangerouslySetInnerHTML={{ __html: fluid }} />
+            <img
+              src={svgDataUrl}
+              alt=""
+              style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill' }}
+            />
           </div>
         : <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', background:'#1e1e2e', border:'1px dashed #333', borderRadius:4 }}>
             <span style={{ color:'#555', fontSize:11 }}>{w}×{h}</span>
@@ -917,9 +933,13 @@ function CanvasPanel({ open, onToggle, svgCode, reactCode, imageMode, compW, com
         )
       }
       // SVG mode — render fluid SVG directly, same as SimulatorPage
+      const fluidSvgDataUrl = fluidSvg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(fluidSvg)}` : ''
       if (fluidSvg) return (
-        <div style={{ position:'absolute', inset:0, pointerEvents:'none' }}
-          dangerouslySetInnerHTML={{ __html: fluidSvg }} />
+        <img
+          src={fluidSvgDataUrl}
+          alt=""
+          style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'fill', pointerEvents:'none' }}
+        />
       )
       return (
         <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', background:'#1e1e2e', border:'1px dashed #333', borderRadius:4 }}>
@@ -1928,6 +1948,7 @@ export default function ComponentEditorPage() {
     // 2) Runtime smoke checks (safe mocks)
     if (!issues.length) {
       try {
+        assertSafeDynamicModule(transpiledLogic, 'logic.ts')
         const logicExports = {}
         const moduleObj = { exports: logicExports }
         class MockBaseComponent {
@@ -1995,6 +2016,7 @@ export default function ComponentEditorPage() {
       }
 
       try {
+        assertSafeDynamicModule(transpiledValidation, 'validation.ts')
         const validationExports = {}
         const validationModule = { exports: validationExports }
         const evalValidation = new Function('exports', 'module', transpiledValidation)
@@ -2996,7 +3018,12 @@ export const ContextMenu = ({ attrs, onUpdate }) => (
       <div style={{ flex:1, display:'flex', flexDirection:'column', gap:12 }}>
         <div style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>Live Preview</div>
         <div style={{ flex:1, background: 'white', color: '#333', borderRadius: 16, padding: 32, overflowY: 'auto', border: '1px solid var(--border)' }} className="panel-scroll prose">
-           <div dangerouslySetInnerHTML={{ __html: docsCode }} />
+           <iframe
+             title="component-doc-preview"
+             sandbox=""
+             srcDoc={docsCode}
+             style={{ width: '100%', minHeight: 480, border: '0', background: 'white' }}
+           />
         </div>
       </div>
     </div>

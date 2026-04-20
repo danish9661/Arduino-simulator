@@ -57,10 +57,15 @@ if (!isDbConnected) {
 }
 
 const app = express();
+app.disable('x-powered-by');
 const SESSION_SECRET = process.env.SESSION_SECRET;
 if (!SESSION_SECRET) {
   console.error('Missing required SESSION_SECRET. Set SESSION_SECRET in openhw-studio-backend-danish/.env or your runtime environment.');
   process.exit(1);
+}
+
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
 }
 
 const allowedOrigins = new Set(
@@ -76,7 +81,13 @@ const allowedOrigins = new Set(
 app.use(session({
     secret: SESSION_SECRET,
     resave: false,
-    saveUninitialized: true,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 1000 * 60 * 60 * 24 * 7,
+    },
 }));
 
 app.use(passport.initialize());
@@ -91,6 +102,43 @@ app.use(cors({
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
+}));
+app.use((req, res, next) => {
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+
+const createInMemoryRateLimiter = ({ windowMs, limit, keyResolver }) => {
+  const buckets = new Map();
+
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = String((keyResolver?.(req) || req.ip || 'unknown')).trim() || 'unknown';
+    const existing = buckets.get(key);
+
+    if (!existing || (now - existing.windowStart) >= windowMs) {
+      buckets.set(key, { windowStart: now, count: 1 });
+      return next();
+    }
+
+    if (existing.count >= limit) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((windowMs - (now - existing.windowStart)) / 1000));
+      res.setHeader('Retry-After', String(retryAfterSeconds));
+      return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+    }
+
+    existing.count += 1;
+    return next();
+  };
+};
+
+app.use(createInMemoryRateLimiter({
+  windowMs: 60 * 1000,
+  limit: 120,
+  keyResolver: (req) => `${req.ip}:${req.path}`,
 }));
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));

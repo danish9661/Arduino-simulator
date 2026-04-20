@@ -53,6 +53,13 @@ import 'prismjs/themes/prism-tomorrow.css';
 
 const EDIT_COPY_KEY = 'openhw_edit_copy';
 const EDIT_COPY_PAYLOAD_PREFIX = 'openhw_edit_copy_payload_';
+const UNSAFE_DYNAMIC_CODE_PATTERN = /\b(?:importScripts|XMLHttpRequest|WebSocket|EventSource|SharedWorker|Worker|navigator\.sendBeacon|document\.cookie|localStorage|sessionStorage|indexedDB)\b|(?:\bfetch\s*\()|(?:\beval\s*\()|(?:\bnew\s+Function\b)/i;
+
+function assertSafeDynamicModule(code, label) {
+  if (UNSAFE_DYNAMIC_CODE_PATTERN.test(String(code || ''))) {
+    throw new Error(`${label} uses blocked browser APIs in sandbox mode`);
+  }
+}
 
 function collectRawComponentSources() {
   const rawFiles = {
@@ -1861,6 +1868,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
       const Babel = await getBabel();
       const transpileUI = Babel.transform(uiStr, { filename: 'ui.tsx', presets: ['react', 'typescript', 'env'] }).code;
       const transpileLogic = Babel.transform(logicStr, { filename: 'logic.ts', presets: ['typescript', 'env'] }).code;
+      assertSafeDynamicModule(transpileUI, 'ui.tsx');
+      assertSafeDynamicModule(transpileLogic, 'logic.ts');
 
       const exportsUI = {};
       const evalUI = new Function('exports', 'require', 'React', transpileUI);
@@ -2204,6 +2213,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
       const Babel = await getBabel();
       const transpileUI = Babel.transform(uiRaw, { filename: 'ui.tsx', presets: ['react', 'typescript', 'env'] }).code;
       const transpileLogic = Babel.transform(logicRaw, { filename: 'logic.ts', presets: ['typescript', 'env'] }).code;
+      assertSafeDynamicModule(transpileUI, 'ui.tsx');
+      assertSafeDynamicModule(transpileLogic, 'logic.ts');
 
       const exportsUI = {};
       const evalUI = new Function('exports', 'require', 'React', transpileUI);
@@ -2285,6 +2296,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
             const Babel = await getBabel();
             const transpileUI = Babel.transform(uiStr, { filename: 'ui.tsx', presets: ['react', 'typescript', 'env'] }).code;
             const transpileLogic = Babel.transform(logicStr, { filename: 'logic.ts', presets: ['typescript', 'env'] }).code;
+            assertSafeDynamicModule(transpileUI, 'ui.tsx');
+            assertSafeDynamicModule(transpileLogic, 'logic.ts');
 
             const exportsUI = {};
             const evalUI = new Function('exports', 'require', 'React', transpileUI);
@@ -7534,10 +7547,9 @@ export default function SimulatorPage({ gamificationMode = false }) {
                             neopixelRefs.current[comp.id] = el;
                           }
                         }}
-                        dangerouslySetInnerHTML={{
-                          __html: `<${comp.type} ${Object.entries(getComponentStateAttrs(comp)).map(([k, v]) => `${k}="${v}"`).join(' ')}></${comp.type}>`,
-                        }}
-                      />
+                      >
+                        {React.createElement(comp.type, getComponentStateAttrs(comp))}
+                      </div>
                     )}
                   </div>
 
@@ -9091,5 +9103,3 @@ function ProjectCard({ proj, currentProjectId, renamingProjectId, renameValue, s
     </div>
   );
 }
-
-
