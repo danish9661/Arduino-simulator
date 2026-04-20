@@ -9,7 +9,7 @@ export const requireRole = (...allowedRoles) => {
   return (req, res, next) => {
     const role = String(req.user?.role || '').trim().toLowerCase();
     if (!role || !normalized.has(role)) {
-      return res.status(403).json({ message: 'Forbidden' });
+      return res.status(403).json({ message: 'Access denied: insufficient permissions' });
     }
     return next();
   };

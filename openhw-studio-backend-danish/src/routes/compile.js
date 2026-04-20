@@ -15,8 +15,8 @@ import { requireAdmin } from '../middleware/authorization.js';
 const router = Router();
 
 // Compile Arduino code
-router.post('/', compileArduinoCode);
-router.post('/diagnostics', compileArduinoCode);
+router.post('/', protectRoute, compileArduinoCode);
+router.post('/diagnostics', protectRoute, compileArduinoCode);
 router.post('/flash', protectRoute, flashFirmware);
 router.get('/ports', protectRoute, listSerialPorts);
 router.get('/pico/micropython-uf2', getDefaultPicoMicroPythonUf2);

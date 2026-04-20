@@ -104,7 +104,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use((req, res, next) => {
-  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
@@ -113,9 +113,20 @@ app.use((req, res, next) => {
 
 const createInMemoryRateLimiter = ({ windowMs, limit, keyResolver }) => {
   const buckets = new Map();
+  const cleanupIntervalMs = Math.max(1000, Math.floor(windowMs));
+  let lastCleanupAt = Date.now();
 
   return (req, res, next) => {
     const now = Date.now();
+    if ((now - lastCleanupAt) >= cleanupIntervalMs) {
+      for (const [bucketKey, bucketValue] of buckets.entries()) {
+        if ((now - bucketValue.windowStart) >= windowMs) {
+          buckets.delete(bucketKey);
+        }
+      }
+      lastCleanupAt = now;
+    }
+
     const key = String((keyResolver?.(req) || req.ip || 'unknown')).trim() || 'unknown';
     const existing = buckets.get(key);
 

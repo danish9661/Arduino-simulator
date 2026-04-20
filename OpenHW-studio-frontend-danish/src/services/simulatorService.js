@@ -21,7 +21,7 @@ const getAdminAuthConfig = () => {
 export async function compileCode(input) {
     try {
         const payload = typeof input === 'string' ? { code: input } : (input || {});
-        const response = await axios.post(`${COMPILER_URL}/compile`, payload);
+        const response = await axios.post(`${COMPILER_URL}/compile`, payload, getUserAuthConfig());
         if (response.data && response.data.hex) {
             return response.data;
         }
