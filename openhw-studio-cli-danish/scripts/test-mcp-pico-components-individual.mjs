@@ -215,7 +215,6 @@ function buildWirePlan(pinNames) {
     || pin === 'OUT'
     || pin === 'PWM'
     || pin === 'DATA'
-    || pin === 'DIN'
   ));
   if (signalPin) add('board1:GP2', `uut:${signalPin}`);
 
