@@ -40,6 +40,9 @@ export interface OpenHwProject {
   components: ComponentEntry[];
   connections: WireEntry[];
   code: string;
+  blocklyXml?: string;
+  blocklyGeneratedCode?: string;
+  useBlocklyCode?: boolean;
   projectFiles: ProjectFileEntry[];
   openCodeTabs: string[];
   activeCodeFileId: string;

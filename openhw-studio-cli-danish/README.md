@@ -53,6 +53,10 @@ npm run cli -- project connect temp/project.json --from board1:GND --to led1:C
 # Update board code (inline or file)
 npm run cli -- project set-code temp/project.json --board-id board1 --code-file examples/blink.ino
 
+# Set block-coding metadata (Blockly XML + generated code preference)
+npm run cli -- project set-blockly temp/project.json --xml-file temp/workspace.xml --generated-code-file temp/generated.cpp --use-blockly-code true
+npm run cli -- project block-summary temp/project.json
+
 # Update project/library.txt from a text file
 npm run cli -- project set-library-file temp/project.json --input temp/libs.txt
 ```
@@ -149,6 +153,9 @@ npm run cli -- lib sync-project temp/project.json --dry-run
 ```bash
 # MCP response contract coverage (positive + negative paths)
 npm run test:mcp:contracts
+
+# Validate block-coding project workflow through CLI
+npm run test:cli:block-coding
 
 # Deterministic scenario runner dry-run (YAML/JSON manifest parse + wiring diagnostics + report export)
 npm run test:mcp:scenario

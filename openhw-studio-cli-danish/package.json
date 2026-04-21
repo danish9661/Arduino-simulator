@@ -14,7 +14,8 @@
     "test:mcp:pico-components-individual": "node scripts/test-mcp-pico-components-individual.mjs",
     "test:mcp:contracts": "node scripts/test-mcp-contracts.mjs",
     "test:mcp:scenario": "node scripts/mcp-scenario-runner.mjs --scenario scenarios/pico-led-lifecycle.yaml --dry-run",
-    "test:mcp:scenario:full": "node scripts/mcp-scenario-runner.mjs --scenario scenarios/pico-led-lifecycle.yaml"
+    "test:mcp:scenario:full": "node scripts/mcp-scenario-runner.mjs --scenario scenarios/pico-led-lifecycle.yaml",
+    "test:cli:block-coding": "node scripts/test-cli-block-coding.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

@@ -33,6 +33,15 @@ function parseAttrs(attrsJson?: string): Record<string, unknown> {
   }
 }
 
+function parseBooleanInput(value: unknown, fallback: boolean): boolean {
+  if (typeof value === 'boolean') return value;
+  const text = String(value ?? '').trim().toLowerCase();
+  if (!text.length) return fallback;
+  if (['1', 'true', 'yes', 'y', 'on'].includes(text)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(text)) return false;
+  throw new Error(`Invalid boolean value: ${String(value)} (expected true/false)`);
+}
+
 async function resolveAttrsInput(options: {
   attrsJson?: string;
   attrsFile?: string;
@@ -255,6 +264,79 @@ export function registerProjectCommands(program: Command): void {
         action: 'project.set-code',
         file: relToCwd(resolveWorkspacePath(target)),
         updated: { id: file.id, path: file.path, boardId: file.boardId },
+      });
+    });
+
+  project
+    .command('set-blockly <projectFile>')
+    .description('Set Blockly XML/generated code metadata for the project')
+    .option('--xml <xml>', 'Inline Blockly XML payload')
+    .option('--xml-file <file>', 'Read Blockly XML from file')
+    .option('--generated-code <code>', 'Inline generated code from block workflow')
+    .option('--generated-code-file <file>', 'Read generated code from file')
+    .option('--use-blockly-code <boolean>', 'Whether generated Blockly code should be preferred')
+    .option('-o, --output <outputFile>', 'Write to different output file')
+    .action(async (projectFile: string, options: any) => {
+      const hasXmlInline = typeof options.xml === 'string';
+      const hasXmlFile = typeof options.xmlFile === 'string';
+      if (hasXmlInline && hasXmlFile) {
+        throw new Error('Use only one XML source: --xml or --xml-file.');
+      }
+
+      const hasCodeInline = typeof options.generatedCode === 'string';
+      const hasCodeFile = typeof options.generatedCodeFile === 'string';
+      if (hasCodeInline && hasCodeFile) {
+        throw new Error('Use only one generated code source: --generated-code or --generated-code-file.');
+      }
+
+      const projectData = await loadProject(projectFile);
+
+      if (hasXmlInline || hasXmlFile) {
+        projectData.blocklyXml = hasXmlInline
+          ? String(options.xml)
+          : await fs.readFile(resolveWorkspacePath(String(options.xmlFile)), 'utf8');
+      }
+
+      if (hasCodeInline || hasCodeFile) {
+        projectData.blocklyGeneratedCode = hasCodeInline
+          ? String(options.generatedCode)
+          : await fs.readFile(resolveWorkspacePath(String(options.generatedCodeFile)), 'utf8');
+      }
+
+      if (options.useBlocklyCode !== undefined) {
+        projectData.useBlocklyCode = parseBooleanInput(options.useBlocklyCode, !!projectData.useBlocklyCode);
+      }
+
+      const target = options.output || projectFile;
+      await saveProject(target, projectData);
+      printJson({
+        ok: true,
+        action: 'project.set-blockly',
+        file: relToCwd(resolveWorkspacePath(target)),
+        blockly: {
+          useBlocklyCode: !!projectData.useBlocklyCode,
+          xmlLength: String(projectData.blocklyXml || '').length,
+          generatedCodeLength: String(projectData.blocklyGeneratedCode || '').length,
+        },
+      });
+    });
+
+  project
+    .command('block-summary <projectFile>')
+    .description('Show block-coding metadata summary')
+    .action(async (projectFile: string) => {
+      const projectData = await loadProject(projectFile);
+      printJson({
+        ok: true,
+        action: 'project.block-summary',
+        file: relToCwd(resolveWorkspacePath(projectFile)),
+        blockly: {
+          useBlocklyCode: !!projectData.useBlocklyCode,
+          hasXml: !!String(projectData.blocklyXml || '').trim(),
+          hasGeneratedCode: !!String(projectData.blocklyGeneratedCode || '').trim(),
+          xmlLength: String(projectData.blocklyXml || '').length,
+          generatedCodeLength: String(projectData.blocklyGeneratedCode || '').length,
+        },
       });
     });
 
