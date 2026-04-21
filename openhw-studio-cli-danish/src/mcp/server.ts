@@ -10,9 +10,11 @@ import {
   loadProject,
   saveProject,
   summarizeProject,
+  validateProject,
 } from '../utils/project.js';
 import { relToCwd, resolveWorkspacePath } from '../utils/paths.js';
 import { startSimulation } from '../sim/session.js';
+import { getPinsForType, listManifestInfos } from '../utils/manifests.js';
 
 export interface McpServerConfig {
   backendUrl: string;
@@ -380,6 +382,52 @@ async function requireActiveProject(session: ActiveProjectSession): Promise<{ pr
   };
 }
 
+function parseEndpoint(endpoint: string): { componentId: string; pinId: string } {
+  const [componentId, pinId] = String(endpoint || '').split(':');
+  if (!componentId || !pinId) {
+    throw new Error(`Invalid endpoint format: ${endpoint}. Expected <componentId>:<pinId>.`);
+  }
+  return { componentId, pinId };
+}
+
+async function validateConnectionInProject(project: OpenHwProject, from: string, to: string): Promise<{
+  from: string;
+  to: string;
+  valid: boolean;
+  issues: string[];
+}> {
+  const issues: string[] = [];
+  const endpoints = [from, to];
+
+  for (const endpoint of endpoints) {
+    let parsed: { componentId: string; pinId: string };
+    try {
+      parsed = parseEndpoint(endpoint);
+    } catch (error) {
+      issues.push(String((error as Error).message || error));
+      continue;
+    }
+
+    const component = project.components.find((entry) => entry.id === parsed.componentId) || null;
+    if (!component) {
+      issues.push(`Component not found for endpoint: ${endpoint}`);
+      continue;
+    }
+
+    const pins = await getPinsForType(component.type);
+    if (pins && pins.size > 0 && !pins.has(parsed.pinId)) {
+      issues.push(`Pin ${parsed.pinId} does not exist on component type ${component.type}.`);
+    }
+  }
+
+  return {
+    from,
+    to,
+    valid: issues.length === 0,
+    issues,
+  };
+}
+
 function buildInteractionEvent(event: unknown, value: unknown): unknown {
   if (event && typeof event === 'object' && !Array.isArray(event)) {
     return event;
@@ -464,6 +512,142 @@ export async function runMcpServer(config: McpServerConfig): Promise<void> {
     name: 'openhw-studio-cli-danish',
     version: '0.1.0',
   });
+
+  server.tool(
+    'project_open',
+    'Load an existing OpenHW project JSON and set it as active session project.',
+    {
+      file: z.string().min(1),
+      token: z.string().optional(),
+    },
+    async ({ file, token }) => {
+      assertToken(config, token);
+
+      const projectFile = resolveWorkspacePath(String(file));
+      const project = await loadProject(projectFile);
+      session.projectFile = projectFile;
+
+      return makeToolResult({
+        ok: true,
+        action: 'project_open',
+        file: relToCwd(projectFile),
+        summary: summarizeProject(project),
+      });
+    }
+  );
+
+  server.tool(
+    'project_status',
+    'Return current MCP active project session status.',
+    {
+      token: z.string().optional(),
+    },
+    async ({ token }) => {
+      assertToken(config, token);
+
+      if (!session.projectFile) {
+        return makeToolResult({
+          ok: true,
+          action: 'project_status',
+          active: false,
+          file: null,
+        });
+      }
+
+      const project = await loadProject(session.projectFile);
+      return makeToolResult({
+        ok: true,
+        action: 'project_status',
+        active: true,
+        file: relToCwd(session.projectFile),
+        summary: summarizeProject(project),
+      });
+    }
+  );
+
+  server.tool(
+    'project_validate',
+    'Validate active project schema and references.',
+    {
+      token: z.string().optional(),
+    },
+    async ({ token }) => {
+      assertToken(config, token);
+
+      const { project, projectFile } = await requireActiveProject(session);
+      const validation = await validateProject(project);
+      return makeToolResult({
+        ok: validation.valid,
+        action: 'project_validate',
+        file: relToCwd(projectFile),
+        ...validation,
+      });
+    }
+  );
+
+  server.tool(
+    'component_catalog',
+    'List known component manifest capabilities (pins, group, onEvent, telemetry keys).',
+    {
+      token: z.string().optional(),
+    },
+    async ({ token }) => {
+      assertToken(config, token);
+      const manifests = await listManifestInfos();
+      return makeToolResult({
+        ok: true,
+        action: 'component_catalog',
+        count: manifests.length,
+        components: manifests.map((entry) => ({
+          type: entry.type,
+          label: entry.label,
+          group: entry.group,
+          pins: entry.pins.map((pin) => pin.id),
+          hasOnEvent: entry.hasOnEvent,
+          telemetry: entry.telemetry || null,
+        })),
+      });
+    }
+  );
+
+  server.tool(
+    'wiring_validate',
+    'Validate one or more proposed wires against the active project without mutating it.',
+    {
+      from: z.string().optional(),
+      to: z.string().optional(),
+      wires: z.array(z.object({ from: z.string().min(1), to: z.string().min(1) })).optional(),
+      token: z.string().optional(),
+    },
+    async ({ from, to, wires, token }) => {
+      assertToken(config, token);
+
+      const { project, projectFile } = await requireActiveProject(session);
+      const plannedWires = Array.isArray(wires) && wires.length > 0
+        ? wires.map((entry) => ({ from: String(entry.from), to: String(entry.to) }))
+        : [{
+          from: String(from || ''),
+          to: String(to || ''),
+        }];
+
+      if (plannedWires.some((entry) => !entry.from || !entry.to)) {
+        throw new Error('wiring_validate requires either --from/--to or non-empty wires[].');
+      }
+
+      const diagnostics = await Promise.all(
+        plannedWires.map((entry) => validateConnectionInProject(project, entry.from, entry.to))
+      );
+      const valid = diagnostics.every((entry) => entry.valid);
+
+      return makeToolResult({
+        ok: valid,
+        action: 'wiring_validate',
+        file: relToCwd(projectFile),
+        valid,
+        diagnostics,
+      });
+    }
+  );
 
   server.tool(
     'project_init',

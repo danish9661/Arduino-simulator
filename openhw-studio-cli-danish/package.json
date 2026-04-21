@@ -11,12 +11,15 @@
     "typecheck": "tsc --noEmit",
     "test:mcp:smoke": "node scripts/mcp-smoke.mjs",
     "test:mcp:pico-all-components": "node scripts/test-mcp-pico-all-components.mjs",
-    "test:mcp:pico-components-individual": "node scripts/test-mcp-pico-components-individual.mjs"
+    "test:mcp:pico-components-individual": "node scripts/test-mcp-pico-components-individual.mjs",
+    "test:mcp:contracts": "node scripts/test-mcp-contracts.mjs",
+    "test:mcp:scenario": "node scripts/mcp-scenario-runner.mjs --scenario scenarios/pico-led-lifecycle.yaml"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "commander": "^12.1.0",
-    "serialport": "^12.0.0"
+    "serialport": "^12.0.0",
+    "yaml": "^2.8.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",

@@ -64,7 +64,17 @@ async function main() {
     const listed = await client.listTools();
     const toolNames = new Set((listed?.tools || []).map((tool) => String(tool?.name || '')));
 
-    const requiredTools = ['project_init', 'sim_execute', 'sim_trace', 'sim_inspect'];
+    const requiredTools = [
+      'project_init',
+      'project_open',
+      'project_status',
+      'project_validate',
+      'component_catalog',
+      'wiring_validate',
+      'sim_execute',
+      'sim_trace',
+      'sim_inspect',
+    ];
     for (const toolName of requiredTools) {
       assert(toolNames.has(toolName), `Missing MCP tool: ${toolName}`);
     }

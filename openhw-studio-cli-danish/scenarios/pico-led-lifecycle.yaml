@@ -1,0 +1,46 @@
+name: pico-led-lifecycle
+board: wokwi-raspberry-pi-pico
+durationMs: 1800
+traceEventTypes:
+  - state
+  - serial
+  - fault
+  - debug
+envs:
+  - key: micropython
+    boardEnv: micropython
+    ms: 2200
+    codeFile: project/board1/main.py
+    source: |
+      from machine import Pin
+      from time import sleep
+      led = Pin(25, Pin.OUT)
+      print("MCP_SCENARIO_MP_BOOT")
+      for i in range(8):
+          led.value(i % 2)
+          print("MCP_SCENARIO_MP_STEP", i)
+          sleep(0.05)
+  - key: circuitpython
+    boardEnv: circuitpython
+    ms: 2600
+    codeFile: project/board1/code.py
+    source: |
+      import time
+      print("MCP_SCENARIO_CP_BOOT")
+      for i in range(8):
+          print("MCP_SCENARIO_CP_STEP", i)
+          time.sleep(0.05)
+components:
+  - type: wokwi-led
+    id: led1
+    x: 360
+    y: 120
+wires:
+  - from: board1:GP2
+    to: led1:A
+  - from: board1:GND
+    to: led1:C
+inspect:
+  - id: led1
+    ms: 1200
+    includeTrace: true
