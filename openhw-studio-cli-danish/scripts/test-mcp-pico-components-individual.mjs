@@ -387,7 +387,9 @@ async function main() {
   summary.totals = totals;
   summary.ok = totals.failed === 0;
 
-  const outPath = path.join(workspaceRoot, 'temp', 'mcp-pico-components-individual-summary.json');
+  const outDir = path.join(workspaceRoot, 'temp');
+  await fs.mkdir(outDir, { recursive: true });
+  const outPath = path.join(outDir, 'mcp-pico-components-individual-summary.json');
   await fs.writeFile(outPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
   console.log(`[mcp-pico-components-individual] summary=${path.relative(workspaceRoot, outPath).replace(/\\/g, '/')}`);
   console.log(`[mcp-pico-components-individual] total=${totals.total} passed=${totals.passed} failed=${totals.failed}`);
