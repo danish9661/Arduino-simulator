@@ -9,6 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const cliRoot = path.resolve(__dirname, '..');
 const workspaceRoot = path.resolve(cliRoot, '..');
+const DEFAULT_INSPECT_MIN_MS = 800;
 
 function npmCommand() {
   return process.platform === 'win32' ? 'npm.cmd' : 'npm';
@@ -352,7 +353,21 @@ function computeBehaviorDiff(report, baseline) {
       serialEventCount: Number(before?.serial?.eventCount || 0),
     };
 
-    if (JSON.stringify(compareFields) !== JSON.stringify(beforeFields)) {
+    const normalizeForCompare = (value) => {
+      if (Array.isArray(value)) {
+        return value.map((entry) => normalizeForCompare(entry));
+      }
+      if (value && typeof value === 'object') {
+        const out = {};
+        for (const key of Object.keys(value).sort((a, b) => a.localeCompare(b))) {
+          out[key] = normalizeForCompare(value[key]);
+        }
+        return out;
+      }
+      return value;
+    };
+
+    if (JSON.stringify(normalizeForCompare(compareFields)) !== JSON.stringify(normalizeForCompare(beforeFields))) {
       changedCases.push({ key, reason: 'behavior-diff' });
     }
   }
@@ -514,7 +529,7 @@ async function main() {
 
         const inspectArgs = {
           id: inspectId,
-          ms: Number(inspect.ms || Math.max(800, Math.floor(durationMs / 2))),
+          ms: Number(inspect.ms || Math.max(DEFAULT_INSPECT_MIN_MS, Math.floor(durationMs / 2))),
           all_boards: true,
           include_trace: !!inspect.includeTrace,
           include_console: !!inspect.includeConsole,
