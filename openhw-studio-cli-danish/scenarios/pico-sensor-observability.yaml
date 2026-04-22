@@ -1,0 +1,44 @@
+name: pico-sensor-observability
+board: wokwi-raspberry-pi-pico
+durationMs: 2000
+envs:
+  - key: native
+    boardEnv: native
+    ms: 2000
+components:
+  - type: wokwi-photoresistor-sensor
+    id: ldr1
+    x: 300
+    y: 120
+  - type: wokwi-slide-potentiometer
+    id: pot1
+    x: 300
+    y: 240
+wires:
+  - from: board1:GP26
+    to: ldr1:AO
+  - from: board1:3V3
+    to: ldr1:VCC
+  - from: board1:GND
+    to: ldr1:GND
+  - from: board1:GP27
+    to: pot1:SIG
+  - from: board1:3V3
+    to: pot1:VCC
+  - from: board1:GND
+    to: pot1:GND
+inspect:
+  - id: ldr1
+    includeTrace: true
+    event:
+      type: SET_ATTR
+      key: lux
+      value: 650
+    atMs: 300
+  - id: pot1
+    includeTrace: true
+    event:
+      type: input
+      value: 75
+    atMs: 700
+traceEventTypes: [state, serial, fault, debug]
