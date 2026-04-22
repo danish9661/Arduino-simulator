@@ -16,6 +16,7 @@ import { relToCwd, resolveWorkspacePath } from '../utils/paths.js';
 import { startSimulation } from '../sim/session.js';
 import { getManifestInfo, getPinsForType, listManifestInfos } from '../utils/manifests.js';
 import {
+  type AssertionCheck,
   buildProfileEvents,
   componentInputSchemaForProject,
   diffBoardPins,
@@ -511,6 +512,49 @@ function normalizeInputEventsForStep(options: {
   }
 
   return events.sort((a, b) => a.atMs - b.atMs);
+}
+
+function normalizeAssertionChecks(assertions: Array<Record<string, unknown>>): AssertionCheck[] {
+  const checks: AssertionCheck[] = [];
+  for (const entry of assertions) {
+    const type = String(entry?.type || '').trim();
+    if (type === 'display_contains') {
+      const text = String(entry?.text || '').trim();
+      if (!text) continue;
+      checks.push({
+        type,
+        component_id: String(entry?.component_id || '').trim() || undefined,
+        text,
+      });
+      continue;
+    }
+
+    if (type === 'component_status') {
+      const componentId = String(entry?.component_id || '').trim();
+      const status = String(entry?.status || '').trim();
+      if (!componentId) continue;
+      if (status !== 'ok' && status !== 'warn' && status !== 'error') continue;
+      checks.push({
+        type,
+        component_id: componentId,
+        status,
+      });
+      continue;
+    }
+
+    if (type === 'pin_state') {
+      const boardId = String(entry?.board_id || '').trim();
+      const pin = String(entry?.pin || '').trim();
+      if (!boardId || !pin) continue;
+      checks.push({
+        type,
+        board_id: boardId,
+        pin,
+        high: !!entry?.high,
+      });
+    }
+  }
+  return checks;
 }
 
 async function runSimulationForDuration(
@@ -1280,8 +1324,9 @@ export async function runMcpServer(config: McpServerConfig): Promise<void> {
       const snapshot = controller.getSnapshot();
 
       const displays = extractDisplayStates(snapshot, telemetry);
+      const checks = normalizeAssertionChecks(assertions as Array<Record<string, unknown>>);
       const assertionResult = evaluateAssertions({
-        checks: assertions as any,
+        checks,
         displays,
         telemetry,
         snapshot,

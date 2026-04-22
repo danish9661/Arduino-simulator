@@ -487,7 +487,7 @@ async function writeOutputFile(targetPath: string, content: string): Promise<voi
   await fs.writeFile(absolute, content, 'utf8');
 }
 
-async function parseScenarioFile(inputPath: string): Promise<any> {
+async function parseScenarioFile(inputPath: string): Promise<unknown> {
   const absolute = resolveWorkspacePath(inputPath);
   const raw = await fs.readFile(absolute, 'utf8');
   const ext = path.extname(absolute).toLowerCase();
@@ -1295,7 +1295,8 @@ export function registerSimCommands(program: Command, getBackendUrl: () => strin
 
       if (options.assertionsFile) {
         const checksRaw = await parseScenarioFile(String(options.assertionsFile));
-        const checks = Array.isArray(checksRaw?.assertions) ? checksRaw.assertions : checksRaw;
+        const checksRoot = (checksRaw && typeof checksRaw === 'object') ? (checksRaw as Record<string, unknown>) : {};
+        const checks = Array.isArray(checksRoot.assertions) ? checksRoot.assertions : checksRaw;
         payload.assertions = evaluateAssertions({
           checks: Array.isArray(checks) ? checks : [],
           displays,
@@ -1366,7 +1367,7 @@ export function registerSimCommands(program: Command, getBackendUrl: () => strin
     .option('--output <file>', 'Write scenario report JSON')
     .action(async (projectFile: string, options: any) => {
       const project = await loadProject(projectFile);
-      const scenario = await parseScenarioFile(String(options.scenario));
+      const scenario = (await parseScenarioFile(String(options.scenario))) as Record<string, unknown>;
       const durationMs = Math.max(1, parsePositiveInt(String(scenario?.durationMs || '1800'), 1800));
       const runOptions: SimulationRunOptions = {
         backendUrl: getBackendUrl(),
@@ -1378,11 +1379,11 @@ export function registerSimCommands(program: Command, getBackendUrl: () => strin
       };
 
       const controller = await startSimulation(project, runOptions, { suppressConsoleOutput: true });
-      const inputs = Array.isArray(scenario?.inputs) ? scenario.inputs : [];
+      const inputs = Array.isArray(scenario?.inputs) ? (scenario.inputs as Array<Record<string, unknown>>) : [];
       let cursorMs = 0;
       let deliveredAll = true;
 
-      for (const input of inputs.sort((a: any, b: any) => Number(a?.atMs || 0) - Number(b?.atMs || 0))) {
+      for (const input of inputs.sort((a, b) => Number(a?.atMs || 0) - Number(b?.atMs || 0))) {
         const atMs = Math.max(0, Math.min(durationMs, Number(input?.atMs || 0)));
         const waitMs = Math.max(0, atMs - cursorMs);
         if (waitMs > 0) await sleep(waitMs);
