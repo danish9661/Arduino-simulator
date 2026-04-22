@@ -202,15 +202,21 @@ export function extractDisplayStates(
       const state = asRecord(component.state) || {};
       const telemetryEntry = telemetryById.get(component.id);
       const telemetryData = asRecord(telemetryEntry?.telemetryData);
-      const text = typeof state.text === 'string'
-        ? state.text
-        : typeof state.value === 'string'
-          ? state.value
-          : (typeof telemetryEntry?.outputSummary === 'string' ? telemetryEntry.outputSummary : null);
+      let text: string | null = null;
+      if (typeof state.text === 'string') {
+        text = state.text;
+      } else if (typeof state.value === 'string') {
+        text = state.value;
+      } else if (typeof telemetryEntry?.outputSummary === 'string') {
+        text = telemetryEntry.outputSummary;
+      }
 
-      const numeric = typeof state.value === 'number'
-        ? state.value
-        : (typeof state.number === 'number' ? state.number : null);
+      let numeric: number | null = null;
+      if (typeof state.value === 'number') {
+        numeric = state.value;
+      } else if (typeof state.number === 'number') {
+        numeric = state.number;
+      }
 
       return {
         id: component.id,
