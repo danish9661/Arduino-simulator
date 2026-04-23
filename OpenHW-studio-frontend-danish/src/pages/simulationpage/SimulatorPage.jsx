@@ -42,7 +42,8 @@ const getHtml2canvas = async () => {
 import * as EmulatorComponents from "@openhw/emulator";
 
 // Web Editor features
-import Editor from 'react-simple-code-editor';
+import EditorComponent from 'react-simple-code-editor';
+const Editor = EditorComponent.default || EditorComponent;
 import BlocklyEditor from '../../components/BlocklyEditor.jsx';
 import Prism from 'prismjs/components/prism-core';
 import 'prismjs/components/prism-clike';
