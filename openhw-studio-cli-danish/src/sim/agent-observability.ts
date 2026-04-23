@@ -64,6 +64,91 @@ function camelizeLowerUnderscore(value: string): string {
   return `${chunks[0]}${chunks.slice(1).map((entry) => entry.charAt(0).toUpperCase() + entry.slice(1)).join('')}`;
 }
 
+function hasTemplateType(templates: ComponentInputTemplate[], type: string): boolean {
+  const wanted = String(type || '').trim();
+  if (!wanted) return false;
+  return templates.some((entry) => {
+    if (typeof entry === 'string') return entry === wanted;
+    if (!entry || typeof entry !== 'object') return false;
+    return String((entry as Record<string, unknown>).type || '').trim() === wanted;
+  });
+}
+
+function synthesizeTemplateForEventType(eventType: string, manifest: ManifestInfo): ComponentInputTemplate {
+  if (eventType === 'press' || eventType === 'release' || eventType === 'rotate-cw' || eventType === 'rotate-ccw') {
+    return eventType;
+  }
+
+  if (eventType === 'move') {
+    return { type: 'move', x: 0.5, y: 0.5 };
+  }
+
+  if (eventType === 'input') {
+    return { type: 'input', value: manifest.attrs?.value?.default ?? 50 };
+  }
+
+  if (eventType === 'SD_MOUNT' || eventType === 'MOUNT') {
+    return { type: eventType };
+  }
+  if (eventType === 'SD_UNMOUNT' || eventType === 'UNMOUNT' || eventType === 'EJECT') {
+    return { type: eventType };
+  }
+  if (eventType === 'SD_FORMAT' || eventType === 'FORMAT') {
+    return { type: eventType };
+  }
+  if (eventType === 'SD_WRITE_FILE' || eventType === 'WRITE_FILE') {
+    return { type: eventType, path: '/LOG.TXT', data: '' };
+  }
+  if (eventType === 'SD_READ_FILE' || eventType === 'READ_FILE') {
+    return { type: eventType, path: '/README.TXT' };
+  }
+  if (eventType === 'SD_DELETE_FILE' || eventType === 'DELETE_FILE') {
+    return { type: eventType, path: '/README.TXT' };
+  }
+
+  if (/^SET_[A-Z0-9_]+$/.test(eventType)) {
+    const normalized = camelizeLowerUnderscore(eventType.replace(/^SET_/, ''));
+    const attrKey = Object.keys(manifest.attrs || {}).find((key) => key.toLowerCase() === normalized.toLowerCase());
+    return {
+      type: eventType,
+      value: attrKey ? (manifest.attrs?.[attrKey]?.default ?? 0) : 0,
+    };
+  }
+
+  return { type: eventType };
+}
+
+function appendComponentSpecificTemplates(templates: ComponentInputTemplate[], manifest: ManifestInfo): void {
+  const type = String(manifest.type || '').toLowerCase();
+
+  if (type.includes('membrane-keypad')) {
+    const keypadKeys = ['1', '2', '3', 'A', '4', '5', '6', 'B', '7', '8', '9', 'C', '*', '0', '#', 'D'];
+    for (const key of keypadKeys) {
+      const eventName = `press:${key}`;
+      if (!templates.includes(eventName)) templates.push(eventName);
+    }
+    if (!templates.includes('release')) templates.push('release');
+    return;
+  }
+
+  if (type.includes('wokwi-sd-card')) {
+    const sdTemplates: ComponentInputTemplate[] = [
+      { type: 'SD_MOUNT' },
+      { type: 'SD_UNMOUNT' },
+      { type: 'SD_FORMAT' },
+      { type: 'SD_WRITE_FILE', path: '/LOG.TXT', data: '' },
+      { type: 'SD_READ_FILE', path: '/README.TXT' },
+      { type: 'SD_DELETE_FILE', path: '/README.TXT' },
+    ];
+    for (const entry of sdTemplates) {
+      const key = JSON.stringify(entry);
+      if (!templates.some((existing) => JSON.stringify(existing) === key)) {
+        templates.push(entry);
+      }
+    }
+  }
+}
+
 function templatesFromManifestContract(manifest: ManifestInfo | null): ComponentInputTemplate[] {
   if (!manifest) return [];
   const templates: ComponentInputTemplate[] = [];
@@ -87,23 +172,11 @@ function templatesFromManifestContract(manifest: ManifestInfo | null): Component
 
   for (const eventType of eventTypes) {
     if (!eventType || eventType === 'SET_ATTR') continue;
-    if (eventType === 'press' || eventType === 'release') {
-      templates.push(eventType);
-      continue;
-    }
-
-    if (/^SET_[A-Z0-9_]+$/.test(eventType)) {
-      const normalized = camelizeLowerUnderscore(eventType.replace(/^SET_/, ''));
-      const attrKey = Object.keys(manifest.attrs || {}).find((key) => key.toLowerCase() === normalized.toLowerCase());
-      templates.push({
-        type: eventType,
-        value: attrKey ? (manifest.attrs?.[attrKey]?.default ?? 0) : 0,
-      });
-      continue;
-    }
-
-    templates.push({ type: eventType });
+    if (hasTemplateType(templates, eventType)) continue;
+    templates.push(synthesizeTemplateForEventType(eventType, manifest));
   }
+
+  appendComponentSpecificTemplates(templates, manifest);
 
   const dedup = new Set<string>();
   return templates.filter((entry) => {
