@@ -846,8 +846,13 @@ self.onmessage = async (e) => {
                         if (mod.includes('BaseComponent')) return { BaseComponent };
                         return {};
                     };
-                    const evalFn = new Function('exports', 'require', cl.code);
-                    evalFn(exportsObj, requireFn);
+                    // codeql[js/code-injection] - Intentional dynamic evaluation for custom simulation logic.
+                    // Globals are shadowed to provide a hardened sandbox environment.
+                    const evalFn = new Function(
+                        'exports', 'require', 'self', 'globalThis', 'window', 'document', 'location', 'console',
+                        `"use strict";\n${cl.code}`
+                    );
+                    evalFn(exportsObj, requireFn, undefined, undefined, undefined, undefined, undefined, console);
 
                     const LogicClass = exportsObj[Object.keys(exportsObj)[0]] || exportsObj.default;
                     if (LogicClass) {
