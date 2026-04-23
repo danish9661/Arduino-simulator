@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # OpenHW Studio CLI
 
 Terminal-first CLI for OpenHW Studio project management, headless simulation, serial monitoring, and library management.
@@ -128,6 +127,13 @@ npm run cli -- mcp serve --auth-token local-dev-token
 
 MCP tools now include `sim_execute`, `sim_trace`, and `sim_inspect` with support for debug/GDB trace capture (`debug_mode`, `include_trace`) and simulation console capture (`include_console`) without polluting stdio transport.
 
+Additional MCP lifecycle and diagnostics tools:
+- `project_open` (set active session from an existing project file)
+- `project_status` (active session state + summary)
+- `project_validate` (schema/reference validation for active session)
+- `component_catalog` (discover component capabilities/pins/onEvent/telemetry metadata)
+- `wiring_validate` (dry-run endpoint/wire validation without project mutation)
+
 ### Library management
 
 ```bash
@@ -137,6 +143,30 @@ npm run cli -- lib install "Adafruit NeoPixel"
 npm run cli -- lib uninstall "Adafruit NeoPixel"
 npm run cli -- lib sync-project temp/project.json --dry-run
 ```
+
+### Advanced MCP testing + behavior reports
+
+```bash
+# MCP response contract coverage (positive + negative paths)
+npm run test:mcp:contracts
+
+# Deterministic scenario runner (YAML/JSON manifest) with unified behavior report export
+npm run test:mcp:scenario
+
+# Override scenario/report paths
+node scripts/mcp-scenario-runner.mjs \
+  --scenario scenarios/pico-led-lifecycle.yaml \
+  --output-json temp/mcp-scenario-report.json \
+  --output-md temp/mcp-scenario-report.md \
+  --baseline temp/mcp-scenario-report-baseline.json
+```
+
+The scenario runner report includes:
+- per-component state timeline (`trace.componentTimeline`)
+- board pin activity timeline (`trace.boardPinTimeline`)
+- wire/connectivity diagnostics (`wiring`)
+- serial + telemetry + trace correlation (`serial`, `telemetry`, `trace`)
+- optional behavior-diff gate against a baseline report (`--baseline`)
 
 ### Interactive REPL
 
@@ -155,6 +185,14 @@ npm run cli -- repl
 - `sim interact` can inject component events for interactive parts (e.g. LDR, potentiometer, pushbutton).
 - `mcp serve` starts a local Model Context Protocol server over stdio, including simulation trace/inspect tools for remote automation.
 - Default backend URL is `http://localhost:5001/api` and can be overridden with `--backend-url`.
-=======
-# OpenHW-studio--cli
->>>>>>> origin/develop
+
+## MCP CLI completion checklist
+
+- [x] Project lifecycle tools: init/open/status/validate
+- [x] Component catalog/discovery with pin and capability metadata
+- [x] Dry-run wiring validation diagnostics before mutation
+- [x] Simulation execution, trace capture, and inspect/event injection
+- [x] Scenario-driven test runner with JSON/YAML manifests
+- [x] Unified report export in JSON + human-readable Markdown
+- [x] Contract tests for MCP tool response shape + negative cases
+- [x] Pico component matrix scripts for broad and per-component coverage
