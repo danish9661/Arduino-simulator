@@ -31,6 +31,13 @@ const RP2040_LOGICAL_FLASH_BYTES = 2 * 1024 * 1024;
 const RP2040_MICROPYTHON_FS_OFFSET = 0xA0000;
 const RP2040_CIRCUITPYTHON_FS_OFFSET = 0x100000;
 const RP2040_LITTLEFS_BLOCK_SIZE = 4096;
+const UNSAFE_DYNAMIC_CODE_PATTERN = /\b(?:importScripts|XMLHttpRequest|WebSocket|EventSource|SharedWorker|Worker|navigator\.sendBeacon|document\.cookie|localStorage|sessionStorage|indexedDB)\b|(?:\bfetch\s*\()|(?:\beval\s*\()|(?:\bnew\s+Function\b)/i;
+
+function assertSafeDynamicModule(code: string, label: string) {
+    if (UNSAFE_DYNAMIC_CODE_PATTERN.test(String(code || ''))) {
+        throw new Error(`${label} uses blocked browser APIs in sandbox mode`);
+    }
+}
 
 function resetSyncValidationState() {
     syncFrameByBoard.clear();
@@ -833,6 +840,7 @@ self.onmessage = async (e) => {
         if (customLogics && Array.isArray(customLogics)) {
             customLogics.forEach((cl: any) => {
                 try {
+                    assertSafeDynamicModule(cl.code, `${cl.type || 'custom'} logic`);
                     const exportsObj: any = {};
                     const requireFn = (mod: string) => {
                         if (mod.includes('BaseComponent')) return { BaseComponent };
