@@ -70,10 +70,14 @@ async function main() {
       'project_status',
       'project_validate',
       'component_catalog',
+      'simulation_capabilities',
+      'component_input_schema',
       'wiring_validate',
       'sim_execute',
       'sim_trace',
       'sim_inspect',
+      'simulation_step',
+      'simulation_assert',
     ]) {
       assert(toolNames.has(requiredTool), `Missing MCP tool ${requiredTool}`);
     }
@@ -103,6 +107,19 @@ async function main() {
     });
     assert(!catalog.isError, 'component_catalog returned error.');
     assert(Array.isArray(catalog.parsed?.components), 'component_catalog components missing.');
+
+    const capabilities = await callTool(client, 'simulation_capabilities', {
+      ...(token ? { token } : {}),
+    });
+    assert(!capabilities.isError, 'simulation_capabilities returned error.');
+    assert(capabilities.parsed?.ok === true, 'simulation_capabilities should return ok=true.');
+    assert(Array.isArray(capabilities.parsed?.project?.interactiveComponents), 'simulation_capabilities interactiveComponents missing.');
+
+    const inputSchema = await callTool(client, 'component_input_schema', {
+      ...(token ? { token } : {}),
+    });
+    assert(!inputSchema.isError, 'component_input_schema returned error.');
+    assert(Array.isArray(inputSchema.parsed?.components), 'component_input_schema components missing.');
 
     const invalidWire = await callTool(client, 'wiring_validate', {
       from: 'board1:NOT_A_PIN',

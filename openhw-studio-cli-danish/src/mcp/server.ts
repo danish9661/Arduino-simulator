@@ -14,7 +14,16 @@ import {
 } from '../utils/project.js';
 import { relToCwd, resolveWorkspacePath } from '../utils/paths.js';
 import { startSimulation } from '../sim/session.js';
-import { getPinsForType, listManifestInfos } from '../utils/manifests.js';
+import { getManifestInfo, getPinsForType, listManifestInfos } from '../utils/manifests.js';
+import {
+  buildProfileEvents,
+  componentInputSchemaForProject,
+  diffBoardPins,
+  diffComponentStates,
+  evaluateAssertions,
+  extractDisplayStates,
+  normalizeBoardPinStates,
+} from '../sim/agent-observability.js';
 
 export interface McpServerConfig {
   backendUrl: string;
@@ -455,6 +464,55 @@ function buildInteractionEvent(event: unknown, value: unknown): unknown {
   };
 }
 
+function buildCorrelationId(prefix: string): string {
+  const stamp = Date.now().toString(36);
+  const rand = Math.random().toString(36).slice(2, 8);
+  return `${prefix}-${stamp}-${rand}`;
+}
+
+function normalizeInputEventsForStep(options: {
+  project: OpenHwProject;
+  durationMs: number;
+  inputs: Array<{
+    id?: string;
+    event?: unknown;
+    value?: unknown;
+    at_ms?: number;
+    profile?: string;
+  }>;
+}): Array<{ atMs: number; id: string; event: unknown; profile?: string }> {
+  const events: Array<{ atMs: number; id: string; event: unknown; profile?: string }> = [];
+
+  for (const input of options.inputs) {
+    const id = String(input?.id || '').trim();
+    if (!id) continue;
+    const component = options.project.components.find((entry) => entry.id === id) || null;
+    if (!component) continue;
+
+    const atMs = Math.max(0, Math.min(options.durationMs, Math.floor(Number(input?.at_ms || 0))));
+    const profile = String(input?.profile || '').trim();
+    if (profile) {
+      for (const profileEvent of buildProfileEvents(profile, component.type, options.durationMs)) {
+        events.push({
+          atMs: profileEvent.atMs,
+          id,
+          event: profileEvent.event,
+          profile,
+        });
+      }
+      continue;
+    }
+
+    events.push({
+      atMs,
+      id,
+      event: buildInteractionEvent(input?.event, input?.value),
+    });
+  }
+
+  return events.sort((a, b) => a.atMs - b.atMs);
+}
+
 async function runSimulationForDuration(
   project: OpenHwProject,
   options: SimulationRunOptions,
@@ -649,6 +707,83 @@ export async function runMcpServer(config: McpServerConfig): Promise<void> {
         file: relToCwd(projectFile),
         valid,
         diagnostics,
+      });
+    }
+  );
+
+  server.tool(
+    'simulation_capabilities',
+    'Describe simulation observability/input/assertion capabilities for the active project.',
+    {
+      token: z.string().optional(),
+    },
+    async ({ token }) => {
+      assertToken(config, token);
+      const { project, projectFile } = await requireActiveProject(session);
+
+      const manifestByType = new Map<string, Awaited<ReturnType<typeof getManifestInfo>>>();
+      for (const component of project.components) {
+        if (!manifestByType.has(component.type)) {
+          manifestByType.set(component.type, await getManifestInfo(component.type));
+        }
+      }
+
+      const componentSchemas = componentInputSchemaForProject(project, manifestByType);
+      return makeToolResult({
+        ok: true,
+        action: 'simulation_capabilities',
+        file: relToCwd(projectFile),
+        tools: {
+          observability: ['sim_execute', 'sim_trace', 'sim_inspect'],
+          interaction: ['component_interact', 'simulation_step'],
+          assertions: ['simulation_assert'],
+          metadata: ['component_catalog', 'component_input_schema'],
+        },
+        project: {
+          boards: project.components.filter((entry) => /(arduino|esp32|stm32|rp2040|pico)/i.test(entry.type)).map((entry) => ({
+            id: entry.id,
+            type: entry.type,
+            label: entry.label || entry.id,
+          })),
+          interactiveComponents: componentSchemas.filter((entry) => entry.interactive).map((entry) => ({
+            id: entry.id,
+            type: entry.type,
+            role: entry.role,
+            profiles: entry.profiles.map((profile) => profile.name),
+          })),
+        },
+      });
+    }
+  );
+
+  server.tool(
+    'component_input_schema',
+    'Return supported input payload templates, profiles, and event hints per project component.',
+    {
+      id: z.string().optional(),
+      token: z.string().optional(),
+    },
+    async ({ id, token }) => {
+      assertToken(config, token);
+      const { project, projectFile } = await requireActiveProject(session);
+
+      const manifestByType = new Map<string, Awaited<ReturnType<typeof getManifestInfo>>>();
+      for (const component of project.components) {
+        if (!manifestByType.has(component.type)) {
+          manifestByType.set(component.type, await getManifestInfo(component.type));
+        }
+      }
+
+      const allSchemas = componentInputSchemaForProject(project, manifestByType);
+      const componentId = String(id || '').trim();
+      const filtered = componentId ? allSchemas.filter((entry) => entry.id === componentId) : allSchemas;
+
+      return makeToolResult({
+        ok: filtered.length > 0 || !componentId,
+        action: 'component_input_schema',
+        file: relToCwd(projectFile),
+        count: filtered.length,
+        components: filtered,
       });
     }
   );
@@ -952,6 +1087,218 @@ export async function runMcpServer(config: McpServerConfig): Promise<void> {
   );
 
   server.tool(
+    'simulation_step',
+    'Run deterministic step-based simulation control with optional timed inputs and bounded trace capture.',
+    {
+      steps: z.number().int().positive().max(500).optional(),
+      step_ms: z.number().int().positive().max(60000).optional(),
+      board_id: z.string().optional(),
+      all_boards: z.boolean().optional(),
+      include_trace: z.boolean().optional(),
+      include_console: z.boolean().optional(),
+      include_state: z.boolean().optional(),
+      include_serial_text: z.boolean().optional(),
+      include_diff: z.boolean().optional(),
+      include_display: z.boolean().optional(),
+      include_pin_state: z.boolean().optional(),
+      max_events: z.number().int().positive().max(5000).optional(),
+      max_console_chars: z.number().int().positive().max(250000).optional(),
+      max_serial_chars: z.number().int().positive().max(10000).optional(),
+      inputs: z.array(z.object({
+        id: z.string().optional(),
+        event: z.any().optional(),
+        value: z.any().optional(),
+        at_ms: z.number().int().nonnegative().optional(),
+        profile: z.string().optional(),
+      })).optional(),
+      token: z.string().optional(),
+    },
+    async ({
+      steps,
+      step_ms,
+      board_id,
+      all_boards,
+      include_trace,
+      include_console,
+      include_state,
+      include_serial_text,
+      include_diff,
+      include_display,
+      include_pin_state,
+      max_events,
+      max_console_chars,
+      max_serial_chars,
+      inputs,
+      token,
+    }) => {
+      assertToken(config, token);
+      const { project, projectFile } = await requireActiveProject(session);
+      const totalSteps = clampPositiveInt(steps, 8, 1, 500);
+      const stepMs = clampPositiveInt(step_ms, 120, 1, 60000);
+      const durationMs = totalSteps * stepMs;
+      const includeTrace = !!include_trace;
+      const includeConsole = !!include_console;
+
+      const runOptions: SimulationRunOptions = {
+        backendUrl: config.backendUrl,
+        boardId: board_id,
+        allBoards: !!all_boards,
+        durationMs: 0,
+        debugMode: includeTrace ? 'json' : 'off',
+        telemetryMode: 'off',
+      };
+
+      const runtimeCapture = createRuntimeCapture({
+        includeTrace,
+        includeConsole,
+        maxEvents: clampPositiveInt(max_events, 400, 1, 5000),
+        maxConsoleChars: clampPositiveInt(max_console_chars, 10000, 256, 250000),
+        traceEventTypes: [],
+        traceBuild: {
+          includeState: !!include_state,
+          includeSerialText: !!include_serial_text,
+          maxSerialChars: clampPositiveInt(max_serial_chars, 120, 16, 10000),
+          componentId: null,
+        },
+      });
+
+      const scheduledInputs = normalizeInputEventsForStep({
+        project,
+        durationMs,
+        inputs: Array.isArray(inputs) ? inputs : [],
+      });
+
+      const controller = await startSimulation(project, runOptions, {
+        suppressConsoleOutput: true,
+        onEvent: runtimeCapture.onEvent,
+      });
+
+      const snapshots: Array<{ step: number; tMs: number; boards: number; components: number }> = [];
+      let elapsedMs = 0;
+      let inputCursor = 0;
+      for (let step = 1; step <= totalSteps; step += 1) {
+        const nextElapsed = step * stepMs;
+        while (inputCursor < scheduledInputs.length && scheduledInputs[inputCursor].atMs <= nextElapsed) {
+          const inputEvent = scheduledInputs[inputCursor];
+          controller.sendComponentEvent(inputEvent.id, inputEvent.event);
+          inputCursor += 1;
+        }
+        await sleep(stepMs);
+        elapsedMs = nextElapsed;
+        const snapshot = controller.getSnapshot();
+        snapshots.push({
+          step,
+          tMs: elapsedMs,
+          boards: snapshot.boards.length,
+          components: snapshot.components.length,
+        });
+      }
+
+      controller.stop();
+
+      const result = controller.getResult();
+      const telemetry = controller.getTelemetryReport();
+      const snapshot = controller.getSnapshot();
+      const captured = runtimeCapture.flush();
+      const displays = extractDisplayStates(snapshot, telemetry);
+
+      return makeToolResult({
+        ok: true,
+        action: 'simulation_step',
+        file: relToCwd(projectFile),
+        run: {
+          steps: totalSteps,
+          stepMs,
+          elapsedMs,
+          boardId: board_id || null,
+          allBoards: !!all_boards,
+        },
+        inputs: scheduledInputs,
+        snapshots,
+        pinState: normalizeBoardPinStates(snapshot),
+        displays,
+        result,
+        telemetry,
+        trace: includeTrace ? captured.trace : undefined,
+        traceSummary: includeTrace
+          ? {
+              capturedEvents: captured.trace.length,
+              droppedEvents: captured.droppedTraceEvents,
+            }
+          : undefined,
+        console: includeConsole
+          ? {
+              text: captured.consoleText,
+              length: captured.consoleText.length,
+            }
+          : undefined,
+      });
+    }
+  );
+
+  server.tool(
+    'simulation_assert',
+    'Run a short simulation and evaluate assertion checks against telemetry, display state, and pin values.',
+    {
+      ms: z.number().int().positive().optional(),
+      board_id: z.string().optional(),
+      all_boards: z.boolean().optional(),
+      assertions: z.array(z.object({
+        type: z.string(),
+        component_id: z.string().optional(),
+        board_id: z.string().optional(),
+        pin: z.string().optional(),
+        text: z.string().optional(),
+        status: z.enum(['ok', 'warn', 'error']).optional(),
+        high: z.boolean().optional(),
+      })),
+      token: z.string().optional(),
+    },
+    async ({ ms, board_id, all_boards, assertions, token }) => {
+      assertToken(config, token);
+      const { project, projectFile } = await requireActiveProject(session);
+      const durationMs = clampPositiveInt(ms, 1200, 1, 1200000);
+
+      const runOptions: SimulationRunOptions = {
+        backendUrl: config.backendUrl,
+        boardId: board_id,
+        allBoards: !!all_boards,
+        durationMs,
+        debugMode: 'off',
+        telemetryMode: 'off',
+      };
+
+      const { result, telemetry } = await runSimulationForDuration(project, runOptions, true);
+      const controller = await startSimulation(project, {
+        ...runOptions,
+        durationMs: 1,
+      }, {
+        suppressConsoleOutput: true,
+      });
+      await sleep(1);
+      controller.stop();
+      const snapshot = controller.getSnapshot();
+
+      const displays = extractDisplayStates(snapshot, telemetry);
+      const assertionResult = evaluateAssertions({
+        checks: assertions as any,
+        displays,
+        telemetry,
+        snapshot,
+      });
+
+      return makeToolResult({
+        ok: assertionResult.ok,
+        action: 'simulation_assert',
+        file: relToCwd(projectFile),
+        durationMs,
+        result,
+        assertions: assertionResult,
+      });
+    }
+  );
+
+  server.tool(
     'sim_inspect',
     'Inspect runtime board/component telemetry for the active project with optional event injection.',
     {
@@ -966,6 +1313,9 @@ export async function runMcpServer(config: McpServerConfig): Promise<void> {
       include_console: z.boolean().optional(),
       include_state: z.boolean().optional(),
       include_serial_text: z.boolean().optional(),
+      include_diff: z.boolean().optional(),
+      include_display: z.boolean().optional(),
+      include_pin_state: z.boolean().optional(),
       max_events: z.number().int().positive().max(5000).optional(),
       max_console_chars: z.number().int().positive().max(250000).optional(),
       max_serial_chars: z.number().int().positive().max(10000).optional(),
@@ -984,6 +1334,9 @@ export async function runMcpServer(config: McpServerConfig): Promise<void> {
       include_console,
       include_state,
       include_serial_text,
+      include_diff,
+      include_display,
+      include_pin_state,
       max_events,
       max_console_chars,
       max_serial_chars,
@@ -1028,6 +1381,9 @@ export async function runMcpServer(config: McpServerConfig): Promise<void> {
       let delivered = false;
       let eventPayload: unknown = null;
       let eventAtMs = 0;
+      let beforeSnapshot = controller.getSnapshot();
+      let beforeTelemetry = controller.getTelemetryReport();
+      let correlationId = '';
 
       if (injectEvent) {
         const targetComponentId = componentId;
@@ -1042,6 +1398,9 @@ export async function runMcpServer(config: McpServerConfig): Promise<void> {
           await sleep(eventAtMs);
         }
 
+        beforeSnapshot = controller.getSnapshot();
+        beforeTelemetry = controller.getTelemetryReport();
+        correlationId = buildCorrelationId('inspect');
         delivered = controller.sendComponentEvent(targetComponentId, eventPayload);
       }
 
@@ -1056,6 +1415,7 @@ export async function runMcpServer(config: McpServerConfig): Promise<void> {
       const telemetry = controller.getTelemetryReport();
       const snapshot = controller.getSnapshot();
       const captured = runtimeCapture.flush();
+      const displays = include_display === false ? [] : extractDisplayStates(snapshot, telemetry);
 
       const componentTelemetry = componentId
         ? telemetry.components.find((component) => component.id === componentId) || null
@@ -1093,11 +1453,36 @@ export async function runMcpServer(config: McpServerConfig): Promise<void> {
           event: eventPayload,
           atMs: eventAtMs,
           delivered,
+          correlationId: correlationId || null,
+        };
+      }
+
+      if (include_pin_state !== false) {
+        payload.pinState = normalizeBoardPinStates(snapshot);
+      }
+
+      if (include_display !== false) {
+        payload.displays = displays;
+      }
+
+      if (injectEvent && include_diff !== false) {
+        payload.diff = {
+          boardPins: diffBoardPins(beforeSnapshot, snapshot),
+          components: diffComponentStates(beforeSnapshot, snapshot, componentId || null),
+          displays: {
+            before: extractDisplayStates(beforeSnapshot, beforeTelemetry),
+            after: displays,
+          },
         };
       }
 
       if (include_trace) {
         payload.trace = captured.trace;
+        if (correlationId) {
+          payload.correlatedTrace = captured.trace
+            .filter((entry) => entry.tMs >= eventAtMs)
+            .map((entry) => ({ ...entry, correlationId }));
+        }
         payload.traceSummary = {
           capturedEvents: captured.trace.length,
           droppedEvents: captured.droppedTraceEvents,

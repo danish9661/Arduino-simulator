@@ -1,0 +1,34 @@
+name: pico-display-observability
+board: wokwi-raspberry-pi-pico
+durationMs: 1800
+envs:
+  - key: native
+    boardEnv: native
+    ms: 1800
+components:
+  - type: wokwi-ssd1306
+    id: oled1
+    x: 300
+    y: 120
+  - type: wokwi-led
+    id: led1
+    x: 360
+    y: 220
+wires:
+  - from: board1:GP0
+    to: oled1:SDA
+  - from: board1:GP1
+    to: oled1:SCL
+  - from: board1:3V3
+    to: oled1:VCC
+  - from: board1:GND
+    to: oled1:GND
+  - from: board1:GP2
+    to: led1:A
+  - from: board1:GND
+    to: led1:C
+inspect:
+  - id: oled1
+    includeTrace: true
+    includeConsole: false
+traceEventTypes: [state, serial, fault, debug]
