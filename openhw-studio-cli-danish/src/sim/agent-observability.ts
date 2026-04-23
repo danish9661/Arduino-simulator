@@ -286,13 +286,20 @@ export function diffComponentStates(
     : [...new Set<string>([...beforeById.keys(), ...afterById.keys()])].sort((a, b) => a.localeCompare(b));
 
   const diffs: Array<{ id: string; changedKeys: string[]; before: Record<string, unknown>; after: Record<string, unknown> }> = [];
+  const equals = (left: unknown, right: unknown): boolean => {
+    if (left === right) return true;
+    const leftIsObject = left !== null && typeof left === 'object';
+    const rightIsObject = right !== null && typeof right === 'object';
+    if (!leftIsObject || !rightIsObject) return false;
+    return JSON.stringify(left) === JSON.stringify(right);
+  };
 
   for (const id of ids) {
     const b = beforeById.get(id) || {};
     const a = afterById.get(id) || {};
     const keys = new Set<string>([...Object.keys(b), ...Object.keys(a)]);
     const changed = [...keys]
-      .filter((key) => JSON.stringify((b as Record<string, unknown>)[key]) !== JSON.stringify((a as Record<string, unknown>)[key]))
+      .filter((key) => !equals((b as Record<string, unknown>)[key], (a as Record<string, unknown>)[key]))
       .sort((x, y) => x.localeCompare(y));
     if (changed.length > 0) {
       diffs.push({ id, changedKeys: changed, before: b, after: a });
