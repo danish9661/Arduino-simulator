@@ -51,7 +51,7 @@ function parseArgs(argv) {
   }
 
   if (!out.scenario) {
-    throw new Error('Usage: node scripts/mcp-scenario-runner.mjs --scenario <path> [--output-json <path>] [--output-md <path>] [--baseline <path>]');
+    throw new Error('Usage: node scripts/mcp-scenario-runner.mjs --scenario <path> [--output-json <path>] [--output-md <path>] [--baseline <path>] [--dry-run]');
   }
 
   return out;
@@ -264,7 +264,9 @@ function indexTrace(trace) {
 }
 
 function safeText(value) {
-  return String(value || '').replace(/\|/g, '\\|');
+  return String(value || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|');
 }
 
 function buildMarkdownReport(report) {

@@ -404,7 +404,11 @@ async function validateConnectionInProject(project: OpenHwProject, from: string,
     try {
       parsed = parseEndpoint(endpoint);
     } catch (error) {
-      issues.push(String((error as Error).message || error));
+      const asError = error as { name?: string; code?: string; message?: string };
+      const errorName = String(asError?.name || 'Error');
+      const errorCode = String(asError?.code || '').trim();
+      const errorMessage = String(asError?.message || error || 'Unknown error');
+      issues.push(errorCode ? `${errorName}(${errorCode}): ${errorMessage}` : `${errorName}: ${errorMessage}`);
       continue;
     }
 
@@ -631,7 +635,7 @@ export async function runMcpServer(config: McpServerConfig): Promise<void> {
         }];
 
       if (plannedWires.some((entry) => !entry.from || !entry.to)) {
-        throw new Error('wiring_validate requires either --from/--to or non-empty wires[].');
+        throw new Error('wiring_validate requires either from/to fields or a non-empty wires[] array.');
       }
 
       const diagnostics = await Promise.all(
