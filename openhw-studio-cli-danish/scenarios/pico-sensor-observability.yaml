@@ -6,7 +6,7 @@ envs:
     boardEnv: native
     ms: 2000
 components:
-  - type: wokwi-photoresistor-sensor
+  - type: wokwi-ldr-module
     id: ldr1
     x: 300
     y: 120

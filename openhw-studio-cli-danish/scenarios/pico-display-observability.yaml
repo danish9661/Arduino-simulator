@@ -6,7 +6,7 @@ envs:
     boardEnv: native
     ms: 1800
 components:
-  - type: wokwi-ssd1306
+  - type: wokwi-ssd1306-oled
     id: oled1
     x: 300
     y: 120
@@ -26,7 +26,7 @@ wires:
   - from: board1:GP2
     to: led1:A
   - from: board1:GND
-    to: led1:C
+    to: led1:K
 inspect:
   - id: oled1
     includeTrace: true
