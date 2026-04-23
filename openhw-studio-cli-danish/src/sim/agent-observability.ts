@@ -11,6 +11,12 @@ export type ComponentInputSchema = {
   role: 'board' | 'input' | 'output' | 'other';
   interactive: boolean;
   hasOnEvent: boolean;
+  contract: {
+    eventTypes: string[];
+    controlKeys: string[];
+    contextMenuDuringRun: boolean;
+    contextMenuOnlyDuringRun: boolean;
+  };
   templates: ComponentInputTemplate[];
   profiles: Array<{
     name: string;
@@ -50,7 +56,70 @@ export function classifyRole(type: string, group: string): 'board' | 'input' | '
   return 'other';
 }
 
-export function interactionTemplatesForType(type: string): ComponentInputTemplate[] {
+function camelizeLowerUnderscore(value: string): string {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return '';
+  const chunks = normalized.split(/[_\s-]+/).filter(Boolean);
+  if (chunks.length === 0) return '';
+  return `${chunks[0]}${chunks.slice(1).map((entry) => entry.charAt(0).toUpperCase() + entry.slice(1)).join('')}`;
+}
+
+function templatesFromManifestContract(manifest: ManifestInfo | null): ComponentInputTemplate[] {
+  if (!manifest) return [];
+  const templates: ComponentInputTemplate[] = [];
+  const eventTypes = manifest.interaction?.eventTypes || [];
+  const controlKeys = manifest.interaction?.controlKeys || [];
+
+  for (const template of manifest.interaction?.uiEventTemplates || []) {
+    templates.push(template);
+  }
+
+  if (eventTypes.includes('SET_ATTR')) {
+    const keys = controlKeys.length > 0 ? controlKeys : Object.keys(manifest.attrs || {});
+    for (const key of keys) {
+      templates.push({
+        type: 'SET_ATTR',
+        key,
+        value: manifest.attrs?.[key]?.default ?? 0,
+      });
+    }
+  }
+
+  for (const eventType of eventTypes) {
+    if (!eventType || eventType === 'SET_ATTR') continue;
+    if (eventType === 'press' || eventType === 'release') {
+      templates.push(eventType);
+      continue;
+    }
+
+    if (/^SET_[A-Z0-9_]+$/.test(eventType)) {
+      const normalized = camelizeLowerUnderscore(eventType.replace(/^SET_/, ''));
+      const attrKey = Object.keys(manifest.attrs || {}).find((key) => key.toLowerCase() === normalized.toLowerCase());
+      templates.push({
+        type: eventType,
+        value: attrKey ? (manifest.attrs?.[attrKey]?.default ?? 0) : 0,
+      });
+      continue;
+    }
+
+    templates.push({ type: eventType });
+  }
+
+  const dedup = new Set<string>();
+  return templates.filter((entry) => {
+    const key = JSON.stringify(entry);
+    if (dedup.has(key)) return false;
+    dedup.add(key);
+    return true;
+  });
+}
+
+export function interactionTemplatesForType(type: string, manifest?: ManifestInfo | null): ComponentInputTemplate[] {
+  const manifestTemplates = templatesFromManifestContract(manifest || null);
+  if (manifestTemplates.length > 0) {
+    return manifestTemplates;
+  }
+
   const t = String(type || '').toLowerCase();
 
   if (t.includes('pushbutton')) return ['press', 'release'];
@@ -65,7 +134,7 @@ export function interactionTemplatesForType(type: string): ComponentInputTemplat
     ];
   }
   if (t.includes('max30102')) {
-    return [{ type: 'SET_ATTR', key: 'heartRate', value: 75 }, { type: 'SET_ATTR', key: 'spo2', value: 98 }];
+    return [{ type: 'SET_RED_LED', value: 24 }, { type: 'SET_IR_LED', value: 24 }];
   }
   if (t.includes('dht')) {
     return [
@@ -140,13 +209,23 @@ export function sensorProfilesForType(type: string): ComponentInputSchema['profi
   if (t.includes('max30102')) {
     return [
       {
-        name: 'heart_rate_ramp',
-        description: 'Ramp heart rate and SpO2 readings.',
+        name: 'max30102_led_sweep',
+        description: 'Sweep MAX30102 red/IR LED drive currents via component onEvent controls.',
         defaultDurationMs: 1200,
         example: [
-          { atMs: 100, event: { type: 'SET_ATTR', key: 'heartRate', value: 68 } },
-          { atMs: 500, event: { type: 'SET_ATTR', key: 'heartRate', value: 88 } },
-          { atMs: 900, event: { type: 'SET_ATTR', key: 'spo2', value: 97 } },
+          { atMs: 100, event: { type: 'SET_RED_LED', value: 32 } },
+          { atMs: 500, event: { type: 'SET_IR_LED', value: 40 } },
+          { atMs: 900, event: { type: 'SET_RED_LED', value: 64 } },
+        ],
+      },
+      {
+        name: 'heart_rate_ramp',
+        description: 'Backward-compatible alias of max30102_led_sweep.',
+        defaultDurationMs: 1200,
+        example: [
+          { atMs: 100, event: { type: 'SET_RED_LED', value: 32 } },
+          { atMs: 500, event: { type: 'SET_IR_LED', value: 40 } },
+          { atMs: 900, event: { type: 'SET_RED_LED', value: 64 } },
         ],
       },
     ];
@@ -163,8 +242,10 @@ export function componentInputSchemaForProject(
     const manifest = manifestByType.get(component.type) || null;
     const group = manifest?.group || 'Other';
     const role = classifyRole(component.type, group);
-    const templates = interactionTemplatesForType(component.type);
+    const templates = interactionTemplatesForType(component.type, manifest);
     const profiles = sensorProfilesForType(component.type);
+    const eventTypes = manifest?.interaction?.eventTypes || [];
+    const controlKeys = manifest?.interaction?.controlKeys || [];
 
     return {
       id: component.id,
@@ -172,8 +253,14 @@ export function componentInputSchemaForProject(
       label: String(component.label || component.id),
       group,
       role,
-      interactive: !!manifest?.hasOnEvent || templates.length > 0,
+      interactive: !!manifest?.hasOnEvent || templates.length > 0 || eventTypes.length > 0,
       hasOnEvent: !!manifest?.hasOnEvent,
+      contract: {
+        eventTypes,
+        controlKeys,
+        contextMenuDuringRun: !!manifest?.interaction?.contextMenuDuringRun,
+        contextMenuOnlyDuringRun: !!manifest?.interaction?.contextMenuOnlyDuringRun,
+      },
       templates,
       profiles,
     };
