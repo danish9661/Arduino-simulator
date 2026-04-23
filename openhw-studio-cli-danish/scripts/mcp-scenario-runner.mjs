@@ -22,6 +22,7 @@ function parseArgs(argv) {
     outputJson: 'temp/mcp-scenario-report.json',
     outputMd: 'temp/mcp-scenario-report.md',
     baseline: '',
+    dryRun: false,
   };
 
   for (let i = 2; i < argv.length; i += 1) {
@@ -44,6 +45,8 @@ function parseArgs(argv) {
     } else if (arg === '--baseline') {
       out.baseline = String(argv[i + 1] || '');
       i += 1;
+    } else if (arg === '--dry-run') {
+      out.dryRun = true;
     }
   }
 
@@ -92,7 +95,23 @@ async function callTool(client, name, args) {
 }
 
 async function readScenario(filePath) {
-  const absolute = path.isAbsolute(filePath) ? filePath : path.resolve(workspaceRoot, filePath);
+  const absolute = await (async () => {
+    if (path.isAbsolute(filePath)) return filePath;
+    const candidates = [
+      path.resolve(process.cwd(), filePath),
+      path.resolve(cliRoot, filePath),
+      path.resolve(workspaceRoot, filePath),
+    ];
+    for (const candidate of candidates) {
+      try {
+        await fs.access(candidate);
+        return candidate;
+      } catch {
+        continue;
+      }
+    }
+    return candidates[0];
+  })();
   const raw = await fs.readFile(absolute, 'utf8');
   const ext = path.extname(absolute).toLowerCase();
   const parsed = ext === '.yaml' || ext === '.yml' ? YAML.parse(raw) : JSON.parse(raw);
@@ -439,17 +458,35 @@ async function main() {
         }
       }
 
-      const executePayload = await callTool(client, 'sim_execute', {
-        ms: durationMs,
-        all_boards: true,
-        include_telemetry: true,
-        include_trace: true,
-        include_console: true,
-        include_state: true,
-        include_serial_text: true,
-        trace_event_types: traceEventTypes,
-        ...(args.token ? { token: args.token } : {}),
-      });
+      const executePayload = args.dryRun
+        ? {
+          result: {
+            elapsedMs: 0,
+            faultCount: 0,
+            serialChars: 0,
+          },
+          telemetry: {
+            components: [],
+          },
+          trace: [],
+          traceSummary: {
+            droppedEvents: 0,
+          },
+          console: {
+            length: 0,
+          },
+        }
+        : await callTool(client, 'sim_execute', {
+          ms: durationMs,
+          all_boards: true,
+          include_telemetry: true,
+          include_trace: true,
+          include_console: true,
+          include_state: true,
+          include_serial_text: true,
+          trace_event_types: traceEventTypes,
+          ...(args.token ? { token: args.token } : {}),
+        });
 
       const trace = Array.isArray(executePayload.trace) ? executePayload.trace : [];
       const telemetry = executePayload.telemetry || executePayload.result?.telemetry || { components: [] };
@@ -469,6 +506,7 @@ async function main() {
 
       const inspectResults = [];
       for (const inspect of inspections) {
+        if (args.dryRun) break;
         const inspectId = String(inspect.id || '').trim();
         if (!inspectId) continue;
 
@@ -565,6 +603,9 @@ async function main() {
   console.log(`[mcp-scenario-runner] json=${path.relative(workspaceRoot, outputJsonAbsolute).replace(/\\/g, '/')}`);
   console.log(`[mcp-scenario-runner] md=${path.relative(workspaceRoot, outputMdAbsolute).replace(/\\/g, '/')}`);
   console.log(`[mcp-scenario-runner] total=${report.totals.total} passed=${report.totals.passed} failed=${report.totals.failed}`);
+  if (args.dryRun) {
+    console.log('[mcp-scenario-runner] mode=dry-run (simulation execution skipped)');
+  }
   if (report.behaviorDiff?.compared) {
     console.log(`[mcp-scenario-runner] behavior-diff changed=${report.behaviorDiff.changedCount}`);
   }

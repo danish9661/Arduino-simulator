@@ -39,7 +39,7 @@ wires:
   - from: board1:GP2
     to: led1:A
   - from: board1:GND
-    to: led1:C
+    to: led1:K
 inspect:
   - id: led1
     ms: 1200

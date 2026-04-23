@@ -150,8 +150,11 @@ npm run cli -- lib sync-project temp/project.json --dry-run
 # MCP response contract coverage (positive + negative paths)
 npm run test:mcp:contracts
 
-# Deterministic scenario runner (YAML/JSON manifest) with unified behavior report export
+# Deterministic scenario runner dry-run (YAML/JSON manifest parse + wiring diagnostics + report export)
 npm run test:mcp:scenario
+
+# Full runtime scenario execution (requires simulation dependencies/backend)
+npm run test:mcp:scenario:full
 
 # Override scenario/report paths
 node scripts/mcp-scenario-runner.mjs \
