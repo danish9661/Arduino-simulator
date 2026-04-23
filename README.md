@@ -214,6 +214,8 @@ Create a file named `.env` (or `env`) inside `openhw-studio-backend-danish/`:
 PORT=5001
 MONGO_URI=mongodb://localhost:27017/openhw-studio
 JWT_SECRET=your_secret_key_here
+SESSION_SECRET=your_session_secret_here
+FRONTEND_URL=http://localhost:5173
 ```
 
 ---

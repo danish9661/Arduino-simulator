@@ -43,6 +43,29 @@ const emulatorComponentsPath = (() => {
 })();
 
 const EMULATOR_COMPONENTS_PATH = emulatorComponentsPath;
+const NORMALIZED_COMPONENTS_ROOT = path.resolve(EMULATOR_COMPONENTS_PATH);
+const COMPONENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+const isValidComponentId = (id) => typeof id === 'string' && COMPONENT_ID_PATTERN.test(id);
+
+const resolveSafeComponentDir = (id) => {
+    if (!isValidComponentId(id)) {
+        const err = new Error('Invalid component id format.');
+        err.statusCode = 400;
+        throw err;
+    }
+
+    const componentDir = path.resolve(NORMALIZED_COMPONENTS_ROOT, id);
+    const relativePath = path.relative(NORMALIZED_COMPONENTS_ROOT, componentDir);
+    const escapesRoot = relativePath.startsWith('..') || path.isAbsolute(relativePath) || relativePath === '';
+    if (escapesRoot) {
+        const err = new Error('Resolved component path is outside the allowed components directory.');
+        err.statusCode = 400;
+        throw err;
+    }
+
+    return componentDir;
+};
 
 // Ensure the directory exists to prevent ENOENT crashes
 if (!fs.existsSync(EMULATOR_COMPONENTS_PATH)) {
@@ -58,6 +81,7 @@ export const submitComponent = (req, res) => {
     try {
         const { id, manifest, ui, logic, validation, index } = req.body;
         if (!id || !manifest) return res.status(400).json({ error: 'Invalid component submission.' });
+        if (!isValidComponentId(id)) return res.status(400).json({ error: 'Invalid component id format.' });
 
         // submissionId is unique per upload so rejecting one copy never drops other submissions
         const submissionId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -97,13 +121,13 @@ export const rejectComponent = (req, res) => {
 
 export const approveComponent = async (req, res) => {
     try {
-        const { id, manifest, ui, logic, validation, index } = req.body;
+        const { submissionId, id, manifest, ui, logic, validation, index } = req.body;
 
-        if (!id || !manifest || !ui || !logic || !index) {
-            return res.status(400).json({ error: 'Missing required component files. Ensure id, manifest, ui, logic, and index are provided.' });
+        if (!submissionId || !id || !manifest || !ui || !logic || !index) {
+            return res.status(400).json({ error: 'Missing required component files. Ensure submissionId, id, manifest, ui, logic, and index are provided.' });
         }
 
-        const componentDir = path.join(EMULATOR_COMPONENTS_PATH, id);
+        const componentDir = resolveSafeComponentDir(id);
 
         // 1. Create directory if not exists
         if (!fs.existsSync(componentDir)) {
@@ -139,12 +163,13 @@ export const approveComponent = async (req, res) => {
         }
 
         // 4. Remove from pending store
-        pendingComponentsStore = pendingComponentsStore.filter(c => c.id !== id);
+        pendingComponentsStore = pendingComponentsStore.filter(c => c.submissionId !== submissionId);
 
         return res.json({ success: true, message: `Successfully installed component ${id} to backend.` });
     } catch (error) {
         console.error('CRITICAL: Component approval error:', error);
-        return res.status(500).json({
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({
             error: 'Failed to approve component.',
             details: error.message,
             path: EMULATOR_COMPONENTS_PATH
@@ -180,7 +205,7 @@ export const getInstalledComponents = (req, res) => {
 export const deleteInstalledComponent = (req, res) => {
     try {
         const { id } = req.params;
-        const componentDir = path.join(EMULATOR_COMPONENTS_PATH, id);
+        const componentDir = resolveSafeComponentDir(id);
         if (fs.existsSync(componentDir)) {
             fs.rmSync(componentDir, { recursive: true, force: true });
         }
