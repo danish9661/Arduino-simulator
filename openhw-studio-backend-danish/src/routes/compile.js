@@ -18,7 +18,7 @@ const router = Router();
 router.post('/', protectRoute, compileArduinoCode);
 router.post('/diagnostics', protectRoute, compileArduinoCode);
 router.post('/flash', protectRoute, flashFirmware);
-router.get('/ports', protectRoute, listSerialPorts);
+router.get('/ports', listSerialPorts);
 router.get('/pico/micropython-uf2', getDefaultPicoMicroPythonUf2);
 router.get('/pico/micropython-hex', getDefaultPicoMicroPythonHex);
 router.get('/pico/circuitpython-uf2', getDefaultPicoCircuitPythonUf2);
@@ -26,6 +26,6 @@ router.get('/pico/circuitpython-uf2', getDefaultPicoCircuitPythonUf2);
 // Library Management
 router.get('/lib-search', protectRoute, searchLibrary);
 router.post('/lib-install', protectRoute, requireAdmin, installLibrary);
-router.get('/lib-list', protectRoute, listLibraries);
+router.get('/lib-list', listLibraries);
 
 export default router;

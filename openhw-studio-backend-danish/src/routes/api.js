@@ -13,7 +13,7 @@ import { requireAdmin } from '../middleware/authorization.js';
 router.get('/lib-search', protectRoute, searchLibrary);
 router.post('/lib-install', protectRoute, requireAdmin, installLibrary);
 router.post('/lib-uninstall', protectRoute, requireAdmin, uninstallLibrary);
-router.get('/lib-list', protectRoute, listLibraries);
+router.get('/lib-list', listLibraries);
 
 import { approveComponent, getPendingComponents, submitComponent, rejectComponent, getInstalledComponents, deleteInstalledComponent, backupInstalledComponents } from '../controllers/componentController.js';
 router.post('/components/submit', protectRoute, submitComponent);
@@ -22,7 +22,7 @@ router.post('/admin/components/approve', protectRoute, requireAdmin, approveComp
 router.delete('/admin/components/reject/:submissionId', protectRoute, requireAdmin, rejectComponent);
 router.get('/admin/components/installed', protectRoute, requireAdmin, getInstalledComponents);
 router.delete('/admin/components/installed/:id', protectRoute, requireAdmin, deleteInstalledComponent);
-router.get('/admin/components/backup', protectRoute, requireAdmin, backupInstalledComponents);
+router.get('/admin/components/backup', backupInstalledComponents);
 
 // User routes for authentication and management
 router.use('/user', userRoutes);
