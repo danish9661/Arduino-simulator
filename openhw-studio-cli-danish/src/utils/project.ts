@@ -217,6 +217,9 @@ export function normalizeProject(rawProject: any): OpenHwProject {
     components,
     connections,
     code: asString(rawProject?.code, asString(rawProject?.userCode, '')),
+    blocklyXml: asString(rawProject?.blocklyXml, ''),
+    blocklyGeneratedCode: asString(rawProject?.blocklyGeneratedCode, ''),
+    useBlocklyCode: !!rawProject?.useBlocklyCode,
     projectFiles,
     openCodeTabs: Array.isArray(rawProject?.openCodeTabs)
       ? rawProject.openCodeTabs.map((id: any) => String(id)).filter(Boolean)
@@ -280,6 +283,9 @@ export function createProject(name: string, board: string): OpenHwProject {
     ],
     connections: [],
     code: defaultMainCode(boardKind === 'unknown' ? 'arduino_uno' : boardKind, boardId),
+    blocklyXml: '',
+    blocklyGeneratedCode: '',
+    useBlocklyCode: false,
     projectFiles: [],
     openCodeTabs: [],
     activeCodeFileId: '',
@@ -504,6 +510,8 @@ export function summarizeProject(project: OpenHwProject): Record<string, unknown
     connections: project.connections.length,
     boards: boards.map((b) => ({ id: b.id, type: b.type })),
     files: project.projectFiles.length,
+    useBlocklyCode: !!project.useBlocklyCode,
+    hasBlocklyXml: !!String(project.blocklyXml || '').trim(),
     activeCodeFileId: project.activeCodeFileId,
     exportedAt: project.exportedAt,
   };
