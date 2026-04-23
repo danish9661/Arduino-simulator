@@ -382,7 +382,7 @@ async function requireActiveProject(session: ActiveProjectSession): Promise<{ pr
   };
 }
 
-function parseEndpoint(endpoint: string): { componentId: string; pinId: string } {
+function parseWireEndpoint(endpoint: string): { componentId: string; pinId: string } {
   const [componentId, pinId] = String(endpoint || '').split(':');
   if (!componentId || !pinId) {
     throw new Error(`Invalid endpoint format: ${endpoint}. Expected <componentId>:<pinId>.`);
@@ -402,7 +402,7 @@ async function validateConnectionInProject(project: OpenHwProject, from: string,
   for (const endpoint of endpoints) {
     let parsed: { componentId: string; pinId: string };
     try {
-      parsed = parseEndpoint(endpoint);
+      parsed = parseWireEndpoint(endpoint);
     } catch (error) {
       const asError = error as { name?: string; code?: string; message?: string };
       const errorName = String(asError?.name || 'Error');
