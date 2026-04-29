@@ -10,10 +10,10 @@ This monorepo contains four packages that work together:
 
 ```
 Arduino-simulator/
-├── OpenHW-studio-frontend-danish/   # React + Vite web app (Hub, User & Admin UI)
-├── openhw-studio-backend-danish/    # Express.js REST API (Compiler & Asset Registry)
-├── openhw-studio-emulator-danish/   # Node.js Emulator & Circuit Validation Engine
-└── openhw-studio-cli-danish/        # Terminal CLI (project/sim/serial/lib workflows)
+├── OpenHW-studio-frontend/   # React + Vite web app (Hub, User & Admin UI)
+├── openhw-studio-backend/    # Express.js REST API (Compiler & Asset Registry)
+├── openhw-studio-emulator/   # Node.js Emulator & Circuit Validation Engine
+└── openhw-studio-cli/        # Terminal CLI (project/sim/serial/lib workflows)
 ```
 
 ```
@@ -38,24 +38,24 @@ Browser (React UI)
 
 ## Packages
 
-### Frontend — `OpenHW-studio-frontend-danish/`
+### Frontend — `OpenHW-studio-frontend/`
 React 18 + Vite single-page app. Provides the circuit editor canvas, Arduino code editor, and real-time simulation rendering via Wokwi web components.
 
 - **Port:** `http://localhost:5173`
 - **Key libs:** React Router, Axios, avr8js, intel-hex, Prism.js, react-simple-code-editor, JSZip, Babel Standalone
 
-### Backend — `openhw-studio-backend-danish/`
+### Backend — `openhw-studio-backend/`
 Express.js REST API. Accepts C++ code, invokes `arduino-cli` to compile it, and returns the `.hex` output. Also handles user auth (JWT + Passport Google OAuth) and MongoDB data.
 
 - **Port:** `http://localhost:5001`
 - **Key libs:** Express, Mongoose, jsonwebtoken, Passport, bcryptjs, cors
 
-### Emulator — `openhw-studio-emulator-danish/`
+### Emulator — `openhw-studio-emulator/`
 Shared component definitions library and AVR simulation engine (runs as a Web Worker inside the browser). Exports all component manifests, UI renderers, and logic classes consumed by the frontend.
 
 - **Key libs:** avr8js, intel-hex, TypeScript
 
-### CLI — `openhw-studio-cli-danish/`
+### CLI — `openhw-studio-cli/`
 Node.js terminal tooling for JSON import/export, project editing, simulation control, serial monitoring, and backend library management.
 
 - **Key libs:** Commander, SerialPort, TypeScript/tsx
@@ -132,22 +132,22 @@ Because the frontend, backend, and emulator are now decoupled, you must install 
 Run `npm install` inside each package directory:
 ```bash
 # 1. Install Frontend Dependencies
-cd OpenHW-studio-frontend-danish
+cd OpenHW-studio-frontend
 npm install
 cd ..
 
 # 2. Install Backend Dependencies
-cd openhw-studio-backend-danish
+cd openhw-studio-backend
 npm install
 cd ..
 
 # 3. Install Emulator Dependencies
-cd openhw-studio-emulator-danish
+cd openhw-studio-emulator
 npm install
 cd ..
 
 # 4. Install CLI Dependencies
-cd openhw-studio-cli-danish
+cd openhw-studio-cli
 npm install
 cd ..
 ```
@@ -155,7 +155,7 @@ cd ..
 ### CLI Quick Start
 
 ```bash
-cd openhw-studio-cli-danish
+cd openhw-studio-cli
 npm run cli -- --help
 
 # Example: create a project, validate, and run simulation
@@ -167,17 +167,17 @@ npm run cli -- sim run temp/demo.json --duration-ms 3000 --debug text
 ### Local Development & NPM Linking
 During local development, you will want the frontend to immediately see changes you make to the emulator source code, without having to push those changes to GitHub first.
 
-We achieve this using **NPM Symlinks**, which tell the frontend to use the local `openhw-studio-emulator-danish` folder instead of downloading the cached version from GitHub.
+We achieve this using **NPM Symlinks**, which tell the frontend to use the local `openhw-studio-emulator` folder instead of downloading the cached version from GitHub.
 
 To set up your local development links:
 ```bash
 # 1. Register the emulator as a linkable global package
-cd openhw-studio-emulator-danish
+cd openhw-studio-emulator
 npm link
 cd ..
 
 # 2. Tell the frontend to use the linked local emulator
-cd OpenHW-studio-frontend-danish
+cd OpenHW-studio-frontend
 npm link @openhw/emulator
 cd ..
 ```
@@ -194,22 +194,22 @@ start_all.bat
 
 ```bash
 # Terminal 1 — Backend
-cd openhw-studio-backend-danish
+cd openhw-studio-backend
 npm run dev
 
 # Terminal 2 — Emulator
-cd openhw-studio-emulator-danish
+cd openhw-studio-emulator
 node src/server.js
 
 # Terminal 3 — Frontend
-cd OpenHW-studio-frontend-danish
+cd OpenHW-studio-frontend
 npm run dev
 ```
 
 Then open **http://localhost:5173** in your browser.
 
 ### Environment Variables
-Create a file named `.env` (or `env`) inside `openhw-studio-backend-danish/`:
+Create a file named `.env` (or `env`) inside `openhw-studio-backend/`:
 ```env
 PORT=5001
 MONGO_URI=mongodb://localhost:27017/openhw-studio
@@ -226,10 +226,10 @@ FRONTEND_URL=http://localhost:5173
 |---|---|
 | This file | Architecture overview, setup, and feature summary |
 | [OFFLINE_AND_STORAGE.md](./OFFLINE_AND_STORAGE.md) | Full technical reference for offline features and IndexedDB storage |
-| [OpenHW-studio-frontend-danish/README.md](./OpenHW-studio-frontend-danish/README.md) | Frontend structure, pages, and features |
-| [openhw-studio-backend-danish/README.md](./openhw-studio-backend-danish/README.md) | Backend API endpoints and compilation pipeline |
-| [openhw-studio-emulator-danish/README.md](./openhw-studio-emulator-danish/README.md) | Emulator CPU simulation and WebSocket protocol |
-| [openhw-studio-cli-danish/README.md](./openhw-studio-cli-danish/README.md) | Terminal command reference for project/sim/serial/lib workflows |
+| [OpenHW-studio-frontend/README.md](./OpenHW-studio-frontend/README.md) | Frontend structure, pages, and features |
+| [openhw-studio-backend/README.md](./openhw-studio-backend/README.md) | Backend API endpoints and compilation pipeline |
+| [openhw-studio-emulator/README.md](./openhw-studio-emulator/README.md) | Emulator CPU simulation and WebSocket protocol |
+| [openhw-studio-cli/README.md](./openhw-studio-cli/README.md) | Terminal command reference for project/sim/serial/lib workflows |
 
 ---
 

@@ -15,7 +15,7 @@ services:
 
   backend-main:
     build:
-      context: ./openhw-studio-backend-danish
+      context: ./openhw-studio-backend
       dockerfile: Dockerfile
     container_name: openhw-backend-main
     ports:
@@ -32,10 +32,10 @@ services:
       - GITHUB_OWNER=danish9661
       - FRONTEND_URL=http://localhost:5000
       - ALLOWED_ORIGINS=http://localhost:5000
-      - EMULATOR_PATH=/usr/src/openhw-studio-emulator-danish
+      - EMULATOR_PATH=/usr/src/openhw-studio-emulator
     volumes:
-      - ./openhw-studio-examples-danish:/usr/src/openhw-studio-examples-danish
-      - ./openhw-studio-emulator-danish:/usr/src/openhw-studio-emulator-danish
+      - ./openhw-studio-examples:/usr/src/openhw-studio-examples
+      - ./openhw-studio-emulator:/usr/src/openhw-studio-emulator
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/lib-list"]
       interval: 15s
@@ -45,10 +45,10 @@ services:
   frontend-main:
     build:
       context: .
-      dockerfile: ./OpenHW-studio-frontend-danish/Dockerfile
+      dockerfile: ./OpenHW-studio-frontend/Dockerfile
       args:
         - VITE_API_BASE_URL=http://localhost:5001/api
-        - VITE_EMULATOR_PATH=../openhw-studio-emulator-danish
+        - VITE_EMULATOR_PATH=../openhw-studio-emulator
     container_name: openhw-frontend-main
     ports:
       - "5000:80" # Host:Container

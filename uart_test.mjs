@@ -2,7 +2,7 @@ import fs from 'fs';
 import { execSync } from 'child_process';
 import path from 'path';
 
-const prefix = 'openhw-studio-cli-danish';
+const prefix = 'openhw-studio-cli';
 const runCli = 'npm --prefix ' + prefix + ' run cli -- ';
 
 function run(cmd) {

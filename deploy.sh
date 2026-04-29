@@ -11,7 +11,7 @@ elif [[ "$ENV" == "main" ]]; then
     echo "Deploying to MAIN Server (Port 5000)..."
     
     echo "Pulling latest changes for all repositories..."
-    REPOS=("OpenHW-studio-frontend-danish" "openhw-studio-backend-danish" "openhw-studio-emulator-danish" "openhw-studio-examples-danish")
+    REPOS=("OpenHW-studio-frontend" "openhw-studio-backend" "openhw-studio-emulator" "openhw-studio-examples")
     
     for REPO in "${REPOS[@]}"; do
         if [ -d "$REPO/.git" ]; then

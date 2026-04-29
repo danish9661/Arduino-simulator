@@ -11,7 +11,7 @@ function run(cmd) {
   }
 }
 
-const prefix = 'openhw-studio-cli-danish';
+const prefix = 'openhw-studio-cli';
 const runCli = 'npm --prefix ' + prefix + ' run cli -- ';
 
 fs.mkdirSync('temp/tests', { recursive: true });

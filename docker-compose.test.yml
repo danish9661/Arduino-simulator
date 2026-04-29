@@ -10,7 +10,7 @@ services:
 
   backend-test:
     build:
-      context: ./openhw-studio-backend-danish
+      context: ./openhw-studio-backend
       dockerfile: Dockerfile
     container_name: openhw-backend-test
     ports:
@@ -24,11 +24,11 @@ services:
       - FRONTEND_URL=http://localhost:6000
       - ALLOWED_ORIGINS=http://localhost:6000
     volumes:
-      - ./openhw-studio-examples-danish:/usr/src/openhw-studio-examples-danish
+      - ./openhw-studio-examples:/usr/src/openhw-studio-examples
 
   frontend-test:
     build:
-      context: ./OpenHW-studio-frontend-danish
+      context: ./OpenHW-studio-frontend
       dockerfile: Dockerfile
       args:
         - VITE_API_BASE_URL=http://localhost:6001/api

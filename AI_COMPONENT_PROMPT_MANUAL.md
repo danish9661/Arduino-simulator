@@ -21,11 +21,11 @@ The simulator uses a **Split-Thread Execution Model**:
 ## 2. Directory Structure: The 5-File + Doc Requirement
 Every component MUST have its own folder in `src/components/[id]/` with these **5 required files** plus **1 recommended folder**:
 
-1.  **[manifest.json](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/wokwi-led/manifest.json)**: Metadata (name, type, group, **description**), dimensions (w, h), user attributes (attrs), and pin coordinates (x, y).
-2.  **[ui.tsx](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/wokwi-led/ui.tsx)**: A React component that renders the SVG/HTML. It receives `state` (from the worker), `attrs` (from the manifest), and `isRunning` (simulation status). It MUST export a `BOUNDS` object for the selection ring (see [Section 7F](#7f-selection-bounding-boxes-bounds-new)). Optionally also exports a `ContextMenu` component for the floating config toolbar (see [Section 5A]).
-3.  **[logic.ts](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/wokwi-led/logic.ts)**: A TypeScript class extending [BaseComponent](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/BaseComponent.ts#1-73). This is the "brain" running in the Web Worker.
-4.  **[validation.ts](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/wokwi-led/validation.ts)**: An object containing `rules[]` with a [check(comp, graph, validator)](file:///c:/Users/Danish/Documents/simulator/openhw-studio-arduino-uno/validation.ts#101-121) function to ensure electrical safety.
-5.  **[index.ts](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/index.ts)**: The bridge that exports the manifest, UI, `BOUNDS`, LogicClass, validation, and optionally ContextMenu.
+1.  **[manifest.json](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/wokwi-led/manifest.json)**: Metadata (name, type, group, **description**), dimensions (w, h), user attributes (attrs), and pin coordinates (x, y).
+2.  **[ui.tsx](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/wokwi-led/ui.tsx)**: A React component that renders the SVG/HTML. It receives `state` (from the worker), `attrs` (from the manifest), and `isRunning` (simulation status). It MUST export a `BOUNDS` object for the selection ring (see [Section 7F](#7f-selection-bounding-boxes-bounds-new)). Optionally also exports a `ContextMenu` component for the floating config toolbar (see [Section 5A]).
+3.  **[logic.ts](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/wokwi-led/logic.ts)**: A TypeScript class extending [BaseComponent](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/BaseComponent.ts#1-73). This is the "brain" running in the Web Worker.
+4.  **[validation.ts](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/wokwi-led/validation.ts)**: An object containing `rules[]` with a [check(comp, graph, validator)](file:///c:/Users/Danish/Documents/simulator/openhw-studio-arduino-uno/validation.ts#101-121) function to ensure electrical safety.
+5.  **[index.ts](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/index.ts)**: The bridge that exports the manifest, UI, `BOUNDS`, LogicClass, validation, and optionally ContextMenu.
 6.  **doc/index.html** *(Recommended)*: Self-contained HTML documentation page. Automatically loaded and surfaced as a **"DOCS ↗"** button in the simulator palette when the component is imported via ZIP. See [Section 2A](#2a-docindexhtml-documentation-page) for the required template.
 
 ---
@@ -113,25 +113,25 @@ void loop()  { /* ... */ }</code></pre>
 - The description in `manifest.json` is also stored directly on the manifest object, so it is always available via `COMPONENT_REGISTRY[type].manifest.description` — no extra wiring needed.
 - If no `doc/` folder is present in the ZIP, the component still imports successfully; the "DOCS ↗" button simply does not appear.
 
-## 3. The Logic Lifecycle ([logic.ts](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/wokwi-led/logic.ts))
+## 3. The Logic Lifecycle ([logic.ts](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/wokwi-led/logic.ts))
 
-You must implement these methods in the `LogicClass` which extends [BaseComponent](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/BaseComponent.ts#1-73):
+You must implement these methods in the `LogicClass` which extends [BaseComponent](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/BaseComponent.ts#1-73):
 
 ### A. Initialization
--   [constructor(id: string, manifest: any)](file:///c:/Users/Danish/Documents/simulator/OpenHW-studio-frontend-danish/src/worker/execute.ts#96-290): Initialize `this.state` here. The base constructor handles pin setup.
+-   [constructor(id: string, manifest: any)](file:///c:/Users/Danish/Documents/simulator/OpenHW-studio-frontend/src/worker/execute.ts#96-290): Initialize `this.state` here. The base constructor handles pin setup.
 
 ### B. Pin Management
 -   `this.getPinVoltage(pinId: string)`: Returns current voltage (0.0 to 5.0).
 -   `this.setPinVoltage(pinId: string, voltage: number)`: Drives a pin (0.0 or 5.0).
 
 ### C. Execution Hooks
--   **[onPinStateChange(pinId, isHigh, cpuCycles)](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/BaseComponent.ts#46-49)**: (CRITICAL) Triggered only when a digital signal flips. Use for buttons, clocks, or simple triggers. This is more efficient than the update loop.
--   **[update(cpuCycles, wires, allComponents)](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/BaseComponent.ts#38-41)**: (CONTINUOUS) Called every simulation tick. Use for analog physics, ramps, or physics-heavy simulations.
--   **[onEvent(event)](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/BaseComponent.ts#42-45)**: Handles interactions from [ui.tsx](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/wokwi-led/ui.tsx). Any UI event (click, drag) sent via [onInteract](file:///c:/Users/Danish/Documents/simulator/OpenHW-studio-frontend-danish/src/pages/SimulatorPage.jsx#1368-1386) arrives here.
+-   **[onPinStateChange(pinId, isHigh, cpuCycles)](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/BaseComponent.ts#46-49)**: (CRITICAL) Triggered only when a digital signal flips. Use for buttons, clocks, or simple triggers. This is more efficient than the update loop.
+-   **[update(cpuCycles, wires, allComponents)](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/BaseComponent.ts#38-41)**: (CONTINUOUS) Called every simulation tick. Use for analog physics, ramps, or physics-heavy simulations.
+-   **[onEvent(event)](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/BaseComponent.ts#42-45)**: Handles interactions from [ui.tsx](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/wokwi-led/ui.tsx). Any UI event (click, drag) sent via [onInteract](file:///c:/Users/Danish/Documents/simulator/OpenHW-studio-frontend/src/pages/SimulatorPage.jsx#1368-1386) arrives here.
 
 ### D. State Synchronization
 -   **`this.setState(newState)`**: Updates `this.state`. Automatically sets `stateChanged = true`.
--   **[getSyncState()](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/BaseComponent.ts#69-72)**: (MANDATORY) The engine calls this at 60Hz if `stateChanged` is true. Return the object used by [ui.tsx](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/wokwi-led/ui.tsx) for rendering.
+-   **[getSyncState()](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/BaseComponent.ts#69-72)**: (MANDATORY) The engine calls this at 60Hz if `stateChanged` is true. Return the object used by [ui.tsx](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/wokwi-led/ui.tsx) for rendering.
 
 ---
 
@@ -145,10 +145,10 @@ You must implement these methods in the `LogicClass` which extends [BaseComponen
 - **Realism note**: Bus timing/electrical contention are simplified. Always design component logic to be robust to coarse event timing.
 
 ### I2C Support
-- **[onI2CStart(addr, read)](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/BaseComponent.ts#50-51)**: ACK/NACK an address. `read=true` means master is reading FROM this slave. Save `addr` to validate subsequent bytes.
-- **[onI2CByte(addr, data)](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/BaseComponent.ts#51-52)**: MUST accept two arguments. Called during **write** transactions. Return `true` to ACK, `false` to NACK.
+- **[onI2CStart(addr, read)](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/BaseComponent.ts#50-51)**: ACK/NACK an address. `read=true` means master is reading FROM this slave. Save `addr` to validate subsequent bytes.
+- **[onI2CByte(addr, data)](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/BaseComponent.ts#51-52)**: MUST accept two arguments. Called during **write** transactions. Return `true` to ACK, `false` to NACK.
 - **`onI2CReadByte(): number`** *(CRITICAL for readable slaves)*: Called by the `TWIAdapter` when the master clocks out a read byte (e.g., after `Wire.requestFrom()`). Return the next byte from the current register pointer. Without this method, all I2C reads from your slave return `0xFF`. See [Section 8G](#8g-i2c-slave-reads-always-returning-0xff).
-- **[onI2CStop()](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/BaseComponent.ts#52-53)**: Transaction end. Reset any internal transaction state here.
+- **[onI2CStop()](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/BaseComponent.ts#52-53)**: Transaction end. Reset any internal transaction state here.
 
 **Typical I2C slave read pattern:**
 ```typescript
@@ -186,7 +186,7 @@ onI2CStop(): void { /* reset transaction state if needed */ }
 - `onI2CStop()` is broadcast to all components.
 
 ### SPI Support
-- **[onSPIByte(data: number): number | void](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/BaseComponent.ts#54-55)**: Called by the hardware SPI peripheral (`AVRSPI`) when the master transfers a byte. Return the MISO byte; return `void`/`undefined` to leave MISO unchanged.
+- **[onSPIByte(data: number): number | void](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/BaseComponent.ts#54-55)**: Called by the hardware SPI peripheral (`AVRSPI`) when the master transfers a byte. Return the MISO byte; return `void`/`undefined` to leave MISO unchanged.
 
   **CS/SS Chip-Select Awareness**: The worker only dispatches `onSPIByte` to a component when:
   - The component has **no** chip-select pin declared (always selected — single-slave wiring), OR
@@ -265,7 +265,7 @@ onI2SFrame(channel: number, sample: number, bitsPerFrame: number): void {
 ```
 
 ### Validation Engine
-The `validator` (from [check](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/wokwi-arduino-uno/validation.ts#101-121) function) provides:
+The `validator` (from [check](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/wokwi-arduino-uno/validation.ts#101-121) function) provides:
 -   `validator.calculateVoltageAtNode(pinId)`: Estimates voltage at a pin.
 -   `validator.findSeriesResistance(pinId)`: Traces path to power through resistors.
 
@@ -273,7 +273,7 @@ The `validator` (from [check](file:///c:/Users/Danish/Documents/simulator/openhw
 
 ## 5. Master Templates for AI Generation
 
-### A. [index.ts](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/index.ts) (The Bridge)
+### A. [index.ts](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/index.ts) (The Bridge)
 ```typescript
 import manifest from './manifest.json';
 import { MyUI, MyContextMenu, BOUNDS } from './ui';
@@ -292,7 +292,7 @@ export default {
 };
 ```
 
-### B. [logic.ts](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/wokwi-led/logic.ts) Template
+### B. [logic.ts](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/wokwi-led/logic.ts) Template
 ```typescript
 import { BaseComponent } from '../BaseComponent';
 export class NewComponentLogic extends BaseComponent {
@@ -500,13 +500,13 @@ export const MySensorContextMenu = ({ attrs, onUpdate }) => {
 After generating the 5 files, the agent MUST register the component in **two places** for built-in/native components:
 
 ### A. Emulator Component Index
-Add this line to [src/components/index.ts](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator-danish/src/components/index.ts):
+Add this line to [src/components/index.ts](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/index.ts):
 ```typescript
 export { default as myNewComponent } from './my-new-component';
 ```
 
 ### B. Worker Registry (`execute.ts`) — CRITICAL
-The Web Worker that runs the simulation must also know about your component. Add entries to **both** maps in [OpenHW-studio-frontend-danish/src/worker/execute.ts](file:///c:/Users/Danish/Documents/simulator/OpenHW-studio-frontend-danish/src/worker/execute.ts):
+The Web Worker that runs the simulation must also know about your component. Add entries to **both** maps in [OpenHW-studio-frontend/src/worker/execute.ts](file:///c:/Users/Danish/Documents/simulator/OpenHW-studio-frontend/src/worker/execute.ts):
 
 **1. Import the Logic class:**
 ```typescript
