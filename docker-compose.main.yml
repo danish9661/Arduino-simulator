@@ -26,7 +26,10 @@ services:
     environment:
       - PORT=5000
       - MONGO_URI=mongodb://mongodb-main:27017/openhw-studio-production
-      - JWT_SECRET=change_me_production_key
+      - JWT_SECRET=4f9e1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p
+      - SESSION_SECRET=a8b3c9d2f5e1g4h7j0k6m9n2p5q8r1s4t7u0v3w6x9y2z
+      - GITHUB_ADMIN_TOKEN=${GITHUB_ADMIN_TOKEN}
+      - GITHUB_OWNER=danish9661
       - FRONTEND_URL=http://localhost:5000
       - ALLOWED_ORIGINS=http://localhost:5000
       - EMULATOR_PATH=/usr/src/openhw-studio-emulator-danish
@@ -41,10 +44,11 @@ services:
 
   frontend-main:
     build:
-      context: ./OpenHW-studio-frontend-danish
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./OpenHW-studio-frontend-danish/Dockerfile
       args:
         - VITE_API_BASE_URL=http://localhost:5001/api
+        - VITE_EMULATOR_PATH=../openhw-studio-emulator-danish
     container_name: openhw-frontend-main
     ports:
       - "5000:80" # Host:Container
