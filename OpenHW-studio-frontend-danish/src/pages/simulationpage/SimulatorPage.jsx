@@ -2175,10 +2175,9 @@ export default function SimulatorPage({ gamificationMode = false }) {
 
 
   // ── Project: load most-recent project on first mount ─────────────────────
-  // ── Project: load most-recent project on first mount ─────────────────────
   useEffect(() => {
-    // Don't auto-load a project if we're in assessment mode or loading a demo
-    if (assessmentMode || projectName || shareId || liveSessionCode) return;
+    // Don't auto-load a project if we're in assessment mode or loading a demo or circuit from URL
+    if (assessmentMode || projectName || shareId || liveSessionCode || assessmentParams.get('circuit')) return;
 
     const owner = user?.email || 'guest';
     listProjects(owner).then((projects) => {
@@ -2408,6 +2407,32 @@ export default function SimulatorPage({ gamificationMode = false }) {
     loadAssignmentSubmission();
     return () => { cancelled = true; };
   }, [assignmentMode, classId, assignmentId, user?.role]);
+
+// ── Auto-load circuit from URL (?circuit=JSON_ENCODED) ──────────────────────
+useEffect(() => {
+  const urlCircuit = assessmentParams.get('circuit');
+  if (!urlCircuit) return;
+
+  try {
+    const payload = JSON.parse(decodeURIComponent(urlCircuit));
+    if (!payload || typeof payload !== 'object') return;
+
+    const normalized = normalizeImportedCircuitData(payload.components || [], payload.connections || []);
+    setBoard(payload.board || 'arduino_uno');
+    setComponents(normalized.components);
+    setWires(normalized.wires);
+    setCode(payload.code || '');
+    syncNextIds(normalized.components, normalized.wires);
+    
+    // Clear project state so we don't accidentally overwrite the user's project
+    setCurrentProjectName('Sample Circuit');
+    setCurrentProjectId(null);
+    currentProjectIdRef.current = null;
+    setHistory({ past: [], future: [] });
+  } catch (e) {
+    console.error('[URL Circuit] Failed to parse circuit from URL:', e);
+  }
+}, [assessmentParams]);
 
   const handleAssignmentSubmissionFilesChange = async (event) => {
     if (isAssignmentSubmissionClosed(assignmentSubmissionAssignment)) {
@@ -3481,7 +3506,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
     const comp = componentsMap.get(compId)
     if (!comp) return null
     const pins = PIN_DEFS[comp.type] || []
-    const pin = pins.find(p => p.id === pinId)
+    const pin = pins.find(p => String(p.id) === String(pinId))
     if (!pin) return null
     const rotation = comp.rotation || 0;
     if (rotation === 0) return { x: comp.x + pin.x, y: comp.y + pin.y }
@@ -3500,7 +3525,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
     const comp = componentsMap.get(compId)
     if (!comp) return null
     const pins = PIN_DEFS[comp.type] || []
-    const pin = pins.find(p => p.id === pinId)
+    const pin = pins.find(p => String(p.id) === String(pinId))
     if (!pin) return null
     const stub = 20;
     // Determine dominant exit direction from unrotated pin position relative to component center
@@ -7801,11 +7826,11 @@ export default function SimulatorPage({ gamificationMode = false }) {
               {wires.filter(w => w.isBelow === true).map(w => {
                 const fromParts = w.from.split(':')
                 const toParts = w.to.split(':')
-                const p1 = getPinPos(fromParts[0], fromParts[1])
-                const p2 = getPinPos(toParts[0], toParts[1])
+                const p1 = getPinPos(fromParts[0], fromParts.slice(1).join(':'))
+                const p2 = getPinPos(toParts[0], toParts.slice(1).join(':'))
                 if (!p1 || !p2) return null
-                const e1 = getPinExitPoint(fromParts[0], fromParts[1]) || p1;
-                const e2 = getPinExitPoint(toParts[0], toParts[1]) || p2;
+                const e1 = getPinExitPoint(fromParts[0], fromParts.slice(1).join(':')) || p1;
+                const e2 = getPinExitPoint(toParts[0], toParts.slice(1).join(':')) || p2;
                 const isSelectedWire = selected === w.id;
                 const wirePath = buildWirePath(p1, e1, e2, p2, w.waypoints);
 
@@ -7872,11 +7897,11 @@ export default function SimulatorPage({ gamificationMode = false }) {
               {wires.filter(w => w.isBelow !== true).map(w => {
                 const fromParts = w.from.split(':')
                 const toParts = w.to.split(':')
-                const p1 = getPinPos(fromParts[0], fromParts[1])
-                const p2 = getPinPos(toParts[0], toParts[1])
+                const p1 = getPinPos(fromParts[0], fromParts.slice(1).join(':'))
+                const p2 = getPinPos(toParts[0], toParts.slice(1).join(':'))
                 if (!p1 || !p2) return null
-                const e1 = getPinExitPoint(fromParts[0], fromParts[1]) || p1;
-                const e2 = getPinExitPoint(toParts[0], toParts[1]) || p2;
+                const e1 = getPinExitPoint(fromParts[0], fromParts.slice(1).join(':')) || p1;
+                const e2 = getPinExitPoint(toParts[0], toParts.slice(1).join(':')) || p2;
                 const isSelectedWire = selected === w.id;
                 const wirePath = buildWirePath(p1, e1, e2, p2, w.waypoints);
 
@@ -7990,8 +8015,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
 
               const fromParts = w.from.split(':')
               const toParts = w.to.split(':')
-              const p1 = getPinPos(fromParts[0], fromParts[1])
-              const p2 = getPinPos(toParts[0], toParts[1])
+              const p1 = getPinPos(fromParts[0], fromParts.slice(1).join(':'))
+              const p2 = getPinPos(toParts[0], toParts.slice(1).join(':'))
               if (!p1 || !p2) return null
 
               // Use click position, fall back to wire midpoint
@@ -8455,7 +8480,9 @@ export default function SimulatorPage({ gamificationMode = false }) {
                     onClick={() => {
                       const doc = COMPONENT_REGISTRY[selectedComponentInfo.type]?.doc;
                       if (doc) {
-                        const b = new Blob([doc], { type: 'text/html' });
+                        // Replace hardcoded localhost URLs with current origin
+                        const finalDoc = doc.replace(/http:\/\/localhost:5173/g, window.location.origin);
+                        const b = new Blob([finalDoc], { type: 'text/html' });
                         window.open(URL.createObjectURL(b), '_blank');
                       } else {
                         window.open(`https://wokwi.com/docs/parts/${selectedComponentInfo.type}`, '_blank');
@@ -8542,7 +8569,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
                   }
 
                   // Gather ALL components for destination endpoints (excluding self)
-                  const validTargets = components.filter(c => c.id !== selectedComponentInfo.id);
+                  const validTargets = components.filter(c => c.id !== selected);
                   const targetOptions = [];
                   validTargets.forEach(b => {
                     const bPins = LOCAL_PIN_DEFS[b.type] || [];
@@ -8555,7 +8582,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
                   });
 
                   return compPins.map(pin => {
-                    const pinIdStr = `${selectedComponentInfo.id}:${pin.id}`;
+                    const pinIdStr = `${selected}:${pin.id}`;
                     const currentPinCat = getPinCategory(pin.id, pin.description, selectedComponentInfo.type);
 
                     // Filter target options to show only compatible pins for special categories (GND, POWER, etc.)
