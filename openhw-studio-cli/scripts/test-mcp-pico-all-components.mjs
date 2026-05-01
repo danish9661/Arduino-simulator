@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const cliRoot = path.resolve(__dirname, '..');
 const workspaceRoot = path.resolve(cliRoot, '..');
-const emulatorComponentsRoot = path.join(workspaceRoot, 'openhw-studio-emulator-danish', 'src', 'components');
+const emulatorComponentsRoot = path.join(workspaceRoot, 'openhw-studio-emulator', 'src', 'components');
 
 const backendUrl = String(process.env.MCP_TEST_BACKEND_URL || 'http://127.0.0.1:5001/api').trim();
 const token = String(process.env.OPENHW_MCP_TOKEN || '').trim();

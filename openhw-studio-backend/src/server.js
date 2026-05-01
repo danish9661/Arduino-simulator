@@ -72,6 +72,7 @@ if (process.env.NODE_ENV === 'production') {
 
 const allowedOrigins = new Set(
   [
+    ...(process.env.ALLOWED_ORIGINS || '').split(','),
     ...(process.env.FRONTEND_URLS || '').split(','),
     process.env.FRONTEND_URL || 'http://localhost:5173',
     'http://127.0.0.1:5173',
@@ -160,12 +161,17 @@ app.use('/api', apiRoutes);
 app.use('/auth', authRoutes);
 
 // Serve demo/guide files from openhw-studio-examples repo
-const examplesDir = resolveConfiguredPath(process.env.EXAMPLES_PATH, [
-  '../openhw-studio-examples/examples',
+const examplesDir = resolveConfiguredPath(process.env.EXAMPLES_DIR || process.env.EXAMPLES_PATH, [
+  './openhw-studio-examples/examples',
   '../openhw-studio-examples/examples',
 ]);
 app.use('/examples', express.static(examplesDir));
 
+// Serve classroom uploads from persistent volume
+const classroomAssetsDir = process.env.CLASSROOM_UPLOADS_DIR
+  ? path.resolve(backendRoot, process.env.CLASSROOM_UPLOADS_DIR)
+  : path.resolve(backendRoot, 'data/classroom');
+app.use('/api/assets/classroom', express.static(classroomAssetsDir));
 const PORT = process.env.PORT || 5001;
 const server = http.createServer(app);
 await registerLiveSimulationWebSocket(server);

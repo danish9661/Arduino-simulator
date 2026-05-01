@@ -32,9 +32,10 @@ const emulatorComponentsPath = (() => {
 
     const resolvedRoot = resolveFirstExisting([
         '../openhw-studio-emulator',
-        '../openhw-studio-emulator',
     ]);
 
+    // In Docker, we WANT this to fail so it falls back to localDataPath (the persistent volume)
+    // Local development will still find the repository.
     if (resolvedRoot) {
         return path.join(resolvedRoot, 'src/components');
     }
@@ -233,6 +234,43 @@ export const deleteInstalledComponent = (req, res) => {
             error: 'Failed to delete component.',
             details: error.message
         });
+    }
+};
+
+/**
+ * Lightweight version hash for the installed custom components.
+ * Computed from: sorted component IDs + manifest mtime.
+ * Only reads file stats (no content) — very fast, no performance impact.
+ * Used by the frontend to decide whether its IndexedDB cache is still valid.
+ */
+export const getComponentsVersion = (req, res) => {
+    try {
+        let hashInput = '';
+        let count = 0;
+
+        const items = fs.readdirSync(EMULATOR_COMPONENTS_PATH).sort();
+        for (const item of items) {
+            const itemPath = path.join(EMULATOR_COMPONENTS_PATH, item);
+            if (!fs.statSync(itemPath).isDirectory()) continue;
+            const manifestPath = path.join(itemPath, 'manifest.json');
+            if (!fs.existsSync(manifestPath)) continue;
+            const mtime = fs.statSync(manifestPath).mtimeMs;
+            hashInput += `${item}:${mtime}|`;
+            count++;
+        }
+
+        // FNV-1a 32-bit hash (same algorithm used on the frontend)
+        let hash = 0x811c9dc5;
+        for (let i = 0; i < hashInput.length; i++) {
+            hash ^= hashInput.charCodeAt(i);
+            hash = Math.imul(hash, 0x01000193) >>> 0;
+        }
+        const version = hash.toString(16).padStart(8, '0');
+
+        return res.json({ version, count });
+    } catch (error) {
+        console.error('Failed to compute component version:', error);
+        return res.status(500).json({ error: 'Failed to compute component version.' });
     }
 };
 

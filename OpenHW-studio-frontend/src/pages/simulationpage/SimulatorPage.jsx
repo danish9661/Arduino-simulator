@@ -19,7 +19,8 @@ import { useAuth } from '../../context/AuthContext.jsx'
 import { useGamification } from '../../context/GamificationContext.jsx'
 import { PROJECTS } from '../../services/gamification/ProjectsConfig.js'
 import { COMPONENT_MAP } from '../../services/gamification/ComponentsConfig.js'
-import { compileCode, flashFirmware, fetchInstalledLibraries, searchLibraries, installLibrary, submitCustomComponent, fetchInstalledComponentsWithFiles, createSharedSimulation, fetchSharedSimulation, fetchLiveSimulationSession, buildLiveSimulationWsUrl } from '../../services/simulatorService.js'
+import { compileCode, flashFirmware, fetchInstalledLibraries, searchLibraries, installLibrary, submitCustomComponent, fetchInstalledComponentsWithFiles, createSharedSimulation, fetchSharedSimulation, fetchLiveSimulationSession, buildLiveSimulationWsUrl, fetchPublicInstalledComponents, fetchComponentsVersion } from '../../services/simulatorService.js'
+import { getCachedComponents, getCachedServerHash, setCachedComponents, clearComponentCache } from '../../services/componentCache.js'
 import { getMyAssignmentSubmission, submitAssignment } from '../../services/classroomService.js'
 import { uploadClassroomFiles } from '../../components/teacher/class-detail/uploadUtils.js'
 import StudentAssignmentModal from '../../components/teacher/class-detail/StudentAssignmentModal.jsx'
@@ -114,6 +115,14 @@ Object.entries(EmulatorComponents).forEach(([key, module]) => {
       : module;
   }
 });
+
+// Types that are natively compiled into the frontend and should not be overwritten by dynamic sync
+const BUILTIN_COMPONENT_TYPES = new Set(
+  Object.values(EmulatorComponents)
+    .filter(m => m && m.manifest)
+    .map(m => m.manifest.type || m.manifest.id)
+    .filter(Boolean)
+);
 
 // Compatibility aliases: accept WS2812 naming variants used in imported diagrams.
 const neopixelBaseModule = COMPONENT_REGISTRY['wokwi-neopixel-matrix'];
@@ -368,8 +377,62 @@ Object.values(COMPONENT_REGISTRY).forEach(module => {
 sortCatalog(LOCAL_CATALOG);
 
 // Tracks component types that were dynamically injected from the backend (not built-in).
-// Used by the polling loop to detect deletions and purge them from the registry.
 const BACKEND_INJECTED_TYPES = new Set();
+
+/**
+ * Injects an array of pre-transpiled backend components into the global registry and catalog.
+ * Works for both cached (IDB) and freshly fetched components.
+ * @param {Array<{id, manifest, transpiledUI, transpiledLogic, uiRaw, logicRaw, validationRaw, indexRaw}>} comps
+ */
+function injectComponentsIntoRegistry(comps) {
+  for (const comp of comps) {
+    const { id, manifest, transpiledUI, transpiledLogic, uiRaw, logicRaw, validationRaw, indexRaw } = comp;
+    if (!manifest || !transpiledUI) continue;
+
+    // Skip core components natively present in the frontend bundle
+    if (BUILTIN_COMPONENT_TYPES.has(manifest.type)) continue;
+    try {
+      const exportsUI = {};
+      const evalUI = new Function('exports', 'require', 'React', transpiledUI);
+      evalUI(exportsUI, (mod) => {
+        if (mod === 'react') return React;
+        if (mod.endsWith('manifest.json')) return manifest;
+        return null;
+      }, React);
+
+      const uiComponent = resolveUiExport(exportsUI);
+      if (!uiComponent) continue;
+
+      COMPONENT_REGISTRY[manifest.type] = {
+        manifest,
+        UI: uiComponent,
+        BOUNDS: exportsUI.BOUNDS,
+        ContextMenu: exportsUI[Object.keys(exportsUI).find(k => k.toLowerCase().includes('contextmenu'))] || null,
+        contextMenuDuringRun: !!(exportsUI.contextMenuDuringRun || manifest.contextMenuDuringRun),
+        contextMenuOnlyDuringRun: !!(exportsUI.contextMenuOnlyDuringRun || manifest.contextMenuOnlyDuringRun),
+        logicCode: transpiledLogic,
+        uiRaw: uiRaw || '',
+        logicRaw: logicRaw || '',
+        validationRaw: validationRaw || '',
+        indexRaw: indexRaw || '',
+        isDynamic: true,
+      };
+
+      if (manifest.pins) LOCAL_PIN_DEFS[manifest.type] = manifest.pins;
+      BACKEND_INJECTED_TYPES.add(manifest.type);
+
+      const groupName = normalizeGroupName(manifest.group);
+      let group = LOCAL_CATALOG.find(g => g.group === groupName);
+      if (!group) { group = { group: groupName, items: [] }; LOCAL_CATALOG.push(group); }
+      group.items = group.items.filter(i => i.type !== manifest.type);
+      const { pins: _p, group: _g, ...catalogItem } = manifest;
+      group.items.push(catalogItem);
+    } catch (err) {
+      console.warn(`[ComponentCache] Failed to inject component ${id}:`, err);
+    }
+  }
+  sortCatalog(LOCAL_CATALOG);
+}
 
 let nextWireId = 1
 
@@ -1376,6 +1439,112 @@ function getPinCategory(pId, pDesc, compType) {
   return categories.length > 0 ? categories : null;
 }
 
+// ─── Memoized Wire Component ────────────────────────────────────────────────
+const CanvasWire = React.memo(({ wire, p1, p2, e1, e2, isSelected, onSelect, onMouseDownSegment, wirepointsEnabled, theme }) => {
+  const wirePath = useMemo(() => buildWirePath(p1, e1, e2, p2, wire.waypoints), [p1, e1, e2, p2, wire.waypoints]);
+
+  return (
+    <g style={{ cursor: 'pointer' }} onClick={onSelect} onDoubleClick={e => e.stopPropagation()}>
+      <path d={wirePath} stroke="transparent" strokeWidth={16} fill="none" style={{ pointerEvents: 'stroke' }} />
+      <path d={wirePath} stroke={isSelected ? 'var(--orange)' : wire.color} strokeWidth={isSelected ? (wire.isBelow ? 2.5 : 2.3) : (wire.isBelow ? 1.5 : 1.3)} fill="none" strokeDasharray={isSelected ? "6 4" : "none"} strokeLinecap="round" opacity={wire.isBelow ? 0.6 : 0.9} />
+      <circle cx={p1.x} cy={p1.y} r={isSelected ? 3 : 2} fill={isSelected ? 'var(--orange)' : wire.color} opacity={wire.isBelow ? 0.6 : 1} />
+      <circle cx={p2.x} cy={p2.y} r={isSelected ? 3 : 2} fill={isSelected ? 'var(--orange)' : wire.color} opacity={wire.isBelow ? 0.6 : 1} />
+      {wirepointsEnabled && getWirePoints(p1, e1, e2, p2, wire.waypoints).reduce((acc, _, i, arr) => {
+        if (i < 1 || i >= arr.length - 2) return acc;
+        const a = arr[i], b = arr[i + 1];
+        const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+        if (segLen < 20) return acc;
+        const isHoriz = Math.abs(b.y - a.y) < 1;
+        const midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
+        acc.push(
+          <circle key={`sh-${i}`} cx={midX} cy={midY} r={isSelected ? 6 : 4}
+            fill={isSelected ? '#fff' : 'rgba(255,255,255,0.35)'}
+            stroke={isSelected ? 'var(--orange)' : wire.color} strokeWidth={1.5}
+            opacity={isSelected ? 1 : 0.55}
+            style={{ pointerEvents: 'all', cursor: isHoriz ? 'ns-resize' : 'ew-resize' }}
+            title={isHoriz ? 'Drag up/down to route' : 'Drag left/right to route'}
+            onMouseDown={ev => onMouseDownSegment(ev, wire, i, isHoriz, arr)}
+            onClick={ev => ev.stopPropagation()}
+            onDoubleClick={ev => {
+              ev.stopPropagation(); ev.preventDefault();
+              // This logic remains in parent for now or we pass a handler
+            }}
+          />
+        );
+        return acc;
+      }, [])}
+    </g>
+  );
+});
+
+// ─── Memoized Component Wrapper ──────────────────────────────────────────────
+const CanvasComponent = React.memo(({ comp, isSelected, hasError, onMouseDown, onClick, getComponentStateAttrs, COMPONENT_REGISTRY, PIN_DEFS }) => {
+  const rad = ((comp.rotation || 0) * Math.PI) / 180;
+  const visualH = Math.abs(Math.sin(rad)) * comp.w + Math.abs(Math.cos(rad)) * comp.h;
+  
+  const getBounds = () => {
+    const reg = COMPONENT_REGISTRY[comp.type];
+    if (!reg) return { x: 0, y: 0, w: comp.w, h: comp.h };
+    if (typeof reg.BOUNDS === 'function') return reg.BOUNDS(getComponentStateAttrs(comp));
+    return reg.BOUNDS || { x: 0, y: 0, w: comp.w, h: comp.h };
+  };
+  const b = getBounds();
+
+  return (
+    <React.Fragment>
+      <div
+        style={{
+          position: 'absolute',
+          left: comp.x, top: comp.y,
+          width: comp.w, height: comp.h,
+          zIndex: isSelected ? 5 : 2,
+          userSelect: 'none',
+          pointerEvents: 'none',
+          transform: comp.rotation ? `rotate(${comp.rotation}deg)` : undefined,
+          transformOrigin: 'center center',
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            left: b.x, top: b.y,
+            width: b.w, height: b.h,
+            cursor: 'move',
+            pointerEvents: 'auto',
+            zIndex: 0,
+          }}
+          onMouseDown={onMouseDown}
+          onClick={onClick}
+          onDoubleClick={e => e.stopPropagation()}
+        />
+        {isSelected && (
+          <div style={{
+            position: 'absolute',
+            left: b.x - 6, top: b.y - 6,
+            width: b.w + 12, height: b.h + 12,
+            borderRadius: 8,
+            border: '2px solid var(--accent)',
+            boxShadow: '0 0 16px var(--glow)',
+            pointerEvents: 'none', zIndex: 10,
+          }} />
+        )}
+        {hasError && (
+          <div style={{
+            position: 'absolute',
+            left: b.x - 6, top: b.y - 6,
+            width: b.w + 12, height: b.h + 12,
+            borderRadius: 8,
+            border: '2px solid var(--red)',
+            boxShadow: '0 0 12px rgba(239,68,68,0.4)',
+            pointerEvents: 'none', zIndex: 9,
+          }} />
+        )}
+      </div>
+      {/* Labels and Pins are usually better kept in the parent loop or as sub-memo items */}
+    </React.Fragment>
+  );
+});
+
 export default function SimulatorPage({ gamificationMode = false }) {
   const { isAuthenticated, isAdminAuthenticated, user, adminUser, token, logout, loading: authLoading } = useAuth()
   const activeUser = user || adminUser;
@@ -1473,6 +1642,9 @@ export default function SimulatorPage({ gamificationMode = false }) {
     handleAssessmentSubmit()
   }, [gamAllUnlocked, gamLockedCount, handleAssessmentSubmit])
 
+  // Incremented whenever backend components are injected/updated so catalog consumers re-render
+  const [customCatalogVersion, setCustomCatalogVersion] = useState(0);
+
   // Theme Logic — defaults to light mode
   const [theme, setTheme] = useState(() => {
     const t = document.documentElement.getAttribute('data-theme') || 'light';
@@ -1537,13 +1709,12 @@ export default function SimulatorPage({ gamificationMode = false }) {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
   const [showFavorites, setShowFavorites] = useState(true)
   const [paletteContextMenu, setPaletteContextMenu] = useState(null) // { x, y, item }
-  const [selectedPaletteItem, setSelectedPaletteItem] = useState(null) // item for description panel
   const [showComponentDesc, setShowComponentDesc] = useState(true) // description panel visible
   const [showCreateComponentModal, setShowCreateComponentModal] = useState(false)
   const paletteContextMenuRef = useRef(null)
   const [canvasZoom, setCanvasZoom] = useState(1)
   const [showCanvasMenu, setShowCanvasMenu] = useState(false)
-  const [showConnectionsPanel, setShowConnectionsPanel] = useState(true)
+  const [showConnectionsPanel, setShowConnectionsPanel] = useState(false)
   const [wirepointsEnabled, setWirepointsEnabled] = useState(false)
   const canvasZoomRef = useRef(1)
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 })
@@ -1787,6 +1958,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
   const innerCanvasRef = useRef(null)   // ref to the zoom-wrapper div — used for CSS-transform panning (Fix #4)
   const rafMoveRef = useRef(null)       // pending rAF id for mousemove throttle (Fixes #1-#4)
   const pendingMoveRef = useRef(null)   // latest computed move data, read by the rAF callback
+  const rafZoomRef = useRef(null)
+  const pendingZoomRef = useRef(null)
   const svgRef = useRef(null)
   const viewPanelRef = useRef(null)
   const schematicSvgRef = useRef(null)
@@ -1908,6 +2081,9 @@ export default function SimulatorPage({ gamificationMode = false }) {
       const Babel = await getBabel();
       const transpileUI = Babel.transform(uiStr, { filename: 'ui.tsx', presets: ['react', 'typescript', 'env'] }).code;
       const transpileLogic = Babel.transform(logicStr, { filename: 'logic.ts', presets: ['typescript', 'env'] }).code;
+
+      // Skip protection for SUBMITTED components (the user wants to preview their own work)
+      // but we still assert safety
       assertSafeDynamicModule(transpileUI, 'ui.tsx');
       assertSafeDynamicModule(transpileLogic, 'logic.ts');
 
@@ -1915,6 +2091,7 @@ export default function SimulatorPage({ gamificationMode = false }) {
       const evalUI = new Function('exports', 'require', 'React', transpileUI);
       evalUI(exportsUI, (mod) => {
         if (mod === 'react') return React;
+        if (mod.endsWith('manifest.json')) return manifest;
         return null;
       }, React);
 
@@ -1948,7 +2125,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
           logicRaw: logicStr,
           validationRaw: validationStr,
           indexRaw: indexStr,
-          ...(docHtml ? { doc: docHtml } : {})
+          ...(docHtml ? { doc: docHtml } : {}),
+          isDynamic: true,
         };
         if (manifest.pins) {
           LOCAL_PIN_DEFS[manifest.type] = manifest.pins;
@@ -2021,9 +2199,8 @@ export default function SimulatorPage({ gamificationMode = false }) {
     }
   };
 
-  useEffect(() => {
-    loadLibraries();
-  }, []);
+  // loadLibraries is called from the demo-load effect below when no demo is loading,
+  // or deferred so that circuit.png gets exclusive network priority on demo pages.
 
   // ── Auto-load component from Component Editor ("Test in Simulator") ────────
   useEffect(() => {
@@ -2046,30 +2223,43 @@ export default function SimulatorPage({ gamificationMode = false }) {
   }, []);
 
   useEffect(() => {
-    if (gamificationMode) return; // gamification simulator starts with clean canvas
-    
+    if (gamificationMode) return;
+
     let cancelled = false;
+    let deferTimer = null;
 
     const loadDemoProject = async () => {
-      if (!projectName) return;
+      if (!projectName) {
+        // No demo loading — run library fetch immediately
+        loadLibraries();
+        return;
+      }
 
       try {
         const pngName = 'circuit.png';
         const pngUrl = `${EXAMPLES_BASE_URL}/${projectName}/${pngName}`;
         const pngRes = await fetch(pngUrl);
-        if (!pngRes.ok) return;
+        if (!pngRes.ok || cancelled) return;
         const blob = await pngRes.blob();
         if (cancelled) return;
         const file = new File([blob], pngName, { type: blob.type || 'image/png' });
         importPng(file);
       } catch (err) {
         console.error(`Failed to load demo project "${projectName}"`, err);
+      } finally {
+        // Defer lib list until after the demo circuit starts painting
+        if (!cancelled) {
+          deferTimer = window.setTimeout(() => { if (!cancelled) loadLibraries(); }, 0);
+        }
       }
     };
 
     loadDemoProject();
-    return () => { cancelled = true; };
-  }, [projectName]);
+    return () => {
+      cancelled = true;
+      if (deferTimer !== null) window.clearTimeout(deferTimer);
+    };
+  }, [projectName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Offline component queue: flush to backend when connectivity restores ──
   useEffect(() => {
@@ -2093,6 +2283,102 @@ export default function SimulatorPage({ gamificationMode = false }) {
     window.addEventListener('online', drainQueue);
     return () => window.removeEventListener('online', drainQueue);
   }, []);
+
+  // ── Sync backend custom components (cache-first, version-checked) ──────────
+  // On every page load:
+  //  1. Read IndexedDB cache → inject immediately (no network, instant palette)
+  //  2. GET /api/components/version (~40 bytes) → compare hash
+  //  3. Only fetch + transpile when the hash actually changed
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncBackendComponents = async () => {
+      // ── Step 1: Serve from cache immediately ──────────────────────────────
+      const cached = await getCachedComponents();
+      if (cached.length > 0 && !cancelled) {
+        injectComponentsIntoRegistry(cached);
+        setCustomCatalogVersion(v => v + 1);
+        console.log(`[ComponentCache] Injected ${cached.length} components from IDB cache.`);
+      }
+
+      // ── Step 2: Lightweight version check ────────────────────────────────
+      const serverVersion = await fetchComponentsVersion();
+      if (!serverVersion || cancelled) return;
+
+      const cachedHash = await getCachedServerHash();
+
+      if (serverVersion === cachedHash) {
+        console.log('[ComponentCache] Cache is fresh, skipping re-fetch.');
+        return;
+      }
+
+      // ── Step 3: Fetch full sources (only when something changed) ──────────
+      console.log('[ComponentCache] Version mismatch — fetching updated components...');
+      const components = await fetchPublicInstalledComponents();
+      if (cancelled) return;
+
+      if (!components.length) {
+        await clearComponentCache();
+        return;
+      }
+
+      // ── Step 4: Transpile with Babel ──────────────────────────────────────
+      const Babel = await getBabel();
+      const injected = [];
+
+      for (const comp of components) {
+        if (cancelled) return;
+        try {
+          const files = comp.files || {};
+          const uiRaw = files['ui.tsx'] || files['ui.jsx'] || '';
+          const logicRaw = files['logic.ts'] || files['logic.js'] || '';
+          const validationRaw = files['validation.ts'] || files['validation.js'] || '';
+          const indexRaw = files['index.ts'] || files['index.js'] || '';
+          const manifest = JSON.parse(files['manifest.json'] || '{}');
+
+          const transpiledUI = Babel.transform(uiRaw, {
+            filename: 'ui.tsx', presets: ['react', 'typescript', 'env'],
+          }).code;
+          const transpiledLogic = Babel.transform(logicRaw, {
+            filename: 'logic.ts', presets: ['typescript', 'env'],
+          }).code;
+
+          injected.push({
+            id: comp.id,
+            manifest,
+            uiRaw,
+            logicRaw,
+            validationRaw,
+            indexRaw,
+            transpiledUI,
+            transpiledLogic,
+          });
+        } catch (err) {
+          console.warn(`[ComponentCache] Transpile failed for ${comp.id}:`, err);
+        }
+      }
+
+      if (cancelled || !injected.length) return;
+
+      // ── Step 5: Persist to IDB + update palette ───────────────────────────
+      await setCachedComponents(injected, serverVersion);
+      injectComponentsIntoRegistry(injected);
+      setCustomCatalogVersion(v => v + 1);
+      console.log(`[ComponentCache] Updated cache with ${injected.length} components (hash: ${serverVersion}).`);
+    };
+
+    // If a demo project is loading, give it a 1.5s head-start on the network
+    // before we fire any component-sync requests.
+    const delay = projectName ? 1500 : 0;
+    const timer = window.setTimeout(() => {
+      if (!cancelled) syncBackendComponents().catch(err => console.warn('[ComponentCache] Sync error:', err));
+    }, delay);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Project: owner string ─────────────────────────────────────────────────
   const getOwner = () => user?.email || 'guest';
@@ -2636,6 +2922,91 @@ useEffect(() => {
     }
   };
 
+  // ── Fetch and inject dynamically installed components from the backend ──────
+  useEffect(() => {
+    (async () => {
+      try {
+        const installedComps = await fetchPublicInstalledComponents();
+        if (!installedComps || installedComps.length === 0) return;
+
+        const Babel = await getBabel();
+        let injectedCount = 0;
+
+        for (const comp of installedComps) {
+          const { id, files } = comp;
+          if (!files || !files['manifest.json'] || !files['ui.tsx'] || !files['logic.ts']) continue;
+
+          try {
+            const manifest = JSON.parse(files['manifest.json']);
+            const uiRaw = files['ui.tsx'];
+            const logicRaw = files['logic.ts'];
+            const compType = manifest.type || id;
+
+            // Skip if it's a core component or already compiled natively into the frontend
+            if (BUILTIN_COMPONENT_TYPES.has(compType)) continue;
+            if (COMPONENT_REGISTRY[compType] && !COMPONENT_REGISTRY[compType].isDynamic) continue;
+
+            const transpileUI = Babel.transform(uiRaw, { filename: 'ui.tsx', presets: ['react', 'typescript', 'env'] }).code;
+            const transpileLogic = Babel.transform(logicRaw, { filename: 'logic.ts', presets: ['typescript', 'env'] }).code;
+            assertSafeDynamicModule(transpileUI, 'ui.tsx');
+            assertSafeDynamicModule(transpileLogic, 'logic.ts');
+
+            const exportsUI = {};
+            const evalUI = new Function('exports', 'require', 'React', transpileUI);
+            evalUI(exportsUI, (mod) => {
+              if (mod === 'react') return React;
+              if (mod.endsWith('manifest.json')) return manifest;
+              return null;
+            }, React);
+
+            const uiComponent = resolveUiExport(exportsUI);
+            if (!uiComponent) continue;
+
+            // Inject into catalog
+            const newCatItem = { ...manifest };
+            delete newCatItem.pins;
+            delete newCatItem.group;
+
+            const groupName = normalizeGroupName(manifest.group);
+            let group = LOCAL_CATALOG.find(g => g.group === groupName);
+            if (!group) {
+              group = { group: groupName, items: [] };
+              LOCAL_CATALOG.push(group);
+            }
+            group.items = group.items.filter(i => i.type !== compType);
+            group.items.push(newCatItem);
+
+            COMPONENT_REGISTRY[compType] = {
+              manifest,
+              UI: uiComponent,
+              BOUNDS: exportsUI.BOUNDS,
+              ContextMenu: exportsUI[Object.keys(exportsUI).find(k => k.toLowerCase().includes('contextmenu'))],
+              contextMenuDuringRun: !!(exportsUI.contextMenuDuringRun || manifest.contextMenuDuringRun),
+              contextMenuOnlyDuringRun: !!(exportsUI.contextMenuOnlyDuringRun || manifest.contextMenuOnlyDuringRun),
+              logicCode: transpileLogic,
+              uiRaw,
+              logicRaw,
+              isDynamic: true // Flag to distinguish dynamically injected components
+            };
+            if (manifest.pins) LOCAL_PIN_DEFS[compType] = manifest.pins;
+            injectedCount++;
+
+          } catch (err) {
+            console.error(`[SimulatorPage] Failed to inject dynamically installed component ${id}:`, err);
+          }
+        }
+
+        if (injectedCount > 0) {
+          sortCatalog(LOCAL_CATALOG);
+          setCustomCatalogCounter(c => c + 1);
+          console.log(`[SimulatorPage] Successfully injected ${injectedCount} permanently installed custom components.`);
+        }
+      } catch (err) {
+        console.error('[SimulatorPage] Failed to fetch permanently installed components:', err);
+      }
+    })();
+  }, []);
+
   // ── Admin Preview: inject a pending component passed via sessionStorage ──────
   // When admin clicks "Test in Simulator", AdminPage stores the component in
   // sessionStorage and opens /simulator in a new tab. This effect picks it up,
@@ -2668,7 +3039,11 @@ useEffect(() => {
 
       const exportsUI = {};
       const evalUI = new Function('exports', 'require', 'React', transpileUI);
-      evalUI(exportsUI, (mod) => (mod === 'react' ? React : null), React);
+      evalUI(exportsUI, (mod) => {
+        if (mod === 'react') return React;
+        if (mod.endsWith('manifest.json')) return manifest;
+        return null;
+      }, React);
 
       const uiComponent = resolveUiExport(exportsUI);
       if (!uiComponent) {
@@ -2740,7 +3115,8 @@ useEffect(() => {
             const compType = manifest.type || id;
             currentInstalledTypes.add(compType);
 
-            // Already in registry — nothing to do this cycle
+            // Skip if it's a core component or already in registry
+            if (BUILTIN_COMPONENT_TYPES.has(compType)) continue;
             if (COMPONENT_REGISTRY[compType]) continue;
 
             const Babel = await getBabel();
@@ -2753,6 +3129,7 @@ useEffect(() => {
             const evalUI = new Function('exports', 'require', 'React', transpileUI);
             evalUI(exportsUI, (mod) => {
               if (mod === 'react') return React;
+              if (mod.endsWith('manifest.json')) return manifest;
               return null;
             }, React);
 
@@ -2983,7 +3360,10 @@ useEffect(() => {
   }, [validationToast]);
 
   // ── Load Catalog on Mount ────────────────────────────────────────────────────
-  const CATALOG = LOCAL_CATALOG;
+  const CATALOG = useMemo(() => {
+    // Return a shallow copy so React detects the update and re-renders the palette
+    return LOCAL_CATALOG.map(group => ({ ...group, items: [...group.items] }));
+  }, [customCatalogVersion]);
   const PIN_DEFS = LOCAL_PIN_DEFS;
 
   // ── Static component descriptions ────────────────────────────────────────────
@@ -3720,28 +4100,50 @@ useEffect(() => {
     initialTouchDistanceRef.current = null;
   }, []);
 
-  // Trackpad pinch (Ctrl + Wheel)
+  // Pinch-to-zoom via trackpad (Ctrl + Wheel)
+  // Key insight: NEVER update React state mid-pinch — that causes React to re-render
+  // which overwrites our DOM transform on the SAME frame, creating the vibration.
+  // Instead: apply only the CSS transform during pinch, update refs for correctness,
+  // then flush to React state via a debounce AFTER the gesture ends.
   const onWheel = useCallback((e) => {
     if (isCanvasLockedRef.current || !e.ctrlKey) return;
     e.preventDefault();
-    const zoomSpeed = 0.001; 
+
+    const zoomSpeed = 0.002;
     const delta = -e.deltaY * zoomSpeed;
-    const newZoom = Math.min(3, Math.max(0.25, canvasZoomRef.current + delta));
-    
+    const currentZoom = canvasZoomRef.current;
+    const newZoom = Math.min(3, Math.max(0.25, currentZoom * (1 + delta)));
+
+    if (newZoom === currentZoom) return;
+
     const rect = canvasRef.current.getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
-    
-    const cx = (mx - canvasOffsetRef.current.x) / canvasZoomRef.current;
-    const cy = (my - canvasOffsetRef.current.y) / canvasZoomRef.current;
-    
+
+    const cx = (mx - canvasOffsetRef.current.x) / currentZoom;
+    const cy = (my - canvasOffsetRef.current.y) / currentZoom;
+
     const newOffsetX = mx - cx * newZoom;
     const newOffsetY = my - cy * newZoom;
-    
-    setCanvasZoom(newZoom);
+
+    // 1. Update refs immediately — keeps subsequent wheel events reading the correct values
     canvasZoomRef.current = newZoom;
-    setCanvasOffset({ x: newOffsetX, y: newOffsetY });
     canvasOffsetRef.current = { x: newOffsetX, y: newOffsetY };
+
+    // 2. Apply directly to DOM — zero React renders mid-pinch = zero vibration
+    if (innerCanvasRef.current) {
+      innerCanvasRef.current.style.transform =
+        `translate(${newOffsetX}px, ${newOffsetY}px) scale(${newZoom})`;
+      innerCanvasRef.current.style.transformOrigin = '0 0';
+    }
+
+    // 3. Debounce the React state flush — commit once the user stops pinching
+    if (rafZoomRef.current) clearTimeout(rafZoomRef.current);
+    rafZoomRef.current = setTimeout(() => {
+      rafZoomRef.current = null;
+      setCanvasZoom(canvasZoomRef.current);
+      setCanvasOffset({ ...canvasOffsetRef.current });
+    }, 150);
   }, []);
 
   // ── Move and Select component ──────────────────────────────────────────────
@@ -3911,20 +4313,19 @@ useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const preventDefault = (e) => {
-      // Still prevent wheel zoom (Ctrl + Wheel)
+    const handleWheel = (e) => {
       if (e.ctrlKey) {
         if (e.cancelable) e.preventDefault();
+        onWheel(e); // Trigger our custom zoom
       }
     };
 
-    canvas.addEventListener('wheel', preventDefault, { passive: false });
-    // removed native touch blockers as touch-action: none handles it and preventDefault might break React events
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
 
     return () => {
-      canvas.removeEventListener('wheel', preventDefault);
+      canvas.removeEventListener('wheel', handleWheel);
     };
-  }, []);
+  }, [onWheel]);
 
   // ── Pin click — start or complete wire ─────────────────────────────────────
   const onPinClick = useCallback((e, compId, pinId, pinLabel) => {
@@ -4901,6 +5302,8 @@ useEffect(() => {
   // ─── Backup / Restore ──────────────────────────────────────────────────────
   const handleBackupWorkflow = async () => {
     const zip = new JSZip();
+
+    // 1. Generate full project payload (workflow.json)
     const data = buildProjectPayload({
       name: currentProjectName,
       board,
@@ -4916,6 +5319,44 @@ useEffect(() => {
       exportedAt: new Date().toISOString(),
     });
     zip.file('workflow.json', JSON.stringify(data, null, 2));
+
+    // 2. Generate diagram.json (stripped version of payload)
+    const diagramJsonPayload = { ...data };
+    delete diagramJsonPayload.schemaVersion;
+    delete diagramJsonPayload.projectFiles;
+    delete diagramJsonPayload.openCodeTabs;
+    delete diagramJsonPayload.activeCodeFileId;
+    delete diagramJsonPayload.exportedAt;
+    if (diagramJsonPayload.board === 'arduino_uno') delete diagramJsonPayload.board;
+    if (!diagramJsonPayload.components || diagramJsonPayload.components.length === 0) delete diagramJsonPayload.components;
+    if (!diagramJsonPayload.connections || diagramJsonPayload.connections.length === 0) delete diagramJsonPayload.connections;
+    if (!diagramJsonPayload.blocklyXml) delete diagramJsonPayload.blocklyXml;
+    if (!diagramJsonPayload.blocklyGeneratedCode) delete diagramJsonPayload.blocklyGeneratedCode;
+    if (!diagramJsonPayload.useBlocklyCode) delete diagramJsonPayload.useBlocklyCode;
+    zip.file('diagram.json', JSON.stringify(diagramJsonPayload, null, 2));
+
+    // 3. Generate library.txt (root)
+    const libraries = (libInstalled || []).map(l => l?.library?.name || l?.name).filter(Boolean);
+    zip.file('library.txt', libraries.join('\n'));
+
+    // 4. Organize files into board-specific folders
+    (projectFiles || []).forEach(file => {
+      // file.id is typically "project/<boardId>/<filename>"
+      const parts = file.id.split('/');
+      if (parts[0] === 'project' && parts.length >= 3) {
+        const boardId = parts[1];
+        const fileName = parts.slice(2).join('/');
+        zip.folder(boardId).file(fileName, file.content || '');
+      } else if (parts[0] === 'project' && parts.length === 2) {
+        // Root files that aren't the special ones we just handled
+        const fileName = parts[1];
+        const reservedNames = ['workflow.json', 'diagram.json', 'library.txt'];
+        if (!reservedNames.includes(fileName)) {
+          zip.file(fileName, file.content || '');
+        }
+      }
+    });
+
     const blob = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -7102,7 +7543,7 @@ useEffect(() => {
       )}
 
       {/* TOP BAR */}
-      <TopToolbox board={board} setBoard={setBoard} isRunning={isRunning} isPaused={isPaused} handleRun={handleRun} handlePause={handlePause} handleResume={handleResume} handleStop={handleStop} isCompiling={isCompiling} assessmentMode={assessmentMode} assessmentProjectName={assessmentProjectName} isSubmittingAssessment={isSubmittingAssessment} handleAssessmentSubmit={handleAssessmentSubmit} undo={undo} redo={redo} selected={selected} rotateComponent={rotateComponent} theme={theme} toggleTheme={toggleTheme} showViewPanel={showViewPanel} setShowViewPanel={setShowViewPanel} viewPanelSection={viewPanelSection} setViewPanelSection={setViewPanelSection} schematicDataUrl={schematicDataUrl} setSchematicDataUrl={setSchematicDataUrl} schematicLoading={schematicLoading} setSchematicLoading={setSchematicLoading} downloadSchematicPng={downloadSchematicPng} downloadSchematicPdf={downloadSchematicPdf} generateSchematic={generateSchematic} downloadCompCsv={downloadCompCsv} importFileRef={importFileRef} downloadPng={downloadPng} importPng={importPng} handleSave={handleSave} isExporting={isExporting} handleShareSimulation={handleShareSimulation} isSharingSimulation={isSharingSimulation} refreshProjectList={refreshProjectList} showProjectsDropdown={showProjectsDropdown} setShowProjectsDropdown={setShowProjectsDropdown} handleNewProject={handleNewProject} handleStartRename={handleStartRename} handleConfirmRename={handleConfirmRename} renamingProjectId={renamingProjectId} setRenamingProjectId={setRenamingProjectId} renameValue={renameValue} setRenameValue={setRenameValue} handleLoadProject={handleLoadProject} handleDeleteProject={handleDeleteProject} handleBackupWorkflow={handleBackupWorkflow} backupRestoreInputRef={backupRestoreInputRef} handleRestoreWorkflow={handleRestoreWorkflow} handleSyncToCloud={handleSyncToCloud} user={activeUser} navigate={navigate} isAuthenticated={isAnyAuthenticated} myProjects={myProjects} currentProjectId={currentProjectId} formatProjectDate={formatProjectDate} saveHistory={saveHistory} setWires={setWires} setComponents={setComponents} setSelected={setSelected} history={history} components={components} wires={wires} webSerialSupported={webSerialSupported} hardwareBoards={boardComponents} hardwareBoardId={hardwareBoardId} setHardwareBoardId={handleHardwareBoardChange} hardwarePortPath={hardwarePortPath} setHardwarePortPath={setHardwarePortPath} resolvedHardwarePort={resolvedHardwarePort} hardwareAvailablePorts={hardwareAvailablePorts} showAllHardwarePorts={showAllHardwarePorts} setShowAllHardwarePorts={setShowAllHardwarePorts} refreshHardwarePorts={refreshHardwarePorts} isLoadingHardwarePorts={isLoadingHardwarePorts} hardwareBaudRate={hardwareBaudRate} setHardwareBaudRate={setHardwareBaudRate} hardwareResetMethod={hardwareResetMethod} setHardwareResetMethod={setHardwareResetMethod} connectHardwareSerial={connectHardwareSerial} disconnectHardwareSerial={disconnectHardwareSerial} uploadToHardware={handleUploadToHardware} hardwareConnected={hardwareConnected} hardwareConnecting={hardwareConnecting} isUploadingHardware={isUploadingHardware} hardwareStatus={hardwareStatus} editingDisabled={liveEditingDisabled} setShowProjectsSidebar={setShowProjectsSidebar} setProjectsSidebarTab={setProjectsSidebarTab} />
+      <TopToolbox board={board} setBoard={setBoard} isRunning={isRunning} isPaused={isPaused} handleRun={handleRun} handlePause={handlePause} handleResume={handleResume} handleStop={handleStop} isCompiling={isCompiling} assessmentMode={assessmentMode} assessmentProjectName={assessmentProjectName} isSubmittingAssessment={isSubmittingAssessment} handleAssessmentSubmit={handleAssessmentSubmit} undo={undo} redo={redo} selected={selected} rotateComponent={rotateComponent} theme={theme} toggleTheme={toggleTheme} showViewPanel={showViewPanel} setShowViewPanel={setShowViewPanel} viewPanelSection={viewPanelSection} setViewPanelSection={setViewPanelSection} schematicDataUrl={schematicDataUrl} setSchematicDataUrl={setSchematicDataUrl} schematicLoading={schematicLoading} setSchematicLoading={setSchematicLoading} downloadSchematicPng={downloadSchematicPng} downloadSchematicPdf={downloadSchematicPdf} generateSchematic={generateSchematic} downloadCompCsv={downloadCompCsv} importFileRef={importFileRef} downloadPng={downloadPng} importPng={importPng} downloadSimulationJson={downloadSimulationJson} handleSave={handleSave} isExporting={isExporting} handleShareSimulation={handleShareSimulation} isSharingSimulation={isSharingSimulation} refreshProjectList={refreshProjectList} showProjectsDropdown={showProjectsDropdown} setShowProjectsDropdown={setShowProjectsDropdown} handleNewProject={handleNewProject} handleStartRename={handleStartRename} handleConfirmRename={handleConfirmRename} renamingProjectId={renamingProjectId} setRenamingProjectId={setRenamingProjectId} renameValue={renameValue} setRenameValue={setRenameValue} handleLoadProject={handleLoadProject} handleDeleteProject={handleDeleteProject} handleBackupWorkflow={handleBackupWorkflow} backupRestoreInputRef={backupRestoreInputRef} handleRestoreWorkflow={handleRestoreWorkflow} handleSyncToCloud={handleSyncToCloud} user={activeUser} navigate={navigate} isAuthenticated={isAnyAuthenticated} myProjects={myProjects} currentProjectId={currentProjectId} projectName={currentProjectName} formatProjectDate={formatProjectDate} saveHistory={saveHistory} setWires={setWires} setComponents={setComponents} setSelected={setSelected} history={history} components={components} wires={wires} webSerialSupported={webSerialSupported} hardwareBoards={boardComponents} hardwareBoardId={hardwareBoardId} setHardwareBoardId={handleHardwareBoardChange} hardwarePortPath={hardwarePortPath} setHardwarePortPath={setHardwarePortPath} resolvedHardwarePort={resolvedHardwarePort} hardwareAvailablePorts={hardwareAvailablePorts} showAllHardwarePorts={showAllHardwarePorts} setShowAllHardwarePorts={setShowAllHardwarePorts} refreshHardwarePorts={refreshHardwarePorts} isLoadingHardwarePorts={isLoadingHardwarePorts} hardwareBaudRate={hardwareBaudRate} setHardwareBaudRate={setHardwareBaudRate} hardwareResetMethod={hardwareResetMethod} setHardwareResetMethod={setHardwareResetMethod} connectHardwareSerial={connectHardwareSerial} disconnectHardwareSerial={disconnectHardwareSerial} uploadToHardware={handleUploadToHardware} hardwareConnected={hardwareConnected} hardwareConnecting={hardwareConnecting} isUploadingHardware={isUploadingHardware} hardwareStatus={hardwareStatus} editingDisabled={liveEditingDisabled} setShowProjectsSidebar={setShowProjectsSidebar} setProjectsSidebarTab={setProjectsSidebarTab} />
       {studentAssignmentMode && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '8px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg2)', flexShrink: 0 }}>
           <div style={{ minWidth: 0 }}>
@@ -7460,15 +7901,41 @@ useEffect(() => {
                   </button>
 
                   {showFilterDropdown && (
-                    <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 6, zIndex: 100, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.4)', padding: 4, minWidth: 160 }}>
+                    <div 
+                      className="canvas-menu"
+                      onMouseLeave={() => setShowFilterDropdown(false)}
+                      style={{ 
+                        position: 'absolute', 
+                        top: '100%', 
+                        right: 0, 
+                        marginTop: 6, 
+                        zIndex: 100, 
+                        background: theme === 'light' ? 'rgba(248, 250, 252, 0.8)' : 'rgba(13, 21, 37, 0.75)',
+                        backdropFilter: 'blur(16px) saturate(1.4)',
+                        WebkitBackdropFilter: 'blur(16px) saturate(1.4)',
+                        border: theme === 'light' ? '1px solid rgba(203, 213, 225, 0.6)' : '1px solid rgba(30, 45, 71, 0.6)',
+                        borderRadius: 12, 
+                        boxShadow: theme === 'light' ? '0 8px 32px rgba(0, 0, 0, 0.08)' : '0 10px 40px rgba(0,0,0,0.5)',
+                        padding: '5px', 
+                        minWidth: 160,
+                        animation: 'canvasMenuIn 0.12s cubic-bezier(0.16, 1, 0.3, 1)',
+                        transformOrigin: 'top right',
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        willChange: 'transform, opacity, backdrop-filter',
+                        backfaceVisibility: 'hidden',
+                        WebkitBackfaceVisibility: 'hidden',
+                      }}
+                    >
                       <div className="text-[10px] font-bold text-[var(--text3)] uppercase tracking-widest px-3 py-1.5 border-b border-[var(--border)] mb-1">Groups</div>
                       {['All', ...CATALOG.map(g => g.group)].map(group => (
                         <button
                           key={group}
+                          className="canvas-menu-item"
                           onClick={() => { setActiveGroupFilter(group); setShowFilterDropdown(false); }}
-                          style={{ width: '100%', textAlign: 'left', padding: '6px 10px', borderRadius: 6, border: 'none', background: activeGroupFilter === group ? 'var(--accent)' : 'transparent', color: activeGroupFilter === group ? '#fff' : 'var(--text)', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 8 }}
-                          onMouseEnter={e => { if (activeGroupFilter !== group) e.currentTarget.style.background = 'var(--bg3)'; }}
-                          onMouseLeave={e => { if (activeGroupFilter !== group) e.currentTarget.style.background = 'transparent'; }}
+                          style={{ 
+                            background: activeGroupFilter === group ? 'var(--accent)' : 'transparent', 
+                            color: activeGroupFilter === group ? '#fff' : 'var(--text)',
+                          }}
                         >
                           {group === 'All' ? 'All Groups' : group}
                         </button>
@@ -7604,7 +8071,7 @@ useEffect(() => {
                               onDragStart={e => !locked && onPaletteDragStart(e, item)}
                               onClick={() => {
                                 if (locked) { showLockToast(item.label, WOKWI_TO_COMP_ID[item.type]); return; }
-                                addComponentAtCenter(item); setSelectedPaletteItem({ ...item, group: group.group });
+                                addComponentAtCenter(item);
                               }}
                               onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setPaletteContextMenu({ x: e.clientX, y: e.clientY, item: { ...item, group: group.group } }); }}
                               title={item.label}
@@ -7645,7 +8112,7 @@ useEffect(() => {
                             onDragStart={e => !locked && onPaletteDragStart(e, item)}
                             onClick={() => {
                               if (locked) { showLockToast(item.label, WOKWI_TO_COMP_ID[item.type]); return; }
-                              addComponentAtCenter(item); setSelectedPaletteItem({ ...item, group: group.group });
+                              addComponentAtCenter(item);
                             }}
                             onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setPaletteContextMenu({ x: e.clientX, y: e.clientY, item: { ...item, group: group.group } }); }}
                             style={{ padding: '7px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--card)', cursor: locked ? 'not-allowed' : 'pointer', userSelect: 'none', marginBottom: 4, borderLeft: `3px solid ${groupColor}`, transition: 'all .15s', opacity: locked ? 0.4 : 1, filter: locked ? 'grayscale(1)' : 'none', position: 'relative' }}
@@ -7683,8 +8150,29 @@ useEffect(() => {
             : paletteContextMenu.y;
           return (
             <div
+              className="canvas-menu"
               onMouseDown={e => e.stopPropagation()}
-              style={{ position: 'fixed', left: paletteContextMenu.x, top: adjustedY, zIndex: 9000, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', minWidth: 200, overflow: 'hidden' }}
+              onMouseLeave={() => { setPaletteContextMenu(null); setIsPaletteHovered(false); }}
+              style={{ 
+                position: 'fixed', 
+                left: paletteContextMenu.x, 
+                top: adjustedY, 
+                zIndex: 10000, 
+                background: theme === 'light' ? 'rgba(248, 250, 252, 0.8)' : 'rgba(13, 21, 37, 0.75)',
+                backdropFilter: 'blur(16px) saturate(1.4)',
+                WebkitBackdropFilter: 'blur(16px) saturate(1.4)',
+                border: theme === 'light' ? '1px solid rgba(203, 213, 225, 0.6)' : '1px solid rgba(30, 45, 71, 0.6)',
+                borderRadius: 12, 
+                boxShadow: theme === 'light' ? '0 8px 32px rgba(0, 0, 0, 0.08)' : '0 10px 40px rgba(0,0,0,0.5)',
+                minWidth: 200, 
+                padding: '5px',
+                animation: 'canvasMenuIn 0.12s cubic-bezier(0.16, 1, 0.3, 1)',
+                transformOrigin: 'top left',
+                fontFamily: "'Space Grotesk', sans-serif",
+                willChange: 'transform, opacity, backdrop-filter',
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden',
+              }}
             >
               <div style={{ padding: '7px 12px 6px', fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', borderBottom: '1px solid var(--border)' }}>{paletteContextMenu.item.label}</div>
               {[
@@ -7741,12 +8229,12 @@ useEffect(() => {
               ].map(({ icon, label, color, action }) => (
                 <button
                   key={label}
+                  className="canvas-menu-item"
                   onClick={action}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', background: 'none', border: 'none', color, padding: '9px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--card)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                  style={{ color }}
                 >
-                  <span>{icon}</span>{label}
+                  {icon}
+                  {label}
                 </button>
               ))}
             </div>
@@ -7782,7 +8270,6 @@ useEffect(() => {
             opacity: liveEditingDisabled ? 0.8 : 1,
           }}
           ref={canvasRef}
-          onWheel={onWheel}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
@@ -7841,60 +8328,32 @@ useEffect(() => {
                 if (!p1 || !p2) return null
                 const e1 = getPinExitPoint(fromParts[0], fromParts.slice(1).join(':')) || p1;
                 const e2 = getPinExitPoint(toParts[0], toParts.slice(1).join(':')) || p2;
-                const isSelectedWire = selected === w.id;
-                const wirePath = buildWirePath(p1, e1, e2, p2, w.waypoints);
-
+                
                 return (
-                  <g key={w.id} style={{ cursor: 'pointer' }} onClick={(e) => {
-                    e.stopPropagation();
-                    setSelected(w.id);
-                    const rect = canvasRef.current.getBoundingClientRect();
-                    setWireClickPos({ x: (e.clientX - rect.left - canvasOffsetRef.current.x) / canvasZoomRef.current, y: (e.clientY - rect.top - canvasOffsetRef.current.y) / canvasZoomRef.current });
-                  }} onDoubleClick={e => e.stopPropagation()}>
-                    <path d={wirePath} stroke="transparent" strokeWidth={16} fill="none" style={{ pointerEvents: 'stroke' }} />
-                    <path d={wirePath} stroke={isSelectedWire ? 'var(--orange)' : w.color} strokeWidth={isSelectedWire ? 2.5 : 1.5} fill="none" strokeDasharray={isSelectedWire ? "6 4" : "none"} strokeLinecap="round" opacity={0.6} />
-                    <circle cx={p1.x} cy={p1.y} r={isSelectedWire ? 4 : 3} fill={isSelectedWire ? 'var(--orange)' : w.color} opacity={0.6} />
-                    <circle cx={p2.x} cy={p2.y} r={isSelectedWire ? 4 : 3} fill={isSelectedWire ? 'var(--orange)' : w.color} opacity={0.6} />
-                    {wirepointsEnabled && getWirePoints(p1, e1, e2, p2, w.waypoints).reduce((acc, _, i, arr) => {
-                      // Skip pin-stub segments (first: p1→e1, last: e2→p2) — only show on routing segments
-                      if (i < 1 || i >= arr.length - 2) return acc;
-                      const a = arr[i], b = arr[i + 1];
-                      const segLen = Math.hypot(b.x - a.x, b.y - a.y);
-                      if (segLen < 20) return acc;
-                      const isHoriz = Math.abs(b.y - a.y) < 1;
-                      const midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
-                      acc.push(
-                        <circle key={`sh-${i}`} cx={midX} cy={midY} r={isSelectedWire ? 6 : 4}
-                          fill={isSelectedWire ? '#fff' : 'rgba(255,255,255,0.35)'}
-                          stroke={isSelectedWire ? 'var(--orange)' : w.color} strokeWidth={1.5}
-                          opacity={isSelectedWire ? 1 : 0.55}
-                          style={{ pointerEvents: 'all', cursor: isHoriz ? 'ns-resize' : 'ew-resize' }}
-                          title={isHoriz ? 'Drag up/down to route' : 'Drag left/right to route'}
-                          onMouseDown={ev => {
-                            ev.stopPropagation(); ev.preventDefault();
-                            if (!isSelectedWire) { setSelected(w.id); return; }
-                            const rect = canvasRef.current.getBoundingClientRect();
-                            const mx = (ev.clientX - rect.left - canvasOffsetRef.current.x) / canvasZoomRef.current;
-                            const my = (ev.clientY - rect.top - canvasOffsetRef.current.y) / canvasZoomRef.current;
-                            const dragData = { wireId: w.id, segIdx: i, isHoriz, startMouseCanvas: { x: mx, y: my }, startPts: arr.map(pt => ({ ...pt })), preWires: wires, hasMoved: false };
-                            segDragRef.current = dragData;
-                            setSegDrag(dragData);
-                          }}
-                          onClick={ev => ev.stopPropagation()}
-                          onDoubleClick={ev => {
-                            ev.stopPropagation(); ev.preventDefault();
-                            const newCorners = arr.slice(1, -1)
-                              .filter((_, ci) => ci !== i - 1 && ci !== i)
-                              .map(pt => ({ x: pt.x, y: pt.y, _corner: true }));
-                            saveHistory();
-                            setWires(prev => prev.map(ww => ww.id === w.id ? { ...ww, waypoints: newCorners } : ww));
-                          }}
-                        />
-                      );
-                      return acc;
-                    }, [])}
-                  </g>
-                )
+                  <CanvasWire
+                    key={w.id}
+                    wire={w}
+                    p1={p1} p2={p2} e1={e1} e2={e2}
+                    isSelected={selected === w.id}
+                    wirepointsEnabled={wirepointsEnabled}
+                    theme={theme}
+                    onSelect={(e) => {
+                      e.stopPropagation();
+                      setSelected(w.id);
+                      const rect = canvasRef.current.getBoundingClientRect();
+                      setWireClickPos({ x: (e.clientX - rect.left - canvasOffsetRef.current.x) / canvasZoomRef.current, y: (e.clientY - rect.top - canvasOffsetRef.current.y) / canvasZoomRef.current });
+                    }}
+                    onMouseDownSegment={(ev, wire, i, isHoriz, arr) => {
+                      if (selected !== wire.id) { setSelected(wire.id); return; }
+                      const rect = canvasRef.current.getBoundingClientRect();
+                      const mx = (ev.clientX - rect.left - canvasOffsetRef.current.x) / canvasZoomRef.current;
+                      const my = (ev.clientY - rect.top - canvasOffsetRef.current.y) / canvasZoomRef.current;
+                      const dragData = { wireId: wire.id, segIdx: i, isHoriz, startMouseCanvas: { x: mx, y: my }, startPts: arr.map(pt => ({ ...pt })), preWires: wires, hasMoved: false };
+                      segDragRef.current = dragData;
+                      setSegDrag(dragData);
+                    }}
+                  />
+                );
               })}
             </svg>
 
@@ -7912,60 +8371,32 @@ useEffect(() => {
                 if (!p1 || !p2) return null
                 const e1 = getPinExitPoint(fromParts[0], fromParts.slice(1).join(':')) || p1;
                 const e2 = getPinExitPoint(toParts[0], toParts.slice(1).join(':')) || p2;
-                const isSelectedWire = selected === w.id;
-                const wirePath = buildWirePath(p1, e1, e2, p2, w.waypoints);
-
+                
                 return (
-                  <g key={w.id} style={{ cursor: 'pointer' }} onClick={(e) => {
-                    e.stopPropagation();
-                    setSelected(w.id);
-                    const rect = canvasRef.current.getBoundingClientRect();
-                    setWireClickPos({ x: (e.clientX - rect.left - canvasOffsetRef.current.x) / canvasZoomRef.current, y: (e.clientY - rect.top - canvasOffsetRef.current.y) / canvasZoomRef.current });
-                  }} onDoubleClick={e => e.stopPropagation()}>
-                    <path d={wirePath} stroke="transparent" strokeWidth={16} fill="none" style={{ pointerEvents: 'stroke' }} />
-                    <path d={wirePath} stroke={isSelectedWire ? 'var(--orange)' : w.color} strokeWidth={isSelectedWire ? 2.3 : 1.3} fill="none" strokeDasharray={isSelectedWire ? "6 4" : "none"} strokeLinecap="round" opacity={0.9} />
-                    <circle cx={p1.x} cy={p1.y} r={isSelectedWire ? 3 : 2} fill={isSelectedWire ? 'var(--orange)' : w.color} />
-                    <circle cx={p2.x} cy={p2.y} r={isSelectedWire ? 3 : 2} fill={isSelectedWire ? 'var(--orange)' : w.color} />
-                    {wirepointsEnabled && getWirePoints(p1, e1, e2, p2, w.waypoints).reduce((acc, _, i, arr) => {
-                      // Skip pin-stub segments (first: p1→e1, last: e2→p2) — only show on routing segments
-                      if (i < 1 || i >= arr.length - 2) return acc;
-                      const a = arr[i], b = arr[i + 1];
-                      const segLen = Math.hypot(b.x - a.x, b.y - a.y);
-                      if (segLen < 20) return acc;
-                      const isHoriz = Math.abs(b.y - a.y) < 1;
-                      const midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
-                      acc.push(
-                        <circle key={`sh-${i}`} cx={midX} cy={midY} r={isSelectedWire ? 6 : 4}
-                          fill={isSelectedWire ? '#fff' : 'rgba(255,255,255,0.35)'}
-                          stroke={isSelectedWire ? 'var(--orange)' : w.color} strokeWidth={1.5}
-                          opacity={isSelectedWire ? 1 : 0.55}
-                          style={{ pointerEvents: 'all', cursor: isHoriz ? 'ns-resize' : 'ew-resize' }}
-                          title={isHoriz ? 'Drag up/down to route' : 'Drag left/right to route'}
-                          onMouseDown={ev => {
-                            ev.stopPropagation(); ev.preventDefault();
-                            if (!isSelectedWire) { setSelected(w.id); return; }
-                            const rect = canvasRef.current.getBoundingClientRect();
-                            const mx = (ev.clientX - rect.left - canvasOffsetRef.current.x) / canvasZoomRef.current;
-                            const my = (ev.clientY - rect.top - canvasOffsetRef.current.y) / canvasZoomRef.current;
-                            const dragData = { wireId: w.id, segIdx: i, isHoriz, startMouseCanvas: { x: mx, y: my }, startPts: arr.map(pt => ({ ...pt })), preWires: wires, hasMoved: false };
-                            segDragRef.current = dragData;
-                            setSegDrag(dragData);
-                          }}
-                          onClick={ev => ev.stopPropagation()}
-                          onDoubleClick={ev => {
-                            ev.stopPropagation(); ev.preventDefault();
-                            const newCorners = arr.slice(1, -1)
-                              .filter((_, ci) => ci !== i - 1 && ci !== i)
-                              .map(pt => ({ x: pt.x, y: pt.y, _corner: true }));
-                            saveHistory();
-                            setWires(prev => prev.map(ww => ww.id === w.id ? { ...ww, waypoints: newCorners } : ww));
-                          }}
-                        />
-                      );
-                      return acc;
-                    }, [])}
-                  </g>
-                )
+                  <CanvasWire
+                    key={w.id}
+                    wire={w}
+                    p1={p1} p2={p2} e1={e1} e2={e2}
+                    isSelected={selected === w.id}
+                    wirepointsEnabled={wirepointsEnabled}
+                    theme={theme}
+                    onSelect={(e) => {
+                      e.stopPropagation();
+                      setSelected(w.id);
+                      const rect = canvasRef.current.getBoundingClientRect();
+                      setWireClickPos({ x: (e.clientX - rect.left - canvasOffsetRef.current.x) / canvasZoomRef.current, y: (e.clientY - rect.top - canvasOffsetRef.current.y) / canvasZoomRef.current });
+                    }}
+                    onMouseDownSegment={(ev, wire, i, isHoriz, arr) => {
+                      if (selected !== wire.id) { setSelected(wire.id); return; }
+                      const rect = canvasRef.current.getBoundingClientRect();
+                      const mx = (ev.clientX - rect.left - canvasOffsetRef.current.x) / canvasZoomRef.current;
+                      const my = (ev.clientY - rect.top - canvasOffsetRef.current.y) / canvasZoomRef.current;
+                      const dragData = { wireId: wire.id, segIdx: i, isHoriz, startMouseCanvas: { x: mx, y: my }, startPts: arr.map(pt => ({ ...pt })), preWires: wires, hasMoved: false };
+                      segDragRef.current = dragData;
+                      setSegDrag(dragData);
+                    }}
+                  />
+                );
               })}
 
               {/* Preview wire while drawing */}
@@ -8107,245 +8538,181 @@ useEffect(() => {
               const hasError = errorCompIds.has(comp.id)
               const isSelected = selected === comp.id
               const isSerialBoardSelected = serialBoardFilter !== 'all' && serialBoardFilter === comp.id
+
+              const rad = ((comp.rotation || 0) * Math.PI) / 180;
+              const visualH = Math.abs(Math.sin(rad)) * comp.w + Math.abs(Math.cos(rad)) * comp.h;
+              const visualHalfHeight = visualH / 2;
+
               return (
-                <div
-                  key={comp.id}
-                  style={{
+                <React.Fragment key={comp.id}>
+                  <CanvasComponent
+                    comp={comp}
+                    isSelected={isSelected}
+                    hasError={hasError}
+                    onMouseDown={e => onCompMouseDown(e, comp.id)}
+                    onClick={e => onCompClick(e, comp.id)}
+                    getComponentStateAttrs={getComponentStateAttrs}
+                    COMPONENT_REGISTRY={COMPONENT_REGISTRY}
+                    PIN_DEFS={PIN_DEFS}
+                  />
+
+                  {/* Wrapper for the actual emulator component and its dynamic pins */}
+                  <div style={{
                     position: 'absolute',
                     left: comp.x, top: comp.y,
                     width: comp.w, height: comp.h,
-                    zIndex: isSelected ? 5 : 2,
+                    zIndex: isSelected ? 4 : 1,
                     userSelect: 'none',
-                    pointerEvents: 'none', // Clicks pass through the manifest wrapper
+                    pointerEvents: 'none',
                     transform: comp.rotation ? `rotate(${comp.rotation}deg)` : undefined,
                     transformOrigin: 'center center',
-                  }}
-                >
-                  {/* Hit Box — captures selection and drag only within BOUNDS */}
-                  {(() => {
-                    const getBounds = () => {
-                      const reg = COMPONENT_REGISTRY[comp.type];
-                      if (!reg) return { x: 0, y: 0, w: comp.w, h: comp.h };
-                      if (typeof reg.BOUNDS === 'function') return reg.BOUNDS(getComponentStateAttrs(comp));
-                      return reg.BOUNDS || { x: 0, y: 0, w: comp.w, h: comp.h };
-                    };
-                    const b = getBounds();
-                    return (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          left: b.x, top: b.y,
-                          width: b.w, height: b.h,
-                          cursor: wireStart ? 'crosshair' : 'move',
-                          pointerEvents: 'auto',
-                          zIndex: 0, // Below pins and interactive UI elements
-                        }}
-                        onMouseDown={e => onCompMouseDown(e, comp.id)}
-                        onClick={e => onCompClick(e, comp.id)}
-                        onDoubleClick={e => e.stopPropagation()}
-                      />
-                    );
-                  })()}
+                  }}>
 
-                  {/* Selection ring — uses BOUNDS from ui.tsx for precise sizing */}
-                  {isSelected && (() => {
-                    const getBounds = () => {
-                      const reg = COMPONENT_REGISTRY[comp.type];
-                      if (!reg) return { x: 0, y: 0, w: comp.w, h: comp.h };
-                      if (typeof reg.BOUNDS === 'function') return reg.BOUNDS(getComponentStateAttrs(comp));
-                      return reg.BOUNDS || { x: 0, y: 0, w: comp.w, h: comp.h };
-                    };
-                    const b = getBounds();
-                    return (
-                      <div style={{
-                        position: 'absolute',
-                        left: b.x - 6, top: b.y - 6,
-                        width: b.w + 12, height: b.h + 12,
-                        borderRadius: 8,
-                        border: '2px solid var(--accent)',
-                        boxShadow: '0 0 16px var(--glow)',
-                        pointerEvents: 'none', zIndex: 10,
-                      }} />
-                    );
-                  })()}
-                  {/* Error ring — uses BOUNDS from ui.tsx for precise sizing */}
-                  {hasError && (() => {
-                    const getBounds = () => {
-                      const reg = COMPONENT_REGISTRY[comp.type];
-                      if (!reg) return { x: 0, y: 0, w: comp.w, h: comp.h };
-                      if (typeof reg.BOUNDS === 'function') return reg.BOUNDS(getComponentStateAttrs(comp));
-                      return reg.BOUNDS || { x: 0, y: 0, w: comp.w, h: comp.h };
-                    };
-                    const b = getBounds();
-                    return (
-                      <div style={{
-                        position: 'absolute',
-                        left: b.x - 6, top: b.y - 6,
-                        width: b.w + 12, height: b.h + 12,
-                        borderRadius: 8,
-                        border: '2px solid var(--red)',
-                        boxShadow: '0 0 16px rgba(255,68,68,.4)',
-                        pointerEvents: 'none', zIndex: 10,
-                      }} />
-                    );
-                  })()}
+                    {/* Serial-target board ring */}
+                    {isSerialBoardSelected && (() => {
+                      const getBounds = () => {
+                        const reg = COMPONENT_REGISTRY[comp.type];
+                        if (!reg) return { x: 0, y: 0, w: comp.w, h: comp.h };
+                        if (typeof reg.BOUNDS === 'function') return reg.BOUNDS(getComponentStateAttrs(comp));
+                        return reg.BOUNDS || { x: 0, y: 0, w: comp.w, h: comp.h };
+                      };
+                      const b = getBounds();
+                      return (
+                        <>
+                          <div style={{
+                            position: 'absolute',
+                            left: b.x - 10, top: b.y - 10,
+                            width: b.w + 20, height: b.h + 20,
+                            borderRadius: 10,
+                            border: '2px dashed #38bdf8',
+                            boxShadow: '0 0 18px rgba(56,189,248,.45)',
+                            pointerEvents: 'none', zIndex: 9,
+                          }} />
+                          <div style={{
+                            position: 'absolute',
+                            left: b.x - 10,
+                            top: b.y - 26,
+                            background: '#0c4a6e',
+                            color: '#e0f2fe',
+                            border: '1px solid #38bdf8',
+                            borderRadius: 6,
+                            fontSize: 9,
+                            padding: '1px 6px',
+                            letterSpacing: '0.04em',
+                            fontFamily: 'JetBrains Mono, monospace',
+                            pointerEvents: 'none',
+                            zIndex: 11,
+                          }}>
+                            SERIAL TARGET
+                          </div>
+                        </>
+                      );
+                    })()}
 
-                  {/* Serial-target board ring */}
-                  {isSerialBoardSelected && (() => {
-                    const getBounds = () => {
-                      const reg = COMPONENT_REGISTRY[comp.type];
-                      if (!reg) return { x: 0, y: 0, w: comp.w, h: comp.h };
-                      if (typeof reg.BOUNDS === 'function') return reg.BOUNDS(getComponentStateAttrs(comp));
-                      return reg.BOUNDS || { x: 0, y: 0, w: comp.w, h: comp.h };
-                    };
-                    const b = getBounds();
-                    return (
-                      <>
-                        <div style={{
-                          position: 'absolute',
-                          left: b.x - 10, top: b.y - 10,
-                          width: b.w + 20, height: b.h + 20,
-                          borderRadius: 10,
-                          border: '2px dashed #38bdf8',
-                          boxShadow: '0 0 18px rgba(56,189,248,.45)',
-                          pointerEvents: 'none', zIndex: 9,
-                        }} />
-                        <div style={{
-                          position: 'absolute',
-                          left: b.x - 10,
-                          top: b.y - 26,
-                          background: '#0c4a6e',
-                          color: '#e0f2fe',
-                          border: '1px solid #38bdf8',
-                          borderRadius: 6,
-                          fontSize: 9,
-                          padding: '1px 6px',
-                          letterSpacing: '0.04em',
-                          fontFamily: 'JetBrains Mono, monospace',
-                          pointerEvents: 'none',
-                          zIndex: 11,
-                        }}>
-                          SERIAL TARGET
+                    {/* Component Render — wrapped to allow pass-through to Hit Box */}
+                    <div style={{ pointerEvents: 'none', position: 'absolute', inset: 0, zIndex: 1 }}>
+                      {COMPONENT_REGISTRY[comp.type] ? (
+                        // Local UI component rendering SVG
+                        React.createElement(COMPONENT_REGISTRY[comp.type].UI, {
+                          state: oopStates[comp.id] || {},
+                          attrs: getComponentStateAttrs(comp),
+                          isRunning: isRunning
+                        })
+                      ) : (
+                        // Fallback for unsupported components (if any left)
+                        <div
+                          style={{ width: '100%', height: '100%', pointerEvents: 'none', background: '#444', border: '1px solid #777' }}
+                          ref={el => {
+                            if (comp.type === 'wokwi-neopixel-matrix' && el) {
+                              neopixelRefs.current[comp.id] = el;
+                            }
+                          }}
+                        >
+                          {React.createElement(comp.type, getComponentStateAttrs(comp))}
                         </div>
-                      </>
-                    );
-                  })()}
+                      )}
+                    </div>
 
-                  {/* Component Render — wrapped to allow pass-through to Hit Box */}
-                  <div style={{ pointerEvents: 'none', position: 'absolute', inset: 0, zIndex: 1 }}>
-                    {COMPONENT_REGISTRY[comp.type] ? (
-                      // Local UI component rendering SVG
-                      React.createElement(COMPONENT_REGISTRY[comp.type].UI, {
-                        state: oopStates[comp.id] || {},
-                        attrs: getComponentStateAttrs(comp),
-                        isRunning: isRunning
-                      })
-                    ) : (
-                      // Fallback for unsupported components (if any left)
-                      <div
-                        style={{ width: '100%', height: '100%', pointerEvents: 'none', background: '#444', border: '1px solid #777' }}
-                        ref={el => {
-                          if (comp.type === 'wokwi-neopixel-matrix' && el) {
-                            neopixelRefs.current[comp.id] = el;
-                          }
-                        }}
-                      >
-                        {React.createElement(comp.type, getComponentStateAttrs(comp))}
-                      </div>
-                    )}
+                    {/* Pins */}
+                    {pins.map(pin => {
+                      const pinStrRef = `${comp.id}:${pin.id}`;
+                      const isHovered = hoveredPin === pinStrRef;
+                      const isWireStartPin = wireStart?.compId === comp.id && wireStart?.pinId === pin.id;
+
+                      // Hovered pin's category for passive highlighting
+                      const hoverCompId = hoveredPin?.split(':')[0];
+                      const hoverPinId = hoveredPin?.split(':')[1];
+                      const hoverComp = hoverCompId ? components.find(c => c.id === hoverCompId) : null;
+                      const hoverCat = (hoverComp && hoverPinId) ? getPinCategory(hoverPinId, '', hoverComp.type) : null;
+
+                      const startCat = wireStart ? getPinCategory(wireStart.pinId, wireStart.pinLabel, wireStart.compType) : null;
+                      const currentCat = getPinCategory(pin.id, pin.description, comp.type);
+
+                      const isSuggested = startCat && currentCat && hasCategoryIntersection(startCat, currentCat) && !isWireStartPin;
+                      const isRelated = hoverCat && currentCat && hasCategoryIntersection(hoverCat, currentCat) && !isHovered;
+
+                      const isHighlight = isWireStartPin || isHovered || isSuggested || isRelated;
+
+                      // Check if a wire is connected to this pin
+                      const connectedWire = wires.find(w => w.from === pinStrRef || w.to === pinStrRef);
+                      const pinColor = connectedWire ? connectedWire.color : (isHighlight ? '#f1c40f' : 'rgba(255,255,255,0.2)');
+                      const pinBorder = connectedWire ? connectedWire.color : (isHighlight ? '#fff' : 'rgba(255,255,255,0.8)');
+
+                      return (
+                        <div
+                          key={pin.id}
+                          title={`${pin.description || pin.id} — click to wire`}
+                          style={{
+                            position: 'absolute',
+                            left: pin.x, top: pin.y,
+                            width: 5, height: 5,
+                            background: pinColor,
+                            border: `1px solid ${pinBorder}`,
+                            borderRadius: '0%', /* matching task3.html */
+                            cursor: 'crosshair',
+                            zIndex: isHovered || isSuggested ? 30 : 20, /* matching task3.html hover and port z-index */
+                            transform: `translate(-50%, -50%)${isHovered || isSuggested ? ' scale(1.5)' : ''}`, /* matching task3.html scale */
+                            transition: '0.2s', /* matching task3.html transition */
+                            pointerEvents: 'all', /* Fix hit detection */
+                            boxShadow: isSuggested ? '0 0 8px #f1c40f' : 'none',
+                          }}
+                          onMouseEnter={() => setHoveredPin(pinStrRef)}
+                          onMouseLeave={() => setHoveredPin(null)}
+                          onClick={e => onPinClick(e, comp.id, pin.id, pin.description || pin.id)}
+                        >
+                          {/* Pin label tooltip */}
+                          {isHovered && (
+                            <div style={{
+                              position: 'absolute', bottom: 18, left: '50%',
+                              transform: 'translateX(-50%)',
+                              background: '#111', color: '#fff',
+                              padding: '4px 8px', borderRadius: 4,
+                              fontSize: 10, whiteSpace: 'nowrap', zIndex: 9999,
+                              pointerEvents: 'none', border: '1px solid #444',
+                              boxShadow: '0 2px 5px rgba(0,0,0,0.5)',
+                            }}>
+                              {pin.description || pin.id}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
 
-                  {/* Pins */}
-                  {pins.map(pin => {
-                    const pinStrRef = `${comp.id}:${pin.id}`;
-                    const isHovered = hoveredPin === pinStrRef;
-                    const isWireStartPin = wireStart?.compId === comp.id && wireStart?.pinId === pin.id;
-
-                    // Hovered pin's category for passive highlighting
-                    const hoverCompId = hoveredPin?.split(':')[0];
-                    const hoverPinId = hoveredPin?.split(':')[1];
-                    const hoverComp = hoverCompId ? components.find(c => c.id === hoverCompId) : null;
-                    const hoverCat = (hoverComp && hoverPinId) ? getPinCategory(hoverPinId, '', hoverComp.type) : null;
-
-                    const startCat = wireStart ? getPinCategory(wireStart.pinId, wireStart.pinLabel, wireStart.compType) : null;
-                    const currentCat = getPinCategory(pin.id, pin.description, comp.type);
-
-                    const isSuggested = startCat && currentCat && hasCategoryIntersection(startCat, currentCat) && !isWireStartPin;
-                    const isRelated = hoverCat && currentCat && hasCategoryIntersection(hoverCat, currentCat) && !isHovered;
-
-                    const isHighlight = isWireStartPin || isHovered || isSuggested || isRelated;
-
-                    // Check if a wire is connected to this pin
-                    const connectedWire = wires.find(w => w.from === pinStrRef || w.to === pinStrRef);
-                    const pinColor = connectedWire ? connectedWire.color : (isHighlight ? '#f1c40f' : 'rgba(255,255,255,0.2)');
-                    const pinBorder = connectedWire ? connectedWire.color : (isHighlight ? '#fff' : 'rgba(255,255,255,0.8)');
-
-                    return (
-                      <div
-                        key={pin.id}
-                        title={`${pin.description || pin.id} — click to wire`}
-                        style={{
-                          position: 'absolute',
-                          left: pin.x, top: pin.y,
-                          width: 5, height: 5,
-                          background: pinColor,
-                          border: `1px solid ${pinBorder}`,
-                          borderRadius: '0%', /* matching task3.html */
-                          cursor: 'crosshair',
-                          zIndex: isHovered || isSuggested ? 30 : 20, /* matching task3.html hover and port z-index */
-                          transform: `translate(-50%, -50%)${isHovered || isSuggested ? ' scale(1.5)' : ''}`, /* matching task3.html scale */
-                          transition: '0.2s', /* matching task3.html transition */
-                          pointerEvents: 'all', /* Fix hit detection */
-                          boxShadow: isSuggested ? '0 0 8px #f1c40f' : 'none',
-                        }}
-                        onMouseEnter={() => setHoveredPin(pinStrRef)}
-                        onMouseLeave={() => setHoveredPin(null)}
-                        onClick={e => onPinClick(e, comp.id, pin.id, pin.description || pin.id)}
-                      >
-                        {/* Pin label tooltip */}
-                        {isHovered && (
-                          <div style={{
-                            position: 'absolute', bottom: 18, left: '50%',
-                            transform: 'translateX(-50%)',
-                            background: '#111', color: '#fff',
-                            padding: '4px 8px', borderRadius: 4,
-                            fontSize: 10, whiteSpace: 'nowrap', zIndex: 9999,
-                            pointerEvents: 'none', border: '1px solid #444',
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.5)',
-                          }}>
-                            {pin.description || pin.id}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-
-                  {/* Component label */}
+                  {/* Component label (Outside rotated container) */}
                   <div style={{
                     position: 'absolute',
-                    top: (() => {
-                      const reg = COMPONENT_REGISTRY[comp.type];
-                      const b = typeof reg?.BOUNDS === 'function'
-                        ? reg.BOUNDS(getComponentStateAttrs(comp))
-                        : (reg?.BOUNDS || { x: 0, y: 0, w: comp.w, h: comp.h });
-                      return b.y + b.h + 4;
-                    })(),
-                    left: (() => {
-                      const reg = COMPONENT_REGISTRY[comp.type];
-                      const b = typeof reg?.BOUNDS === 'function'
-                        ? reg.BOUNDS(getComponentStateAttrs(comp))
-                        : (reg?.BOUNDS || { x: 0, y: 0, w: comp.w, h: comp.h });
-                      return b.x + b.w / 2;
-                    })(),
+                    top: comp.y + comp.h / 2 + visualHalfHeight + 4,
+                    left: comp.x + comp.w / 2,
                     transform: 'translateX(-50%)',
                     fontSize: 10, color: hasError ? 'var(--red)' : 'var(--text3)',
                     whiteSpace: 'nowrap', fontFamily: 'JetBrains Mono, monospace',
                     pointerEvents: 'none',
+                    zIndex: 5,
                   }}>
                     {comp.label}
                   </div>
-
-                </div>
+                </React.Fragment>
               )
             })}
           </div>{/* end zoom wrapper */}
@@ -8435,6 +8802,7 @@ useEffect(() => {
               data-export-ignore="true"
               onClick={e => e.stopPropagation()}
               onMouseDown={e => e.stopPropagation()}
+              onDoubleClick={e => e.stopPropagation()}
               style={{ position: 'absolute', top: 12, right: 12, zIndex: 90, width: 220, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.35)', overflow: 'hidden' }}
             >
               {/* Header */}
@@ -8457,10 +8825,6 @@ useEffect(() => {
                   {selectedComponentInfo.label}
                 </div>
 
-                {/* Description - Preserved from Local */}
-                <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
-                  {COMPONENT_REGISTRY[selectedComponentInfo.type]?.manifest?.description || COMPONENT_DESCRIPTIONS[selectedComponentInfo.type] || `${selectedComponentInfo.type} component`}
-                </div>
 
                 <div style={{
                   display: 'flex',
@@ -8815,8 +9179,29 @@ useEffect(() => {
               >⋮</button>
               {showCanvasMenu && (
                 <div
-                  style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: 6, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', minWidth: 190, zIndex: 200, padding: '4px' }}
+                  className="canvas-menu"
                   onMouseLeave={() => setShowCanvasMenu(false)}
+                  style={{ 
+                    position: 'absolute', 
+                    bottom: '100%', 
+                    right: 0, 
+                    marginBottom: 10,
+                    zIndex: 10000, 
+                    background: theme === 'light' ? 'rgba(248, 250, 252, 0.8)' : 'rgba(13, 21, 37, 0.75)',
+                    backdropFilter: 'blur(16px) saturate(1.4)',
+                    WebkitBackdropFilter: 'blur(16px) saturate(1.4)',
+                    border: theme === 'light' ? '1px solid rgba(203, 213, 225, 0.6)' : '1px solid rgba(30, 45, 71, 0.6)',
+                    borderRadius: 12, 
+                    boxShadow: theme === 'light' ? '0 8px 32px rgba(0, 0, 0, 0.08)' : '0 10px 40px rgba(0,0,0,0.5)',
+                    padding: '5px',
+                    minWidth: 190,
+                    animation: 'canvasMenuIn 0.12s cubic-bezier(0.16, 1, 0.3, 1)',
+                    transformOrigin: 'bottom right',
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    willChange: 'transform, opacity, backdrop-filter',
+                    backfaceVisibility: 'hidden',
+                    WebkitBackfaceVisibility: 'hidden',
+                  }}
                 >
                   <button className="canvas-menu-item" onClick={() => { setCanvasZoom(1); setCanvasOffset({ x: 0, y: 0 }); setShowCanvasMenu(false); }}>Fit to Canvas</button>
                   <button className={`canvas-menu-item${history.past.length === 0 || isRunning ? ' canvas-menu-item--disabled' : ''}`} onClick={() => { undo(); setShowCanvasMenu(false); }} disabled={history.past.length === 0 || isRunning}>Undo</button>
@@ -8882,17 +9267,30 @@ useEffect(() => {
             const top = quickAdd.screenY + approxH > VH ? quickAdd.screenY - approxH - 4 : quickAdd.screenY + 4;
             return (
               <div
+                className="canvas-menu"
                 data-quickadd="true"
                 onMouseDown={e => e.stopPropagation()}
+                onDoubleClick={e => e.stopPropagation()}
+                onMouseLeave={() => setQuickAdd(null)}
                 style={{
-                  position: 'fixed', left, top, zIndex: 9999,
+                  position: 'fixed', 
+                  left, 
+                  top, 
+                  zIndex: 10000,
                   width: menuW,
-                  background: 'var(--bg2)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 10,
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.55)',
-                  overflow: 'hidden',
+                  background: theme === 'light' ? 'rgba(248, 250, 252, 0.8)' : 'rgba(13, 21, 37, 0.75)',
+                  backdropFilter: 'blur(16px) saturate(1.4)',
+                  WebkitBackdropFilter: 'blur(16px) saturate(1.4)',
+                  border: theme === 'light' ? '1px solid rgba(203, 213, 225, 0.6)' : '1px solid rgba(30, 45, 71, 0.6)',
+                  borderRadius: 12,
+                  boxShadow: theme === 'light' ? '0 8px 32px rgba(0, 0, 0, 0.08)' : '0 10px 40px rgba(0,0,0,0.5)',
+                  padding: '5px',
+                  animation: 'canvasMenuIn 0.12s cubic-bezier(0.16, 1, 0.3, 1)',
+                  transformOrigin: 'top left',
                   fontFamily: "'Space Grotesk', sans-serif",
+                  willChange: 'transform, opacity, backdrop-filter',
+                  backfaceVisibility: 'hidden',
+                  WebkitBackfaceVisibility: 'hidden',
                 }}
               >
                 {/* Search input */}
@@ -8915,30 +9313,34 @@ useEffect(() => {
                     placeholder="Search component..."
                     style={{
                       width: '100%', boxSizing: 'border-box',
-                      background: 'var(--bg3)', border: '1px solid var(--border2)',
-                      color: 'var(--text)', padding: '7px 10px',
-                      borderRadius: 7, fontFamily: 'inherit', fontSize: 13, outline: 'none',
+                      background: theme === 'light' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.2)', 
+                      border: '1px solid var(--border)',
+                      color: 'var(--text)', padding: '10px 14px',
+                      borderRadius: 10, fontFamily: 'inherit', fontSize: 14, outline: 'none',
+                      transition: 'all 0.2s',
                     }}
+                    onFocus={e => e.currentTarget.style.borderColor = 'var(--accent)'}
+                    onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
                   />
                 </div>
                 {/* Result list */}
                 {results.map((item, i) => (
                   <div
                     key={`${item.type}-${i}`}
+                    className="canvas-menu-item"
                     data-quickadd="true"
                     onMouseEnter={() => setQuickAddIdx(i)}
                     onMouseDown={e => { e.preventDefault(); addComponentAt(item, quickAdd.canvasX, quickAdd.canvasY); setQuickAdd(null); }}
                     style={{
-                      padding: '8px 12px',
-                      fontSize: 13,
-                      cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', gap: 8,
                       background: i === selIdx ? 'var(--accent)' : 'transparent',
                       color: i === selIdx ? '#fff' : 'var(--text)',
+                      borderRadius: 8,
+                      margin: '2px 5px',
+                      width: 'calc(100% - 10px)',
                       userSelect: 'none',
                     }}
                   >
-                    <span style={{ fontWeight: 600, flex: 1 }}>{item.label}</span>
+                    <span style={{ fontWeight: i === selIdx ? 700 : 500, flex: 1 }}>{item.label}</span>
                     {i === selIdx && <span style={{ fontSize: 10, opacity: 0.75 }}>↵</span>}
                   </div>
                 ))}
@@ -8959,7 +9361,8 @@ useEffect(() => {
         <RightPanel
           isPanelOpen={isPanelOpen} panelWidth={panelWidth} isDragging={isDragging} onMouseDownResize={onMouseDownResize} setIsPanelOpen={setIsPanelOpen}
           explorerWidth={explorerWidth} isExplorerDragging={isExplorerDragging} onMouseDownExplorerResize={onMouseDownExplorerResize}
-          selected={selected} setSelected={setSelected}
+          selected={selected} setSelected={setSelected} theme={theme}
+          projectName={currentProjectName}
           validationErrors={validationErrors} showValidation={showValidation} setShowValidation={setShowValidation}
           codeTab={codeTab} setCodeTab={setCodeTab} code={code} setCode={setCode}
           blocklyXml={blocklyXml} setBlocklyXml={setBlocklyXml}
@@ -9681,10 +10084,30 @@ useEffect(() => {
       {/* Project right-click context menu */}
       {projContextMenu && (
         <div
-          className="fixed z-[9999] bg-[var(--bg2)] border border-[var(--border)] rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] min-w-[200px] overflow-hidden animate-in fade-in zoom-in-95 duration-100"
-          style={{ left: projContextMenu.x, top: Math.min(projContextMenu.y, window.innerHeight - 240) }}
+          className="canvas-menu"
           onMouseDown={e => e.stopPropagation()}
           onClick={e => e.stopPropagation()}
+          onMouseLeave={() => setProjContextMenu(null)}
+          style={{ 
+            position: 'fixed', 
+            left: projContextMenu.x, 
+            top: Math.min(projContextMenu.y, window.innerHeight - 240),
+            zIndex: 10000, 
+            background: theme === 'light' ? 'rgba(248, 250, 252, 0.8)' : 'rgba(13, 21, 37, 0.75)',
+            backdropFilter: 'blur(16px) saturate(1.4)',
+            WebkitBackdropFilter: 'blur(16px) saturate(1.4)',
+            border: theme === 'light' ? '1px solid rgba(203, 213, 225, 0.6)' : '1px solid rgba(30, 45, 71, 0.6)',
+            borderRadius: 12, 
+            boxShadow: theme === 'light' ? '0 8px 32px rgba(0, 0, 0, 0.08)' : '0 10px 40px rgba(0,0,0,0.5)',
+            minWidth: 200, 
+            padding: '5px',
+            animation: 'canvasMenuIn 0.12s cubic-bezier(0.16, 1, 0.3, 1)',
+            transformOrigin: 'top left',
+            fontFamily: "'Space Grotesk', sans-serif",
+            willChange: 'transform, opacity, backdrop-filter',
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+          }}
         >
           <div className="px-4 py-2.5 text-[10px] font-extrabold text-[var(--text3)] uppercase tracking-wider border-b border-[var(--border)] bg-[var(--bg)]/40 flex items-center justify-between">
             <span className="truncate mr-2">{projContextMenu.proj.name || 'Untitled Project'}</span>
@@ -9696,7 +10119,7 @@ useEffect(() => {
           
           <div className="p-1 flex flex-col gap-0.5">
             <button 
-              className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-semibold text-[var(--text2)] hover:text-[var(--text)] rounded-lg transition-all hover:bg-[var(--card)] group"
+              className="canvas-menu-item"
               onClick={() => { toggleFavourite(projContextMenu.proj.id); setProjContextMenu(null); }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill={favouriteProjectIds.includes(projContextMenu.proj.id) ? "var(--orange, #f59e0b)" : "none"} stroke={favouriteProjectIds.includes(projContextMenu.proj.id) ? "var(--orange, #f59e0b)" : "currentColor"} strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
@@ -9704,7 +10127,7 @@ useEffect(() => {
             </button>
             
             <button 
-              className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-semibold text-[var(--text2)] hover:text-[var(--text)] rounded-lg transition-all hover:bg-[var(--card)]"
+              className="canvas-menu-item"
               onClick={() => { handleCopyProject(projContextMenu.proj); setProjContextMenu(null); }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
@@ -9712,7 +10135,7 @@ useEffect(() => {
             </button>
             
             <button 
-              className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-semibold text-[var(--text2)] hover:text-[var(--text)] rounded-lg transition-all hover:bg-[var(--card)]"
+              className="canvas-menu-item"
               onClick={() => { handleStartRename(projContextMenu.proj, { stopPropagation: () => {} }); setProjContextMenu(null); setProjectsSidebarTab('projects'); }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
@@ -9722,7 +10145,7 @@ useEffect(() => {
             <div className="h-px bg-[var(--border)] my-1 mx-2 opacity-50" />
             
             <button 
-              className="w-full flex items-center gap-3 px-3 py-2 text-[13px] font-semibold text-red-500 hover:text-red-600 rounded-lg transition-all hover:bg-red-500/10"
+              className="canvas-menu-item canvas-menu-item--danger"
               onClick={() => { handleDeleteProject(projContextMenu.proj.id); setProjContextMenu(null); }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /></svg>

@@ -22,7 +22,15 @@ COPY OpenHW-studio-frontend/ .
 # Build-time environment variables
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-# We don't need VITE_EMULATOR_PATH anymore because we put it in node_modules
+
+ARG VITE_EXAMPLES_BASE_URL
+ENV VITE_EXAMPLES_BASE_URL=$VITE_EXAMPLES_BASE_URL
+
+ARG VITE_GOOGLE_CLIENT_ID
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+
+ARG VITE_ADMIN_EMAILS
+ENV VITE_ADMIN_EMAILS=$VITE_ADMIN_EMAILS
 
 # Build the app
 RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
@@ -31,15 +39,8 @@ RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
 FROM nginx:stable-alpine
 COPY --from=build /app/frontend/dist /usr/share/nginx/html
 
-# Custom nginx config to handle SPA routing
-RUN printf "server { \n\
-    listen 80; \n\
-    location / { \n\
-        root /usr/share/nginx/html; \n\
-        index index.html index.htm; \n\
-        try_files \$uri \$uri/ /index.html; \n\
-    } \n\
-}" > /etc/nginx/conf.d/default.conf
+# Custom nginx config to handle SPA routing and Reverse Proxy
+COPY OpenHW-studio-frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
