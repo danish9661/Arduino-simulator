@@ -20,6 +20,11 @@ import { BOARD_DEFAULT_BAUD, normalizeBoardKind } from '../utils/boards.js';
 import { getManifestInfo } from '../utils/manifests.js';
 import { FRONTEND_ROOT, relToCwd, resolveWorkspacePath } from '../utils/paths.js';
 import {
+  runCircuitValidation,
+  formatCircuitValidationText,
+  runCodeSyncValidation,
+} from '../utils/circuit-validate.js';
+import {
   buildProfileEvents,
   componentInputSchemaForProject,
   diffBoardPins,
@@ -580,6 +585,45 @@ function buildConnectionChecker(project: Awaited<ReturnType<typeof loadProject>>
 export function registerSimCommands(program: Command, getBackendUrl: () => string): void {
   const sim = program.command('sim').description('Simulation run, telemetry, input, and screenshot commands');
 
+  // ── sim validate ──────────────────────────────────────────────────────────
+  sim
+    .command('validate <projectFile>')
+    .description(
+      'Run physics-based circuit safety validation (wiring rules, over-current, polarity, etc.)'
+    )
+    .option('--json', 'Output results as JSON instead of human-readable text')
+    .option('--fail-on-warn', 'Exit with code 1 even when only warnings are found')
+    .action(async (projectFile: string, options: any) => {
+      const project = await loadProject(projectFile);
+      const result = await runCircuitValidation(project);
+      const syncResult = await runCodeSyncValidation(project);
+
+      if (options.json) {
+        printJson({
+          ok: result.passed && syncResult.passed,
+          action: 'sim.validate',
+          file: relToCwd(resolveWorkspacePath(projectFile)),
+          passed: result.passed && syncResult.passed,
+          issueCount: result.issues.length + syncResult.issues.length,
+          issues: [...result.issues, ...syncResult.issues.map(i => ({ ...i, compIds: [] }))],
+          rawErrors: result.rawErrors,
+        });
+      } else {
+        process.stdout.write(
+          formatCircuitValidationText(result, relToCwd(resolveWorkspacePath(projectFile)))
+        );
+        if (syncResult.issues.length > 0) {
+          process.stdout.write('\nSoftware-Hardware Sync Issues:\n');
+          syncResult.issues.forEach(i => process.stdout.write(`  🟡 ${i.message}\n`));
+        }
+      }
+
+      const shouldFail = !result.passed ||
+        (options.failOnWarn && (result.issues.some(i => i.severity === 'warn') || syncResult.issues.length > 0));
+      if (shouldFail) process.exitCode = 1;
+    });
+
+  // ── sim run ───────────────────────────────────────────────────────────────
   sim
     .command('run <projectFile>')
     .description('Compile and run simulation from project JSON')
@@ -601,6 +645,26 @@ export function registerSimCommands(program: Command, getBackendUrl: () => strin
       const validation = await validateProject(project);
       if (!validation.valid) {
         process.stderr.write('[sim] project validation has errors, run may fail.\n');
+      }
+
+      // ── Physics / wiring safety check (mirrors SimulatorPage.jsx) ──────────
+      const circuitCheck = await runCircuitValidation(project);
+      if (!circuitCheck.passed) {
+        process.stderr.write(formatCircuitValidationText(circuitCheck, relToCwd(resolveWorkspacePath(projectFile))));
+        process.stderr.write('[sim] Circuit safety check failed. Fix the above issues before running.\n');
+        process.exitCode = 1;
+        return;
+      }
+      if (circuitCheck.issues.some(i => i.severity === 'warn')) {
+        process.stderr.write(formatCircuitValidationText(circuitCheck, relToCwd(resolveWorkspacePath(projectFile))));
+        process.stderr.write('[sim] Circuit warnings detected (see above). Continuing run.\n');
+      }
+
+      const syncResult = await runCodeSyncValidation(project);
+      if (syncResult.issues.length > 0) {
+          process.stderr.write('\n⚠️  Software-Hardware Sync Warnings:\n');
+          syncResult.issues.forEach(i => process.stderr.write(`   ${i.message}\n`));
+          process.stderr.write('\n');
       }
 
       const boardSummary = summarizeProject(project).boards as Array<{ id: string; type: string }>;
@@ -743,7 +807,7 @@ export function registerSimCommands(program: Command, getBackendUrl: () => strin
       );
 
       let latestTelemetry = controller.getTelemetryReport();
-      const render = () => {
+      const render = async () => {
         latestTelemetry = controller.getTelemetryReport();
         if (options.json) {
           printJson(latestTelemetry);
@@ -751,6 +815,17 @@ export function registerSimCommands(program: Command, getBackendUrl: () => strin
         }
         console.clear();
         printTelemetryTextReport(latestTelemetry, projectFile, options.output);
+
+        // ── Live Circuit Safety Check ───────────────────────────────────────
+        const safetyResult = await runCircuitValidation(project);
+        const syncResult = await runCodeSyncValidation(project);
+        if (!safetyResult.passed || safetyResult.issues.length > 0 || syncResult.issues.length > 0) {
+          process.stdout.write(formatCircuitValidationText(safetyResult, 'LIVE SESSION'));
+          if (syncResult.issues.length > 0) {
+            process.stdout.write('\nSoftware-Hardware Sync Issues:\n');
+            syncResult.issues.forEach(i => process.stdout.write(`  🟡 ${i.message}\n`));
+          }
+        }
       };
 
       if (!options.json) {

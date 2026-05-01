@@ -13,6 +13,11 @@ import {
   validateProject,
 } from '../utils/project.js';
 import { relToCwd, resolveWorkspacePath } from '../utils/paths.js';
+import {
+  runCircuitValidation,
+  formatCircuitValidationText,
+  runCodeSyncValidation,
+} from '../utils/circuit-validate.js';
 import { startSimulation } from '../sim/session.js';
 import { getManifestInfo, getPinsForType, listManifestInfos } from '../utils/manifests.js';
 import {
@@ -687,6 +692,48 @@ export async function runMcpServer(config: McpServerConfig): Promise<void> {
         action: 'project_validate',
         file: relToCwd(projectFile),
         ...validation,
+      });
+    }
+  );
+
+  server.tool(
+    'circuit_validate',
+    'Run real-world physics-based circuit safety checks on the active project ' +
+    '(short circuits, polarity, missing resistors, floating pins, RP2040 over-voltage, I2C pull-ups, etc.). ' +
+    'Returns the same issues that appear in the SimulatorPage validation panel.',
+    {
+      token: z.string().optional(),
+    },
+    async ({ token }) => {
+      assertToken(config, token);
+      const { project, projectFile } = await requireActiveProject(session);
+      const result = await runCircuitValidation(project);
+      const syncResult = await runCodeSyncValidation(project);
+      
+      const allIssues = [
+        ...result.issues.map(issue => ({
+          severity: issue.severity,
+          message: issue.message,
+          compIds: issue.compIds,
+          type: 'physics'
+        })),
+        ...syncResult.issues.map(issue => ({
+          severity: issue.severity,
+          message: issue.message,
+          compIds: [],
+          type: 'software-sync'
+        }))
+      ];
+
+      return makeToolResult({
+        ok: result.passed && syncResult.passed,
+        action: 'circuit_validate',
+        file: relToCwd(projectFile),
+        passed: result.passed && syncResult.passed,
+        issueCount: allIssues.length,
+        issues: allIssues,
+        summary: formatCircuitValidationText(result, relToCwd(projectFile)),
+        rawErrors: result.rawErrors,
       });
     }
   );

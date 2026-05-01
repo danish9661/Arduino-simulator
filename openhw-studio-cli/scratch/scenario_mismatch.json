@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "author": "Test",
+  "name": "Mismatch Test",
+  "components": [
+    { "id": "uno1", "type": "wokwi-arduino-uno", "attrs": {} }
+  ],
+  "connections": [],
+  "code": "void setup() {\n  pinMode(12, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(12, HIGH);\n  delay(500);\n  digitalWrite(12, LOW);\n  delay(500);\n}"
+}
