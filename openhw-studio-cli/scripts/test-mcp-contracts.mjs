@@ -102,6 +102,15 @@ async function main() {
     assert(!validate.isError, 'project_validate returned error.');
     assert(typeof validate.parsed?.ok === 'boolean', 'project_validate ok missing.');
 
+    const circuitValidate = await callTool(client, 'circuit_validate', {
+      ...(token ? { token } : {}),
+    });
+    assert(!circuitValidate.isError, 'circuit_validate returned error.');
+    assert(typeof circuitValidate.parsed?.ok === 'boolean', 'circuit_validate ok missing.');
+    assert(typeof circuitValidate.parsed?.issueCount === 'number', 'circuit_validate issueCount missing.');
+    assert(Array.isArray(circuitValidate.parsed?.issues), 'circuit_validate issues missing.');
+    assert(typeof circuitValidate.parsed?.summary === 'string', 'circuit_validate summary missing.');
+
     const catalog = await callTool(client, 'component_catalog', {
       ...(token ? { token } : {}),
     });

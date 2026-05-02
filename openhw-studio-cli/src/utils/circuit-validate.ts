@@ -24,17 +24,31 @@ export type ValidationSeverity = 'error' | 'warn' | 'info';
 
 export interface CircuitValidationIssue {
   severity: ValidationSeverity;
+  type?: string;
   message: string;
   /** Component IDs extracted from the message (best-effort). */
   compIds: string[];
+  remediation?: string | null;
+  autoFix?: boolean;
+  ruleId?: string | null;
+  componentId?: string | null;
+  source?: string | null;
+  priority?: number | null;
+  confidence?: number | null;
+  details?: unknown;
 }
 
 export interface CircuitValidationResult {
   /** true = all checks passed, false = at least one failure. */
   passed: boolean;
   issues: CircuitValidationIssue[];
-  /** Raw error strings from the engine, exactly as they appear in the UI. */
-  rawErrors: string[];
+  /** Raw error objects/strings from the engine. */
+  rawErrors: any[];
+  profile: string;
+  fromCache: boolean;
+  rootCauseGroups: unknown[];
+  recommendedFixes: unknown[];
+  ignoredIssueCount: number;
 }
 
 // --------------------------------------------------------------------------
@@ -106,6 +120,11 @@ export async function runCircuitValidation(project: OpenHwProject): Promise<Circ
         compIds: [],
       }],
       rawErrors: [],
+      profile: 'balanced',
+      fromCache: false,
+      rootCauseGroups: [],
+      recommendedFixes: [],
+      ignoredIssueCount: 0,
     };
   }
 
@@ -122,22 +141,63 @@ export async function runCircuitValidation(project: OpenHwProject): Promise<Circ
 
   try {
     const validator = new ValidatorClass(projectData);
-    const passed = validator.runValidation();
+    const passed = validator.runValidation({
+      profile: 'balanced',
+      useCache: true,
+      includeTemporalValidation: false,
+      incremental: true,
+      incrementalScope: 'cli',
+    });
 
-    const rawErrors: string[] = validator.errors || [];
-    const issues: CircuitValidationIssue[] = rawErrors.map(msg => ({
-      severity: classifySeverity(msg),
-      message: msg,
-      compIds: extractCompIds(msg),
-    }));
+    const rawErrors: any[] = validator.errors || [];
+    const issues: CircuitValidationIssue[] = rawErrors.map(err => {
+      if (typeof err === 'string') {
+        return {
+          severity: classifySeverity(err),
+          type: classifySeverity(err),
+          message: err,
+          compIds: extractCompIds(err),
+        };
+      }
+      return {
+        severity: err.severity || err.type || 'error',
+        type: err.type || err.severity || 'error',
+        message: err.message || '',
+        compIds: err.compIds || [],
+        remediation: err.remediation,
+        autoFix: err.autoFix,
+        ruleId: err.ruleId || err.id || null,
+        componentId: err.componentId || null,
+        source: err.source || null,
+        priority: Number.isFinite(Number(err.priority)) ? Number(err.priority) : null,
+        confidence: Number.isFinite(Number(err.confidence)) ? Number(err.confidence) : null,
+        details: err.details ?? null,
+      };
+    });
 
-    return { passed, issues, rawErrors };
+    const lastRunMeta = validator.lastRunMeta || {};
+
+    return {
+      passed,
+      issues,
+      rawErrors,
+      profile: String(lastRunMeta.profile || 'balanced'),
+      fromCache: Boolean(lastRunMeta.fromCache),
+      rootCauseGroups: Array.isArray(lastRunMeta.rootCauseGroups) ? lastRunMeta.rootCauseGroups : [],
+      recommendedFixes: Array.isArray(lastRunMeta.recommendedFixes) ? lastRunMeta.recommendedFixes : [],
+      ignoredIssueCount: Array.isArray(lastRunMeta.ignoredErrors) ? lastRunMeta.ignoredErrors.length : 0,
+    };
   } catch (err) {
     const msg = `[circuit-validate] Engine threw an error: ${String(err)}`;
     return {
       passed: true,
       issues: [{ severity: 'warn', message: msg, compIds: [] }],
       rawErrors: [msg],
+      profile: 'balanced',
+      fromCache: false,
+      rootCauseGroups: [],
+      recommendedFixes: [],
+      ignoredIssueCount: 0,
     };
   }
 }
@@ -175,6 +235,12 @@ export function formatCircuitValidationText(result: CircuitValidationResult, pro
       if (issue.compIds.length > 0) {
         lines.push(`     → Affected: ${issue.compIds.join(', ')}`);
       }
+      if (issue.remediation) {
+        lines.push(`     → Fix: ${issue.remediation}`);
+      }
+      if (issue.autoFix) {
+        lines.push('     → Auto-fix: available');
+      }
     }
   }
 
@@ -183,4 +249,54 @@ export function formatCircuitValidationText(result: CircuitValidationResult, pro
   }
 
   return lines.join('\n') + '\n';
+}
+
+/**
+ * Programmatic autofix runner for CLI/MCP
+ * - `issue` can be an issue object returned by `runCircuitValidation`.
+ * - Returns { applied, components, connections, appliedFixes, metadata }
+ */
+export async function runAutoFix(project: OpenHwProject, issue: any, options: { appliedBy?: string } = {}) {
+  const indexPath = path.join(EMULATOR_ROOT, 'src', 'circuit-validation', 'index.js');
+  try {
+    const mod = await import(pathToFileURL(indexPath).href);
+    const applyCircuitFix = mod.applyCircuitFix;
+    if (!applyCircuitFix) {
+      return { applied: false, reason: 'applyCircuitFix not available in emulator package' };
+    }
+
+    const engineConnections = (project.connections || []).map(wire => ({
+      from: String(wire.from || '').replace(':', '.'),
+      to: String(wire.to || '').replace(':', '.')
+    }));
+
+    const projectData = { components: project.components || [], connections: engineConnections };
+
+    const engineError = {
+      message: issue.message || String(issue || ''),
+      remediation: issue.remediation || issue.fix || null,
+      compIds: issue.compIds || issue.componentId ? (issue.compIds || [issue.componentId]) : [],
+      id: issue.ruleId || issue.id || null,
+    };
+
+    const result = applyCircuitFix(projectData, engineError, { appliedBy: options.appliedBy || 'cli', trackHistory: true });
+
+    // Convert connections back to CLI format (comp.pin -> comp:pin)
+    const outConnections = (result.connections || []).map(w => ({
+      from: String(w.from || '').replace('.', ':'),
+      to: String(w.to || '').replace('.', ':'),
+      color: w.color,
+      label: w.label,
+    }));
+
+    return {
+      applied: Boolean(result.applied),
+      components: result.components,
+      connections: outConnections,
+      appliedFixes: result.appliedFixes || [],
+      metadata: result.metadata || {},
+    };
+  } catch (err) {
+    return { applied: false, reason: String(err) };
+  }
 }

@@ -713,15 +713,31 @@ export async function runMcpServer(config: McpServerConfig): Promise<void> {
       const allIssues = [
         ...result.issues.map(issue => ({
           severity: issue.severity,
+          type: issue.type || issue.severity,
           message: issue.message,
           compIds: issue.compIds,
-          type: 'physics'
+          remediation: issue.remediation ?? null,
+          autoFix: Boolean(issue.autoFix),
+          ruleId: issue.ruleId ?? null,
+          componentId: issue.componentId ?? null,
+          source: issue.source || 'physics',
+          priority: issue.priority ?? null,
+          confidence: issue.confidence ?? null,
+          details: issue.details ?? null,
         })),
         ...syncResult.issues.map(issue => ({
           severity: issue.severity,
+          type: issue.severity,
           message: issue.message,
           compIds: [],
-          type: 'software-sync'
+          remediation: null,
+          autoFix: false,
+          ruleId: null,
+          componentId: null,
+          source: 'software-sync',
+          priority: null,
+          confidence: 1,
+          details: null,
         }))
       ];
 
@@ -730,8 +746,13 @@ export async function runMcpServer(config: McpServerConfig): Promise<void> {
         action: 'circuit_validate',
         file: relToCwd(projectFile),
         passed: result.passed && syncResult.passed,
+        profile: result.profile,
+        fromCache: result.fromCache,
         issueCount: allIssues.length,
+        ignoredIssueCount: result.ignoredIssueCount,
         issues: allIssues,
+        rootCauseGroups: result.rootCauseGroups,
+        recommendedFixes: result.recommendedFixes,
         summary: formatCircuitValidationText(result, relToCwd(projectFile)),
         rawErrors: result.rawErrors,
       });

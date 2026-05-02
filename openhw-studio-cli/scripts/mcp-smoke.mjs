@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const cliRoot = path.resolve(__dirname, '..');
 
-const backendUrl = String(process.env.MCP_SMOKE_BACKEND_URL || 'http://127.0.0.1:5001').trim();
+const backendUrl = String(process.env.MCP_SMOKE_BACKEND_URL || 'http://127.0.0.1:5001/api').trim();
 const requireSimulation = String(process.env.MCP_SMOKE_REQUIRE_SIM || '1').trim() !== '0';
 const token = String(process.env.OPENHW_MCP_TOKEN || '').trim();
 

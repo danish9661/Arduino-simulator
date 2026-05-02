@@ -226,6 +226,7 @@ FRONTEND_URL=http://localhost:5173
 |---|---|
 | This file | Architecture overview, setup, and feature summary |
 | [OFFLINE_AND_STORAGE.md](./OFFLINE_AND_STORAGE.md) | Full technical reference for offline features and IndexedDB storage |
+| [validation_migration_guide.md](./validation_migration_guide.md) | Migration guide for structured validation issues, WebUI annotations, and CLI/MCP output |
 | [OpenHW-studio-frontend/README.md](./OpenHW-studio-frontend/README.md) | Frontend structure, pages, and features |
 | [openhw-studio-backend/README.md](./openhw-studio-backend/README.md) | Backend API endpoints and compilation pipeline |
 | [openhw-studio-emulator/README.md](./openhw-studio-emulator/README.md) | Emulator CPU simulation and WebSocket protocol |
