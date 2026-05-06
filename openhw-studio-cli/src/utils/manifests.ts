@@ -167,6 +167,12 @@ async function loadAllManifests(): Promise<void> {
         const pinId = String(pin?.id || '').trim();
         if (!pinId) continue;
         pinIds.add(pinId);
+
+        const pinDescription = typeof pin?.description === 'string' ? pin.description.trim() : '';
+        if (pinDescription) {
+          pinIds.add(pinDescription);
+        }
+
         pins.push({
           id: pinId,
           x: Number.isFinite(Number(pin?.x)) ? Number(pin?.x) : undefined,

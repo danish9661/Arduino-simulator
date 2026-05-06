@@ -126,6 +126,10 @@ export interface SimulationRunOptions {
   stdinSerial?: boolean;
   stdinBoardId?: string;
   telemetryMode?: 'off' | 'text' | 'json';
+  telemetrySchedule?: {
+    intervalMs?: number;
+    atMs?: number[];
+  };
 }
 
 export interface SimulationRunResult {

@@ -1,3 +1,4 @@
+import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useIsMobile } from './hooks/useIsMobile'
 
@@ -35,8 +36,13 @@ import AdventureMapPage from './pages/AdventureMapPage.jsx'
 import ProjectGuidePage from './pages/ProjectGuidePage.jsx'
 import GamifiedProjectGuidePage from './pages/GamifiedProjectGuidePage.jsx'
 import GuidedSimulatorPage from './pages/GuidedSimulatorPage.jsx'
-import MobileSimulatorPage from "./pages/mobileui/SimulatorPage.jsx";
+import MobileSimulatorPage from './pages/mobileui/SimulatorPage.jsx'
 import ComponentLab from "./pages/simulationpage/ComponentLab.jsx";
+import GradingPage from './pages/GradingPage.jsx';
+import MaintenancePage from './pages/MaintenancePage.jsx';
+
+import { fetchMaintenanceStatus } from './services/simulatorService.js';
+import axios from 'axios';
 
 
 
@@ -65,12 +71,60 @@ const ResponsiveSimulatorRoute = ({ desktopElement, mobileElement }) => {
   return isMobile ? mobileElement : desktopElement;
 };
 
+const MaintenanceGuard = ({ children }) => {
+  const [maintenance, setMaintenance] = React.useState(false);
+  const [checking, setChecking] = React.useState(true);
+  const location = useLocation();
+  const isAdminPath = location.pathname.startsWith('/admin');
+
+  React.useEffect(() => {
+    let isMounted = true;
+    const check = async () => {
+      const isMaint = await fetchMaintenanceStatus();
+      if (isMounted) {
+        setMaintenance(isMaint);
+        setChecking(false);
+      }
+    };
+
+    check();
+    const interval = setInterval(check, 30000); // Check every 30s
+
+    // Global Axios Interceptor for 503 / connection errors
+    const interceptor = axios.interceptors.response.use(
+      response => response,
+      error => {
+        if (!error.response || error.response.status === 503) {
+          if (isMounted) setMaintenance(true);
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      axios.interceptors.response.eject(interceptor);
+    };
+  }, []);
+
+  if (checking && !isAdminPath) return null; // Wait for initial check unless admin
+
+  // Admins are never blocked from admin paths
+  if (maintenance && !isAdminPath) {
+    return <MaintenancePage />;
+  }
+
+  return children;
+};
+
 export default function App() {
 
   return (
     <BrowserRouter>
       <AuthProvider>
         <GamificationProvider>
+          <MaintenanceGuard>
 
           {/* Global toast notifications (level-up, badge earned, XP) */}
           <GamificationToasts />
@@ -94,7 +148,9 @@ export default function App() {
             <Route path="/components/:componentId/theory" element={<TheoryPage />} />
             <Route path="/components/:componentId/quiz" element={<QuizPage />} />
             <Route path="/adventure" element={<AdventureMapPage />} />
+            <Route path="/grade" element={<GradingPage />} />
             <Route path="/gamification-simulator" element={<GamificationSimulatorPage />} />
+
                         <Route path="/gamification-simulator/:projectName" element={<GamificationSimulatorPage />} />
             {/* Guest accessible simulator */}
             <Route path="/simulator" element={<ResponsiveSimulatorRoute desktopElement={<SimulatorPage />} mobileElement={<MobileSimulatorPage />} />} />
@@ -195,6 +251,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
 
+          </MaintenanceGuard>
         </GamificationProvider>
       </AuthProvider>
     </BrowserRouter>

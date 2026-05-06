@@ -1,0 +1,4 @@
+# Protect CI/CD workflows and sensitive configurations
+/.github/workflows/ @danish9661
+/.env* @danish9661
+/package.json @danish9661

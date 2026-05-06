@@ -97,6 +97,8 @@ export interface SimulationController {
   sendComponentEvent: (componentId: string, event: any) => boolean;
   getSnapshot: () => SimulationSnapshot;
   getTelemetryReport: () => SimulationTelemetryReport;
+  getRichTelemetrySnapshot: () => any;
+  setTelemetryEnabled: (enabled: boolean) => void;
   getResult: () => SimulationRunResult;
 }
 
@@ -815,6 +817,17 @@ export async function startSimulation(
       return;
     }
 
+    if (normalized.type === 'telemetry_finding') {
+      if (!suppressConsoleOutput) {
+        const componentId = String(normalized.componentId || 'unknown');
+        const summary = String(normalized.summary || '');
+        const severity = String(normalized.severity || 'warn').toUpperCase();
+        const icon = severity === 'ERROR' ? '🔴' : '🟡';
+        process.stderr.write(`\n${icon} [telemetry:${boardId || 'unknown'}] ${componentId}: ${summary}\n`);
+      }
+      return;
+    }
+
     if (suppressConsoleOutput) {
       return;
     }
@@ -846,6 +859,13 @@ export async function startSimulation(
         })),
       };
       process.stdout.write(`${JSON.stringify(compact)}\n`);
+    }
+
+    if (normalized.type === 'telemetry_snapshot') {
+      if (!suppressConsoleOutput) {
+        const elapsed = (Number(normalized.elapsedMs) / 1000).toFixed(2);
+        process.stderr.write(`\n[sim] Telemetry Snapshot captured at ${elapsed}s\n`);
+      }
     }
   };
 
@@ -1010,6 +1030,37 @@ export async function startSimulation(
   }
 
   let stopped = false;
+
+  // -- Telemetry Scheduler --
+  const schedule = options.telemetrySchedule;
+  const scheduleTimers: Array<ReturnType<typeof setTimeout>> = [];
+  
+  if (schedule && (schedule.intervalMs || (schedule.atMs && schedule.atMs.length > 0))) {
+    const triggerSnapshot = () => {
+      if (stopped) return;
+      const snapshot = getRichTelemetrySnapshot();
+      emitEvent({
+        type: 'telemetry_snapshot',
+        ...snapshot
+      });
+    };
+
+    if (schedule.intervalMs && schedule.intervalMs >= 250) {
+      const interval = setInterval(triggerSnapshot, schedule.intervalMs);
+      registerInjectionTimer(interval);
+    }
+
+    if (Array.isArray(schedule.atMs)) {
+      for (const ms of schedule.atMs) {
+        if (ms > 0) {
+          const timeout = setTimeout(triggerSnapshot, ms);
+          scheduleTimers.push(timeout);
+          registerInjectionTimer(timeout);
+        }
+      }
+    }
+  }
+
   let stdinAttached = false;
   let stdinHandler: ((chunk: string) => void) | null = null;
 
@@ -1092,22 +1143,42 @@ export async function startSimulation(
     return telemetryCollector.getSnapshot();
   };
 
-  const getResult = (): SimulationRunResult => {
-    const boardResults = selectedBoards.map((board) => ({
-      boardId: board.id,
-      boardType: board.type,
-      serialChars: Number(boardSerialChars.get(board.id) || 0),
-      faultCount: Number(boardFaultCounts.get(board.id) || 0),
-    }));
-
+  const getRichTelemetrySnapshot = (options: { mode?: 'standard' | 'deep' | 'delta' } = {}) => {
+    const reports: any[] = [];
+    for (const runtime of boardRuntimes.values()) {
+      const report = (runtime.runner as any).getRichTelemetrySnapshot?.(options);
+      if (report) reports.push(report);
+    }
     return {
+      capturedAt: new Date().toISOString(),
       elapsedMs: Date.now() - startedAt,
+      mode: options.mode || 'deep',
+      reports,
+    };
+  };
+
+  const setTelemetryEnabled = (enabled: boolean) => {
+    for (const runtime of boardRuntimes.values()) {
+      (runtime.runner as any).setTelemetryEnabled?.(!!enabled);
+    }
+  };
+
+  const getResult = (): SimulationRunResult => {
+    const elapsedMs = Date.now() - startedAt;
+    return {
+      elapsedMs,
       boardId: selectedBoards[0]?.id || '',
       boardType: selectedBoards[0]?.type || '',
       boardIds: selectedBoards.map((b) => b.id),
-      serialChars: boardResults.reduce((acc, b) => acc + b.serialChars, 0),
-      faultCount: boardResults.reduce((acc, b) => acc + b.faultCount, 0),
-      boardResults,
+      serialChars: Array.from(boardSerialChars.values()).reduce((a, b) => a + b, 0),
+      faultCount: Array.from(boardFaultCounts.values()).reduce((a, b) => a + b, 0),
+      boardResults: selectedBoards.map((b) => ({
+        boardId: b.id,
+        boardType: b.type,
+        serialChars: boardSerialChars.get(b.id) || 0,
+        faultCount: boardFaultCounts.get(b.id) || 0,
+      })),
+      telemetry: telemetryCollector.getReport(elapsedMs),
     };
   };
 
@@ -1118,9 +1189,22 @@ export async function startSimulation(
     boardTypes,
     stop,
     sendSerial,
-    sendComponentEvent,
     getSnapshot,
     getTelemetryReport,
+    getRichTelemetrySnapshot: (options: { mode?: 'standard' | 'deep' | 'delta' } = {}) => {
+      const reports: any[] = [];
+      for (const runtime of boardRuntimes.values()) {
+        const report = (runtime.runner as any).getRichTelemetrySnapshot?.(options);
+        if (report) reports.push(report);
+      }
+      return {
+        capturedAt: new Date().toISOString(),
+        elapsedMs: Date.now() - startedAt,
+        mode: options.mode || 'deep',
+        reports,
+      };
+    },
+    setTelemetryEnabled,
     getResult,
   };
 }

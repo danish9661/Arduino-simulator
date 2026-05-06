@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "openhw-project-v2",
+  "board": "arduino_uno",
+  "components": [
+    {
+      "id": "wokwi-resistor_1777999183638_0",
+      "type": "wokwi-resistor",
+      "label": "Resistor",
+      "x": -162.712,
+      "y": 561.804,
+      "w": 60,
+      "h": 12,
+      "rotation": 0,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "id": "wokwi_led_1",
+      "type": "wokwi-led",
+      "label": "LED",
+      "x": -142.712,
+      "y": 572.804,
+      "w": 38,
+      "h": 38,
+      "rotation": 0,
+      "attrs": {
+        "color": "red",
+        "breadboard": {
+          "anchorPin": "A"
+        }
+      }
+    },
+    {
+      "id": "uno1",
+      "type": "wokwi-arduino-uno",
+      "label": "Arduino Uno",
+      "x": -279.814,
+      "y": 161.961,
+      "w": 311,
+      "h": 228,
+      "rotation": 0,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    {
+      "id": "w_via_out_1777999183638_0",
+      "from": "wokwi-resistor_1777999183638_0:p2",
+      "to": "uno:13",
+      "color": "blue",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "p2",
+      "toLabel": "13"
+    }
+  ],
+  "blocklyXml": "",
+  "blocklyGeneratedCode": "",
+  "useBlocklyCode": false,
+  "projectFiles": [
+    {
+      "id": "project/library.txt",
+      "path": "project/library.txt",
+      "name": "library.txt",
+      "kind": "root",
+      "content": "void setup() {\n  pinMode(13, OUTPUT);\n}\n\n{}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\ndelay(500);\ndigitalWrite(13, LOW);\ndelay(500);\n}",
+      "dirty": true
+    },
+    {
+      "id": "project/uno1/uno1.ino",
+      "path": "project/uno1/uno1.ino",
+      "name": "uno1.ino",
+      "kind": "code",
+      "boardId": "uno1",
+      "boardKind": "arduino_uno",
+      "content": "// uno1 main sketch\nvoid setup() {\n  pinMode(13, OUTPUT);\n  // Serial.begin(9600);\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(500);\n  digitalWrite(13, LOW);\n  delay(500);\n}\n",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [],
+  "activeCodeFileId": "project/library.txt",
+  "code": "void setup() {\n  pinMode(13, OUTPUT);\n}\n\n{}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\ndelay(500);\ndigitalWrite(13, LOW);\ndelay(500);\n}",
+  "name": "Untitled",
+  "exportedAt": "2026-05-06T10:38:35.373Z"
+}

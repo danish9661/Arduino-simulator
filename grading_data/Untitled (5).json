@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "openhw-project-v2",
+  "board": "arduino_uno",
+  "components": [
+    {
+      "id": "uno1",
+      "type": "wokwi-arduino-uno",
+      "label": "Arduino Uno",
+      "x": 318.5,
+      "y": 548.8,
+      "w": 311,
+      "h": 228,
+      "rotation": 0,
+      "attrs": {}
+    },
+    {
+      "id": "wokwi_arduino_mega_1",
+      "type": "wokwi-arduino-mega",
+      "label": "Arduino Mega 2560",
+      "x": 359,
+      "y": -35.2,
+      "w": 430,
+      "h": 228,
+      "rotation": 0,
+      "attrs": {}
+    },
+    {
+      "id": "wokwi_breadboard_1",
+      "type": "wokwi-breadboard",
+      "label": "Breadboard (Full)",
+      "x": 8,
+      "y": 176.20001220703125,
+      "w": 990,
+      "h": 295,
+      "rotation": 0,
+      "attrs": {}
+    }
+  ],
+  "connections": [],
+  "blocklyXml": "",
+  "blocklyGeneratedCode": "",
+  "useBlocklyCode": false,
+  "projectFiles": [
+    {
+      "id": "project/library.txt",
+      "path": "project/library.txt",
+      "name": "library.txt",
+      "kind": "root",
+      "content": "{}",
+      "dirty": true
+    },
+    {
+      "id": "project/uno1/uno1.ino",
+      "path": "project/uno1/uno1.ino",
+      "name": "uno1.ino",
+      "kind": "code",
+      "boardId": "uno1",
+      "boardKind": "arduino_uno",
+      "content": "// uno1 main sketch\nvoid setup() {\n  pinMode(13, OUTPUT);\n  // Serial.begin(9600);\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(500);\n  digitalWrite(13, LOW);\n  delay(500);\n}\n",
+      "dirty": false
+    },
+    {
+      "id": "project/wokwi_arduino_mega_1/wokwi_arduino_mega_1.ino",
+      "path": "project/wokwi_arduino_mega_1/wokwi_arduino_mega_1.ino",
+      "name": "wokwi_arduino_mega_1.ino",
+      "kind": "code",
+      "boardId": "wokwi_arduino_mega_1",
+      "boardKind": "arduino_uno",
+      "content": "// wokwi_arduino_mega_1 main sketch\nvoid setup() {\n  pinMode(13, OUTPUT);\n  // Serial.begin(9600);\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(500);\n  digitalWrite(13, LOW);\n  delay(500);\n}\n",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/library.txt"
+  ],
+  "activeCodeFileId": "project/library.txt",
+  "code": "{}",
+  "name": "Untitled",
+  "exportedAt": "2026-05-06T07:23:11.405Z"
+}

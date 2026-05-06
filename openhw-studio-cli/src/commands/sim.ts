@@ -501,11 +501,17 @@ async function parseScenarioFile(inputPath: string): Promise<unknown> {
 
 async function runForDuration(
   project: Awaited<ReturnType<typeof loadProject>>,
-  runOptions: SimulationRunOptions
-): Promise<{ result: any; telemetry: SimulationTelemetryReport; snapshot: SimulationSnapshot }> {
+  runOptions: SimulationRunOptions & { richTelemetry?: boolean }
+): Promise<{ result: any; telemetry: SimulationTelemetryReport; snapshot: SimulationSnapshot; richReport?: any }> {
   const controller = await startSimulation(project, runOptions);
+  
+  if (runOptions.richTelemetry || runOptions.telemetrySchedule) {
+    controller.setTelemetryEnabled(true);
+  }
 
   const waitMs = parsePositiveInt(String(runOptions.durationMs), 0);
+  let richReport: any = null;
+
   if (waitMs > 0) {
     await new Promise((resolve) => setTimeout(resolve, waitMs));
   } else {
@@ -518,11 +524,16 @@ async function runForDuration(
     });
   }
 
+  if (runOptions.richTelemetry) {
+    richReport = controller.getRichTelemetrySnapshot();
+  }
+
   controller.stop();
   return {
     result: controller.getResult(),
     telemetry: controller.getTelemetryReport(),
     snapshot: controller.getSnapshot(),
+    richReport
   };
 }
 
@@ -639,6 +650,10 @@ export function registerSimCommands(program: Command, getBackendUrl: () => strin
     .option('--snapshot-json <file>', 'Write runtime snapshot JSON to file')
     .option('--screenshot-out <file>', 'Write SVG screenshot of final simulation state')
     .option('--telemetry-out <file>', 'Write telemetry JSON report to file')
+    .option('--rich-telemetry', 'Enable deep component-level telemetry collection')
+    .option('--rich-telemetry-out <file>', 'Write rich telemetry raw metrics JSON to file')
+    .option('--telemetry-interval <ms>', 'Automated periodic telemetry report interval', '0')
+    .option('--telemetry-at <seconds>', 'Comma-separated timestamps (in seconds) for automated reports')
     .option('--fail-on-fault', 'Exit with non-zero code when faults are reported')
     .action(async (projectFile: string, options: any) => {
       const project = await loadProject(projectFile);
@@ -685,10 +700,17 @@ export function registerSimCommands(program: Command, getBackendUrl: () => strin
         serialInput: options.serialInput,
         stdinSerial: !!options.stdinSerial,
         stdinBoardId: options.stdinBoardId || getDefaultBoardForStdin(project),
+        telemetrySchedule: {
+          intervalMs: parsePositiveInt(options.telemetryInterval, 0),
+          atMs: String(options.telemetryAt || '')
+            .split(',')
+            .map((s) => parseFloat(s.trim()) * 1000)
+            .filter((ms) => !Number.isNaN(ms) && ms > 0),
+        },
       };
 
       const startedAt = new Date().toISOString();
-      const { result, telemetry, snapshot } = await runForDuration(project, runOptions);
+      const { result, telemetry, snapshot, richReport } = await runForDuration(project, { ...runOptions, richTelemetry: !!options.richTelemetry });
 
       if (options.snapshotJson) {
         await writeOutputFile(options.snapshotJson, `${JSON.stringify(snapshot, null, 2)}\n`);
@@ -701,6 +723,10 @@ export function registerSimCommands(program: Command, getBackendUrl: () => strin
       if (options.screenshotOut) {
         const svg = await renderSnapshotSvg(project, snapshot, telemetry);
         await writeOutputFile(options.screenshotOut, svg);
+      }
+
+      if (options.richTelemetryOut && richReport) {
+        await writeOutputFile(options.richTelemetryOut, `${JSON.stringify(richReport, null, 2)}\n`);
       }
 
       const payload: Record<string, unknown> = {
@@ -724,6 +750,10 @@ export function registerSimCommands(program: Command, getBackendUrl: () => strin
 
       if (runOptions.telemetryMode !== 'off') {
         payload.telemetry = telemetry;
+      }
+
+      if (options.richTelemetry && richReport) {
+        payload.richReport = richReport;
       }
 
       if (options.snapshotJson) {

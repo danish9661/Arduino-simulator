@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intelligent Grading Engine Prototype</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #070b14;
+            --card: #0f172a;
+            --primary: #3b82f6;
+            --accent: #10b981;
+            --error: #ef4444;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #60a5fa, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--card);
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+        }
+
+        .upload-area {
+            border: 2px dashed rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary);
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .upload-area input {
+            display: none;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+
+        .option-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        button.grade-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+
+        button.grade-btn:hover {
+            opacity: 0.9;
+        }
+
+        button.grade-btn:active {
+            transform: scale(0.98);
+        }
+
+        #result {
+            margin-top: 40px;
+            display: none;
+        }
+
+        .report {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 16px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .score-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .score-box {
+            flex: 1;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            border-radius: 12px;
+        }
+
+        .score-val {
+            font-size: 2.5rem;
+            font-weight: 700;
+            display: block;
+        }
+
+        .score-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .feedback-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .feedback-list li {
+            padding: 12px;
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid var(--error);
+            margin-bottom: 8px;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.95rem;
+        }
+
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(7, 11, 20, 0.9);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.1);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Grading Eye Engine</h1>
+        <p class="subtitle">High-performance Rust/WASM Comparison Prototype</p>
+
+        <div class="grid">
+            <div class="card">
+                <h2>Teacher PNG</h2>
+                <div class="upload-area" id="teacher-area">
+                    <span>Click or Drag Teacher PNG</span>
+                    <input type="file" id="teacher-input" accept="image/png">
+                </div>
+            </div>
+            <div class="card">
+                <h2>Student PNG</h2>
+                <div class="upload-area" id="student-area">
+                    <span>Click or Drag Student PNG</span>
+                    <input type="file" id="student-input" accept="image/png">
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Teacher Configuration</h2>
+            <div class="options">
+                <label class="option-item">
+                    <input type="checkbox" id="exact-match" checked>
+                    Exact Pin Matching (Penalize if different pins used)
+                </label>
+                <label class="option-item">
+                    <input type="checkbox" id="check-breadboard" checked>
+                    Enforce Breadboard Placement
+                </label>
+                <label class="option-item">
+                    <input type="checkbox" id="check-overlap" checked>
+                    Check Component Overlaps
+                </label>
+            </div>
+            <button class="grade-btn" id="grade-btn">Compare & Grade</button>
+        </div>
+
+        <div id="result">
+            <div class="report">
+                <h2>Grading Report</h2>
+                <div class="score-row">
+                    <div class="score-box">
+                        <span class="score-val" id="total-score">--</span>
+                        <span class="score-label">Total Score</span>
+                    </div>
+                    <div class="score-box">
+                        <span class="score-val" id="spatial-score">--</span>
+                        <span class="score-label">Spatial Eye</span>
+                    </div>
+                    <div class="score-box">
+                        <span class="score-val" id="logic-score">--</span>
+                        <span class="score-label">Logic Score</span>
+                    </div>
+                </div>
+                <ul class="feedback-list" id="feedback-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loading">
+        <div class="spinner"></div>
+        <p>Analyzing Circuits in Rust WASM...</p>
+    </div>
+
+    <script type="module">
+        const teacherInput = document.getElementById('teacher-input');
+        const studentInput = document.getElementById('student-input');
+        const teacherArea = document.getElementById('teacher-area');
+        const studentArea = document.getElementById('student-area');
+        const gradeBtn = document.getElementById('grade-btn');
+        const loading = document.getElementById('loading');
+        const resultDiv = document.getElementById('result');
+
+        teacherArea.onclick = () => teacherInput.click();
+        studentArea.onclick = () => studentInput.click();
+
+        teacherInput.onchange = (e) => {
+            teacherArea.querySelector('span').textContent = e.target.files[0].name;
+        };
+        studentInput.onchange = (e) => {
+            studentArea.querySelector('span').textContent = e.target.files[0].name;
+        };
+
+        const worker = new Worker('grading-worker.js', { type: 'module' });
+
+        worker.onmessage = (e) => {
+            loading.style.display = 'none';
+            const report = e.data;
+            
+            document.getElementById('total-score').textContent = report.score;
+            document.getElementById('spatial-score').textContent = report.spatial_score;
+            document.getElementById('logic-score').textContent = report.logic_score;
+
+            const list = document.getElementById('feedback-list');
+            list.innerHTML = '';
+            report.feedback.forEach(f => {
+                const li = document.createElement('li');
+                li.textContent = f;
+                list.appendChild(li);
+            });
+
+            if (report.feedback.length === 0) {
+                const li = document.createElement('li');
+                li.textContent = "Perfect circuit! No errors detected.";
+                li.style.borderColor = "var(--accent)";
+                li.style.background = "rgba(16, 185, 129, 0.1)";
+                list.appendChild(li);
+            }
+
+            resultDiv.style.display = 'block';
+            resultDiv.scrollIntoView({ behavior: 'smooth' });
+        };
+
+        gradeBtn.onclick = async () => {
+            if (!teacherInput.files[0] || !studentInput.files[0]) {
+                alert("Please select both Teacher and Student PNG files.");
+                return;
+            }
+
+            loading.style.display = 'flex';
+
+            const teacherBuf = await teacherInput.files[0].arrayBuffer();
+            const studentBuf = await studentInput.files[0].arrayBuffer();
+
+            const options = {
+                exact_match: document.getElementById('exact-match').checked,
+                check_breadboard: document.getElementById('check-breadboard').checked,
+                check_overlap: document.getElementById('check-overlap').checked
+            };
+
+            worker.postMessage({
+                teacher: teacherBuf,
+                student: studentBuf,
+                options
+            }, [teacherBuf, studentBuf]);
+        };
+    </script>
+</body>
+</html>
