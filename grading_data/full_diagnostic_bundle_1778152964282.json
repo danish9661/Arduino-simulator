@@ -1,0 +1,982 @@
+{
+  "grading_report": {
+    "score": 60,
+    "spatial_score": 67,
+    "logic_score": 30,
+    "behavioral_score": 100,
+    "teacher_metrics": {
+      "pins": 20,
+      "functional": 6,
+      "serial": 0
+    },
+    "student_metrics": {
+      "pins": 20,
+      "functional": 6,
+      "serial": 0
+    },
+    "feedback": [
+      "Spatial Error: Component inventory does not match reference. (e.g., Wrong board or missing parts)",
+      "Spatial Error: 1 overlapping component sets detected.",
+      "Spatial Error: wokwi-resistor_1777999183638_0 is floating! Pins must be snapped to breadboard holes.",
+      "Spatial Error: wokwi_led_1 is floating! Pins must be snapped to breadboard holes.",
+      "Missing Connection: Expected wokwi_led_1:A to res_wokwi_led_1:p1.",
+      "Missing Connection: Expected res_wokwi_led_1:p2 to uno1:13.",
+      "Missing Connection: Expected wokwi_led_1:K to uno1:GND.",
+      "Missing Connection: Expected wokwi_led_1:A to bb_2:3c.",
+      "Missing Connection: Expected wokwi_led_1:K to bb_2:4c.",
+      "Missing Connection: Expected res_wokwi_led_1:p1 to bb_2:3a.",
+      "Missing Connection: Expected res_wokwi_led_1:p2 to bb_2:7a.",
+      "Code Note: Programming style differs from reference, but core logic is present.",
+      "Note: Wiring structure differs from reference, but functional results prove valid connectivity."
+    ],
+    "logs": [
+      "Initializing Grading Engine (Rust/WASM)...",
+      "Warning: Teacher's reference circuit has spatial errors! (Health: 95%)",
+      "Teacher Reference: 4 components, 7 connections.",
+      "Starting Spatial Eye Analysis...",
+      "Spatial: Inventory mismatch detected. Teacher: [\"wokwi-arduino-uno\", \"wokwi-breadboard-mini\", \"wokwi-led\", \"wokwi-resistor\"], Student: [\"wokwi-arduino-uno\", \"wokwi-led\", \"wokwi-resistor\"]",
+      "Spatial: Detected 1 collisions.",
+      "Spatial: Pin-snapping check complete. Score: 80",
+      "Spatial: Final Analysis complete. Score: 67",
+      "Starting Connectivity Graph Comparison...",
+      "Logic: Graph isomorphism complete. Score: 30. (2 of 7 teacher connections validated in student circuit)",
+      "Diagnostic: Telemetry Filtered. Teacher: 26 -> 0, Student: 26 -> 0",
+      "Behavior: Time-scaling active. Factor: 1.000x (Compensating for simulator drift)",
+      "Warning: Teacher's reference shows very low functional activity. Behavior score may be inflated.",
+      "Behavior: Telemetry diffing complete. Score: 100. (Captured 26 student events vs 26 teacher events)",
+      "Starting Code & Programming Logic Analysis...",
+      "Code: AST/Keyword matching complete. Score: 95. (Verified core Arduino/Logic structures)",
+      "Scoring Breakdown: Spatial: 67, Logic: 30, Behavior: 100, Code: 95, Health Penalty: 30%"
+    ],
+    "teacher_telemetry": "{\n  \"events\": [\n    {\n      \"PinChange\": {\n        \"pin\": \"0\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"1\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"2\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"3\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"4\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"5\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"6\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"7\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"8\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"9\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"10\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"11\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"12\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"13\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"A0\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"A1\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"A2\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"A3\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"A4\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"A5\",\n        \"state\": false,\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"ComponentState\": {\n        \"id\": \"wokwi_led_1\",\n        \"key\": \"glow\",\n        \"value\": \"false\",\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"ComponentState\": {\n        \"id\": \"wokwi_led_1\",\n        \"key\": \"current\",\n        \"value\": \"0\",\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"ComponentState\": {\n        \"id\": \"wokwi_led_1\",\n        \"key\": \"voltageDrop\",\n        \"value\": \"0\",\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"ComponentState\": {\n        \"id\": \"res_wokwi_led_1\",\n        \"key\": \"glow\",\n        \"value\": \"false\",\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"ComponentState\": {\n        \"id\": \"res_wokwi_led_1\",\n        \"key\": \"current\",\n        \"value\": \"0\",\n        \"time_ms\": 25\n      }\n    },\n    {\n      \"ComponentState\": {\n        \"id\": \"res_wokwi_led_1\",\n        \"key\": \"voltageDrop\",\n        \"value\": \"0\",\n        \"time_ms\": 25\n      }\n    }\n  ],\n  \"duration_ms\": 8000,\n  \"rich_metrics\": \"{\\\"boardId\\\":\\\"uno1\\\",\\\"components\\\":[{\\\"id\\\":\\\"uno1\\\",\\\"type\\\":\\\"wokwi-arduino-uno\\\",\\\"metrics\\\":{\\\"updateFreq\\\":159999999.9,\\\"timing\\\":{\\\"totalMs\\\":1.9000000208616257,\\\"maxMs\\\":0.30000000447034836,\\\"avgMs\\\":0.01137724563390195,\\\"count\\\":167,\\\"lastUpdateAtMs\\\":1778152942465},\\\"pinToggles\\\":{},\\\"stateSize\\\":55,\\\"stateStability\\\":{\\\"lastStateChangeAtMs\\\":1778152934052,\\\"lastStateChangeCycles\\\":null,\\\"stateMutationCount\\\":5,\\\"idleMs\\\":8536},\\\"ioThroughput\\\":{\\\"i2cTransactions\\\":0,\\\"i2cBytes\\\":0,\\\"spiTransactions\\\":0,\\\"spiBytes\\\":0,\\\"uartBytes\\\":0,\\\"lastIoAtMs\\\":0},\\\"interactionAudit\\\":{\\\"onEventCount\\\":0,\\\"onPinStateChangeCount\\\":0,\\\"byType\\\":{},\\\"lastEventAtMs\\\":0},\\\"powerProfile\\\":{\\\"vcc\\\":{\\\"current\\\":0,\\\"average\\\":0,\\\"samples\\\":0},\\\"gnd\\\":{\\\"current\\\":0,\\\"average\\\":0,\\\"samples\\\":0},\\\"railDelta\\\":0},\\\"custom\\\":{}},\\\"heuristics\\\":{\\\"status\\\":\\\"State has been stable for 8536ms while updates continue.\\\",\\\"summary\\\":\\\"STATE HAS BEEN STABLE FOR 8536MS WHILE UPDATES CONTINUE.: warn\\\",\\\"findings\\\":[\\\"warn\\\"]},\\\"capturedAt\\\":\\\"2026-05-07T11:22:22.588Z\\\"},{\\\"id\\\":\\\"wokwi_led_1\\\",\\\"type\\\":\\\"wokwi-led\\\",\\\"metrics\\\":{\\\"updateFreq\\\":159999999.9,\\\"timing\\\":{\\\"totalMs\\\":11.800000004470348,\\\"maxMs\\\":3.6999999955296516,\\\"avgMs\\\":0.07065868266149909,\\\"count\\\":167,\\\"lastUpdateAtMs\\\":1778152942465},\\\"pinToggles\\\":{},\\\"stateSize\\\":162,\\\"stateStability\\\":{\\\"lastStateChangeAtMs\\\":1778152934271,\\\"lastStateChangeCycles\\\":null,\\\"stateMutationCount\\\":20,\\\"idleMs\\\":8317},\\\"ioThroughput\\\":{\\\"i2cTransactions\\\":0,\\\"i2cBytes\\\":0,\\\"spiTransactions\\\":0,\\\"spiBytes\\\":0,\\\"uartBytes\\\":0,\\\"lastIoAtMs\\\":0},\\\"interactionAudit\\\":{\\\"onEventCount\\\":0,\\\"onPinStateChangeCount\\\":0,\\\"byType\\\":{},\\\"lastEventAtMs\\\":0},\\\"powerProfile\\\":{\\\"vcc\\\":{\\\"current\\\":0,\\\"average\\\":0,\\\"samples\\\":0},\\\"gnd\\\":{\\\"current\\\":0,\\\"average\\\":0,\\\"samples\\\":0},\\\"railDelta\\\":0},\\\"custom\\\":{\\\"status\\\":\\\"off\\\",\\\"color\\\":\\\"red\\\",\\\"voltageDrop\\\":\\\"0.00 V\\\",\\\"current\\\":\\\"0.00 mA\\\"}},\\\"heuristics\\\":{\\\"status\\\":\\\"State has been stable for 8317ms while updates continue.\\\",\\\"summary\\\":\\\"STATE HAS BEEN STABLE FOR 8317MS WHILE UPDATES CONTINUE.: warn\\\",\\\"findings\\\":[\\\"warn\\\"]},\\\"capturedAt\\\":\\\"2026-05-07T11:22:22.588Z\\\"},{\\\"id\\\":\\\"res_wokwi_led_1\\\",\\\"type\\\":\\\"wokwi-resistor\\\",\\\"metrics\\\":{\\\"updateFreq\\\":159999999.9,\\\"timing\\\":{\\\"totalMs\\\":2.9000000059604645,\\\"maxMs\\\":0.5,\\\"avgMs\\\":0.01736526949676925,\\\"count\\\":167,\\\"lastUpdateAtMs\\\":1778152942465},\\\"pinToggles\\\":{},\\\"stateSize\\\":105,\\\"stateStability\\\":{\\\"lastStateChangeAtMs\\\":1778152934271,\\\"lastStateChangeCycles\\\":null,\\\"stateMutationCount\\\":20,\\\"idleMs\\\":8317},\\\"ioThroughput\\\":{\\\"i2cTransactions\\\":0,\\\"i2cBytes\\\":0,\\\"spiTransactions\\\":0,\\\"spiBytes\\\":0,\\\"uartBytes\\\":0,\\\"lastIoAtMs\\\":0},\\\"interactionAudit\\\":{\\\"onEventCount\\\":0,\\\"onPinStateChangeCount\\\":0,\\\"byType\\\":{},\\\"lastEventAtMs\\\":0},\\\"powerProfile\\\":{\\\"vcc\\\":{\\\"current\\\":0,\\\"average\\\":0,\\\"samples\\\":0},\\\"gnd\\\":{\\\"current\\\":0,\\\"average\\\":0,\\\"samples\\\":0},\\\"railDelta\\\":0},\\\"custom\\\":{\\\"voltageDrop\\\":\\\"0.00 V\\\",\\\"current\\\":\\\"0.00 mA\\\",\\\"power\\\":\\\"0.00 mW\\\"}},\\\"heuristics\\\":{\\\"status\\\":\\\"State has been stable for 8317ms while updates continue.\\\",\\\"summary\\\":\\\"STATE HAS BEEN STABLE FOR 8317MS WHILE UPDATES CONTINUE.: warn\\\",\\\"findings\\\":[\\\"warn\\\"]},\\\"capturedAt\\\":\\\"2026-05-07T11:22:22.588Z\\\"}],\\\"capturedAt\\\":\\\"2026-05-07T11:22:22.588Z\\\",\\\"mode\\\":\\\"deep\\\",\\\"isDelta\\\":false}\"\n}",
+    "student_telemetry": "{\n  \"events\": [\n    {\n      \"PinChange\": {\n        \"pin\": \"0\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"1\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"2\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"3\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"4\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"5\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"6\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"7\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"8\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"9\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"10\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"11\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"12\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"13\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"A0\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"A1\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"A2\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"A3\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"A4\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"PinChange\": {\n        \"pin\": \"A5\",\n        \"state\": false,\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"ComponentState\": {\n        \"id\": \"wokwi-resistor_1777999183638_0\",\n        \"key\": \"glow\",\n        \"value\": \"false\",\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"ComponentState\": {\n        \"id\": \"wokwi-resistor_1777999183638_0\",\n        \"key\": \"current\",\n        \"value\": \"0\",\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"ComponentState\": {\n        \"id\": \"wokwi-resistor_1777999183638_0\",\n        \"key\": \"voltageDrop\",\n        \"value\": \"0\",\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"ComponentState\": {\n        \"id\": \"wokwi_led_1\",\n        \"key\": \"glow\",\n        \"value\": \"false\",\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"ComponentState\": {\n        \"id\": \"wokwi_led_1\",\n        \"key\": \"current\",\n        \"value\": \"0\",\n        \"time_ms\": 22\n      }\n    },\n    {\n      \"ComponentState\": {\n        \"id\": \"wokwi_led_1\",\n        \"key\": \"voltageDrop\",\n        \"value\": \"0\",\n        \"time_ms\": 22\n      }\n    }\n  ],\n  \"duration_ms\": 8000,\n  \"rich_metrics\": \"{\\\"boardId\\\":\\\"uno1\\\",\\\"components\\\":[{\\\"id\\\":\\\"wokwi-resistor_1777999183638_0\\\",\\\"type\\\":\\\"wokwi-resistor\\\",\\\"metrics\\\":{\\\"updateFreq\\\":19.695,\\\"timing\\\":{\\\"totalMs\\\":7.299999997019768,\\\"maxMs\\\":0.5,\\\"avgMs\\\":0.04319526625455484,\\\"count\\\":169,\\\"lastUpdateAtMs\\\":1778152951165},\\\"pinToggles\\\":{},\\\"stateSize\\\":105,\\\"stateStability\\\":{\\\"lastStateChangeAtMs\\\":1778152944868,\\\"lastStateChangeCycles\\\":null,\\\"stateMutationCount\\\":20,\\\"idleMs\\\":6311},\\\"ioThroughput\\\":{\\\"i2cTransactions\\\":0,\\\"i2cBytes\\\":0,\\\"spiTransactions\\\":0,\\\"spiBytes\\\":0,\\\"uartBytes\\\":0,\\\"lastIoAtMs\\\":0},\\\"interactionAudit\\\":{\\\"onEventCount\\\":0,\\\"onPinStateChangeCount\\\":0,\\\"byType\\\":{},\\\"lastEventAtMs\\\":0},\\\"powerProfile\\\":{\\\"vcc\\\":{\\\"current\\\":0,\\\"average\\\":0,\\\"samples\\\":0},\\\"gnd\\\":{\\\"current\\\":0,\\\"average\\\":0,\\\"samples\\\":0},\\\"railDelta\\\":0},\\\"custom\\\":{\\\"voltageDrop\\\":\\\"0.00 V\\\",\\\"current\\\":\\\"0.00 mA\\\",\\\"power\\\":\\\"0.00 mW\\\"}},\\\"heuristics\\\":{\\\"status\\\":\\\"ok\\\",\\\"summary\\\":\\\"OK: No anomalies detected.\\\",\\\"findings\\\":[]},\\\"capturedAt\\\":\\\"2026-05-07T11:22:31.179Z\\\"},{\\\"id\\\":\\\"wokwi_led_1\\\",\\\"type\\\":\\\"wokwi-led\\\",\\\"metrics\\\":{\\\"updateFreq\\\":19.695,\\\"timing\\\":{\\\"totalMs\\\":6.600000038743019,\\\"maxMs\\\":1.3999999985098839,\\\"avgMs\\\":0.03905325466711845,\\\"count\\\":169,\\\"lastUpdateAtMs\\\":1778152951165},\\\"pinToggles\\\":{},\\\"stateSize\\\":162,\\\"stateStability\\\":{\\\"lastStateChangeAtMs\\\":1778152944868,\\\"lastStateChangeCycles\\\":null,\\\"stateMutationCount\\\":20,\\\"idleMs\\\":6311},\\\"ioThroughput\\\":{\\\"i2cTransactions\\\":0,\\\"i2cBytes\\\":0,\\\"spiTransactions\\\":0,\\\"spiBytes\\\":0,\\\"uartBytes\\\":0,\\\"lastIoAtMs\\\":0},\\\"interactionAudit\\\":{\\\"onEventCount\\\":0,\\\"onPinStateChangeCount\\\":0,\\\"byType\\\":{},\\\"lastEventAtMs\\\":0},\\\"powerProfile\\\":{\\\"vcc\\\":{\\\"current\\\":0,\\\"average\\\":0,\\\"samples\\\":0},\\\"gnd\\\":{\\\"current\\\":0,\\\"average\\\":0,\\\"samples\\\":0},\\\"railDelta\\\":0},\\\"custom\\\":{\\\"status\\\":\\\"off\\\",\\\"color\\\":\\\"red\\\",\\\"voltageDrop\\\":\\\"0.00 V\\\",\\\"current\\\":\\\"0.00 mA\\\"}},\\\"heuristics\\\":{\\\"status\\\":\\\"ok\\\",\\\"summary\\\":\\\"OK: No anomalies detected.\\\",\\\"findings\\\":[]},\\\"capturedAt\\\":\\\"2026-05-07T11:22:31.179Z\\\"},{\\\"id\\\":\\\"uno1\\\",\\\"type\\\":\\\"wokwi-arduino-uno\\\",\\\"metrics\\\":{\\\"updateFreq\\\":19.695,\\\"timing\\\":{\\\"totalMs\\\":0.29999998956918716,\\\"maxMs\\\":0.10000000149011612,\\\"avgMs\\\":0.001775147867273297,\\\"count\\\":169,\\\"lastUpdateAtMs\\\":1778152951165},\\\"pinToggles\\\":{},\\\"stateSize\\\":55,\\\"stateStability\\\":{\\\"lastStateChangeAtMs\\\":1778152942763,\\\"lastStateChangeCycles\\\":null,\\\"stateMutationCount\\\":5,\\\"idleMs\\\":8416},\\\"ioThroughput\\\":{\\\"i2cTransactions\\\":0,\\\"i2cBytes\\\":0,\\\"spiTransactions\\\":0,\\\"spiBytes\\\":0,\\\"uartBytes\\\":0,\\\"lastIoAtMs\\\":0},\\\"interactionAudit\\\":{\\\"onEventCount\\\":0,\\\"onPinStateChangeCount\\\":0,\\\"byType\\\":{},\\\"lastEventAtMs\\\":0},\\\"powerProfile\\\":{\\\"vcc\\\":{\\\"current\\\":0,\\\"average\\\":0,\\\"samples\\\":0},\\\"gnd\\\":{\\\"current\\\":0,\\\"average\\\":0,\\\"samples\\\":0},\\\"railDelta\\\":0},\\\"custom\\\":{}},\\\"heuristics\\\":{\\\"status\\\":\\\"State has been stable for 8416ms while updates continue.\\\",\\\"summary\\\":\\\"STATE HAS BEEN STABLE FOR 8416MS WHILE UPDATES CONTINUE.: warn\\\",\\\"findings\\\":[\\\"warn\\\"]},\\\"capturedAt\\\":\\\"2026-05-07T11:22:31.179Z\\\"}],\\\"capturedAt\\\":\\\"2026-05-07T11:22:31.179Z\\\",\\\"mode\\\":\\\"deep\\\",\\\"isDelta\\\":false}\"\n}",
+    "id_mapping": {},
+    "ai_status": "Analyzing...",
+    "ai_score": 89,
+    "verified_behavior_score": 95,
+    "ai_teacher_str": "wokwi_led_1:glow=false wokwi_led_1:glow=false wokwi_led_1:glow=false wokwi_led_1:current=0 wokwi_led_1:current=0 wokwi_led_1:current=0 wokwi_led_1:voltageDrop=0 wokwi_led_1:voltageDrop=0 wokwi_led_1:voltageDrop=0 res_wokwi_led_1:glow=false res_wokwi_led_1:glow=false res_wokwi_led_1:glow=false res_wokwi_led_1:current=0 res_wokwi_led_1:current=0 res_wokwi_led_1:current=0 res_wokwi_led_1:voltageDrop=0 res_wokwi_led_1:voltageDrop=0 res_wokwi_led_1:voltageDrop=0 p0:L p1:L p2:L p3:L p4:L p5:L p6:L p7:L p8:L p9:L p10:L p11:L p12:L p13:L pA0:L pA1:L pA2:L pA3:L pA4:L pA5:L",
+    "student_ai_str": "wokwi-resistor_1777999183638_0:glow=false wokwi-resistor_1777999183638_0:glow=false wokwi-resistor_1777999183638_0:glow=false wokwi-resistor_1777999183638_0:current=0 wokwi-resistor_1777999183638_0:current=0 wokwi-resistor_1777999183638_0:current=0 wokwi-resistor_1777999183638_0:voltageDrop=0 wokwi-resistor_1777999183638_0:voltageDrop=0 wokwi-resistor_1777999183638_0:voltageDrop=0 wokwi_led_1:glow=false wokwi_led_1:glow=false wokwi_led_1:glow=false wokwi_led_1:current=0 wokwi_led_1:current=0 wokwi_led_1:current=0 wokwi_led_1:voltageDrop=0 wokwi_led_1:voltageDrop=0 wokwi_led_1:voltageDrop=0 p0:L p1:L p2:L p3:L p4:L p5:L p6:L p7:L p8:L p9:L p10:L p11:L p12:L p13:L pA0:L pA1:L pA2:L pA3:L pA4:L pA5:L"
+  },
+  "behavioral_diff_report": [
+    {
+      "index": 0,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "0",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "0",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 1,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "1",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "1",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 2,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "2",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "2",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 3,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "3",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "3",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 4,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "4",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "4",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 5,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "5",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "5",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 6,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "6",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "6",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 7,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "7",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "7",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 8,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "8",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "8",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 9,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "9",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "9",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 10,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "10",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "10",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 11,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "11",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "11",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 12,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "12",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "12",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 13,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "13",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "13",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 14,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "A0",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "A0",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 15,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "A1",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "A1",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 16,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "A2",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "A2",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 17,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "A3",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "A3",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 18,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "A4",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "A4",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 19,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "PinChange": {
+          "pin": "A5",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "PinChange": {
+          "pin": "A5",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 20,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "ComponentState": {
+          "id": "wokwi_led_1",
+          "key": "glow",
+          "value": "false",
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "ComponentState": {
+          "id": "wokwi-resistor_1777999183638_0",
+          "key": "glow",
+          "value": "false",
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 21,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "ComponentState": {
+          "id": "wokwi_led_1",
+          "key": "current",
+          "value": "0",
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "ComponentState": {
+          "id": "wokwi-resistor_1777999183638_0",
+          "key": "current",
+          "value": "0",
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 22,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "ComponentState": {
+          "id": "wokwi_led_1",
+          "key": "voltageDrop",
+          "value": "0",
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "ComponentState": {
+          "id": "wokwi-resistor_1777999183638_0",
+          "key": "voltageDrop",
+          "value": "0",
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 23,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "ComponentState": {
+          "id": "res_wokwi_led_1",
+          "key": "glow",
+          "value": "false",
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "ComponentState": {
+          "id": "wokwi_led_1",
+          "key": "glow",
+          "value": "false",
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 24,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "ComponentState": {
+          "id": "res_wokwi_led_1",
+          "key": "current",
+          "value": "0",
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "ComponentState": {
+          "id": "wokwi_led_1",
+          "key": "current",
+          "value": "0",
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    },
+    {
+      "index": 25,
+      "teacher_time": 25,
+      "student_time": 22,
+      "teacher_event": {
+        "ComponentState": {
+          "id": "res_wokwi_led_1",
+          "key": "voltageDrop",
+          "value": "0",
+          "time_ms": 25
+        }
+      },
+      "student_event": {
+        "ComponentState": {
+          "id": "wokwi_led_1",
+          "key": "voltageDrop",
+          "value": "0",
+          "time_ms": 22
+        }
+      },
+      "is_match": false
+    }
+  ],
+  "teacher_telemetry": {
+    "events": [
+      {
+        "PinChange": {
+          "pin": "0",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "1",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "2",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "3",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "4",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "5",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "6",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "7",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "8",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "9",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "10",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "11",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "12",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "13",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "A0",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "A1",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "A2",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "A3",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "A4",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "A5",
+          "state": false,
+          "time_ms": 25
+        }
+      },
+      {
+        "ComponentState": {
+          "id": "wokwi_led_1",
+          "key": "glow",
+          "value": "false",
+          "time_ms": 25
+        }
+      },
+      {
+        "ComponentState": {
+          "id": "wokwi_led_1",
+          "key": "current",
+          "value": "0",
+          "time_ms": 25
+        }
+      },
+      {
+        "ComponentState": {
+          "id": "wokwi_led_1",
+          "key": "voltageDrop",
+          "value": "0",
+          "time_ms": 25
+        }
+      },
+      {
+        "ComponentState": {
+          "id": "res_wokwi_led_1",
+          "key": "glow",
+          "value": "false",
+          "time_ms": 25
+        }
+      },
+      {
+        "ComponentState": {
+          "id": "res_wokwi_led_1",
+          "key": "current",
+          "value": "0",
+          "time_ms": 25
+        }
+      },
+      {
+        "ComponentState": {
+          "id": "res_wokwi_led_1",
+          "key": "voltageDrop",
+          "value": "0",
+          "time_ms": 25
+        }
+      }
+    ]
+  },
+  "student_telemetry": {
+    "events": [
+      {
+        "PinChange": {
+          "pin": "0",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "1",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "2",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "3",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "4",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "5",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "6",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "7",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "8",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "9",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "10",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "11",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "12",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "13",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "A0",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "A1",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "A2",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "A3",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "A4",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "PinChange": {
+          "pin": "A5",
+          "state": false,
+          "time_ms": 22
+        }
+      },
+      {
+        "ComponentState": {
+          "id": "wokwi-resistor_1777999183638_0",
+          "key": "glow",
+          "value": "false",
+          "time_ms": 22
+        }
+      },
+      {
+        "ComponentState": {
+          "id": "wokwi-resistor_1777999183638_0",
+          "key": "current",
+          "value": "0",
+          "time_ms": 22
+        }
+      },
+      {
+        "ComponentState": {
+          "id": "wokwi-resistor_1777999183638_0",
+          "key": "voltageDrop",
+          "value": "0",
+          "time_ms": 22
+        }
+      },
+      {
+        "ComponentState": {
+          "id": "wokwi_led_1",
+          "key": "glow",
+          "value": "false",
+          "time_ms": 22
+        }
+      },
+      {
+        "ComponentState": {
+          "id": "wokwi_led_1",
+          "key": "current",
+          "value": "0",
+          "time_ms": 22
+        }
+      },
+      {
+        "ComponentState": {
+          "id": "wokwi_led_1",
+          "key": "voltageDrop",
+          "value": "0",
+          "time_ms": 22
+        }
+      }
+    ]
+  },
+  "ai_report": {
+    "score": 89,
+    "teacher_trace": "wokwi_led_1:glow=false wokwi_led_1:glow=false wokwi_led_1:glow=false wokwi_led_1:current=0 wokwi_led_1:current=0 wokwi_led_1:current=0 wokwi_led_1:voltageDrop=0 wokwi_led_1:voltageDrop=0 wokwi_led_1:voltageDrop=0 res_wokwi_led_1:glow=false res_wokwi_led_1:glow=false res_wokwi_led_1:glow=false res_wokwi_led_1:current=0 res_wokwi_led_1:current=0 res_wokwi_led_1:current=0 res_wokwi_led_1:voltageDrop=0 res_wokwi_led_1:voltageDrop=0 res_wokwi_led_1:voltageDrop=0 p0:L p1:L p2:L p3:L p4:L p5:L p6:L p7:L p8:L p9:L p10:L p11:L p12:L p13:L pA0:L pA1:L pA2:L pA3:L pA4:L pA5:L"
+  }
+}

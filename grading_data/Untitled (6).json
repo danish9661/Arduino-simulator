@@ -1,0 +1,181 @@
+{
+  "schemaVersion": "openhw-project-v2",
+  "board": "arduino_uno",
+  "components": [
+    {
+      "id": "uno1",
+      "type": "wokwi-arduino-uno",
+      "label": "Arduino Uno",
+      "x": 403.5,
+      "y": 189.79999923706055,
+      "w": 311,
+      "h": 228,
+      "rotation": 0,
+      "attrs": {}
+    },
+    {
+      "id": "wokwi_led_1",
+      "type": "wokwi-led",
+      "label": "LED",
+      "x": 140,
+      "y": 95,
+      "w": 38,
+      "h": 38,
+      "rotation": 0,
+      "attrs": {
+        "color": "red",
+        "breadboard": {
+          "anchorPin": "A"
+        }
+      },
+      "snap": true
+    },
+    {
+      "id": "bb_2",
+      "type": "wokwi-breadboard-mini",
+      "label": "Breadboard",
+      "x": 105,
+      "y": 90,
+      "w": 270,
+      "h": 195,
+      "rotation": 0,
+      "attrs": {},
+      "snap": true
+    },
+    {
+      "id": "res_wokwi_led_1",
+      "type": "wokwi-resistor",
+      "label": "220R",
+      "x": 150,
+      "y": 155,
+      "w": 70,
+      "h": 32,
+      "rotation": 0,
+      "attrs": {},
+      "snap": true
+    }
+  ],
+  "connections": [
+    {
+      "id": "wire_lb33f7tqq",
+      "from": "wokwi_led_1:A",
+      "to": "res_wokwi_led_1:p1",
+      "color": "orange",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "",
+      "toLabel": ""
+    },
+    {
+      "id": "wire_ufufk8lx8",
+      "from": "res_wokwi_led_1:p2",
+      "to": "uno1:13",
+      "color": "green",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "",
+      "toLabel": ""
+    },
+    {
+      "id": "wire_y69wz58vi",
+      "from": "wokwi_led_1:K",
+      "to": "uno1:GND",
+      "color": "green",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "",
+      "toLabel": ""
+    },
+    {
+      "id": "w_socket_wokwi_led_1_A_1778147966608_q0h2l",
+      "from": "wokwi_led_1:A",
+      "to": "bb_2:3c",
+      "color": "transparent",
+      "waypoints": [],
+      "isBelow": true,
+      "isSocket": true,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "",
+      "toLabel": ""
+    },
+    {
+      "id": "w_socket_wokwi_led_1_K_1778147966608_wt686",
+      "from": "wokwi_led_1:K",
+      "to": "bb_2:4c",
+      "color": "transparent",
+      "waypoints": [],
+      "isBelow": true,
+      "isSocket": true,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "",
+      "toLabel": ""
+    },
+    {
+      "id": "w_socket_res_wokwi_led_1_p1_1778147971622_vewv3",
+      "from": "res_wokwi_led_1:p1",
+      "to": "bb_2:3a",
+      "color": "transparent",
+      "waypoints": [],
+      "isBelow": true,
+      "isSocket": true,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "",
+      "toLabel": ""
+    },
+    {
+      "id": "w_socket_res_wokwi_led_1_p2_1778147971622_wb4mj",
+      "from": "res_wokwi_led_1:p2",
+      "to": "bb_2:7a",
+      "color": "transparent",
+      "waypoints": [],
+      "isBelow": true,
+      "isSocket": true,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "",
+      "toLabel": ""
+    }
+  ],
+  "blocklyXml": "",
+  "blocklyGeneratedCode": "",
+  "useBlocklyCode": false,
+  "projectFiles": [
+    {
+      "id": "project/library.txt",
+      "path": "project/library.txt",
+      "name": "library.txt",
+      "kind": "root",
+      "content": "Adafruit BusIO\nAdafruit ILI9341\nAdafruit LiquidCrystal\nAdafruit SH110X\nAdafruit STMPE610\nAdafruit GFX Library\nAdafruit SSD1306\n107-Arduino-Servo-RP2040\nAdafruit TouchScreen\nLiquidCrystal I2C\nAdafruit MCP23017 Arduino Library\nAdafruit TSC2007\nServo\n107-Arduino-24LCxx\nSparkFun MAX3010x Pulse and Proximity Sensor Library\nAdafruit NeoPixel",
+      "dirty": false
+    },
+    {
+      "id": "project/uno1/uno1.ino",
+      "path": "project/uno1/uno1.ino",
+      "name": "uno1.ino",
+      "kind": "code",
+      "boardId": "uno1",
+      "boardKind": "arduino_uno",
+      "content": "// uno1 main sketch\nvoid setup() {\n  pinMode(13, OUTPUT);\n  // Serial.begin(9600);\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(500);\n  digitalWrite(13, LOW);\n  delay(500);\n}\n",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/library.txt"
+  ],
+  "activeCodeFileId": "project/library.txt",
+  "code": "void setup() {\n  pinMode(13, OUTPUT);\n  pinMode(13, OUTPUT);\n  pinMode(13, OUTPUT);\n  pinMode(13, OUTPUT);\n  pinMode(13, OUTPUT);\n  pinMode(13, OUTPUT);\n  pinMode(13, OUTPUT);\n}\n\n{}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\ndelay(500);\ndigitalWrite(13, LOW);\ndelay(500);\n  digitalWrite(13, HIGH);\ndelay(500);\ndigitalWrite(13, LOW);\ndelay(500);\n  digitalWrite(13, HIGH);\ndelay(500);\ndigitalWrite(13, LOW);\ndelay(500);\n  digitalWrite(13, HIGH);\ndelay(500);\ndigitalWrite(13, LOW);\ndelay(500);\n  digitalWrite(13, HIGH);\ndelay(500);\ndigitalWrite(13, LOW);\ndelay(500);\n  digitalWrite(13, HIGH);\ndelay(500);\ndigitalWrite(13, LOW);\ndelay(500);\n  digitalWrite(13, HIGH);\ndelay(500);\ndigitalWrite(13, LOW);\ndelay(500);\n}",
+  "name": "Untitled",
+  "exportedAt": "2026-05-07T09:59:52.731Z"
+}

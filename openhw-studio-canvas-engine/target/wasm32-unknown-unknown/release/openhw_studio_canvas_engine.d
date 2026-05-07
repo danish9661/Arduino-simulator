@@ -1,0 +1,1 @@
+C:\Users\Danish\Documents\simulator\openhw-studio-canvas-engine\target\wasm32-unknown-unknown\release\openhw_studio_canvas_engine.wasm: C:\Users\Danish\Documents\simulator\openhw-studio-canvas-engine\src\lib.rs

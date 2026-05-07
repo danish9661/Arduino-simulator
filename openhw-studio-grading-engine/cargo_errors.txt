@@ -1,0 +1,59 @@
+﻿cargo :     Checking openhw-studio-grading-engine v0.1.0 
+(C:\Users\Danish\Documents\simulator\openhw-studio-grading-engine)
+At line:1 char:1
++ cargo check 2>&1 | Out-File -FilePath cargo_errors.txt -Encoding utf8 ...
++ ~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (    Checking op...grading-engine):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+error[E0425]: cannot find value `logs` in this scope
+   --> src\lib.rs:435:5
+    |
+435 |     logs.push(format!("Diagnostic: Telemetry Filtered. Teacher: {} -> {}, Student: {} -> {}", 
+    |     ^^^^ not found in this scope
+
+error[E0425]: cannot find value `logs` in this scope
+   --> src\lib.rs:450:9
+    |
+450 |         logs.push("Warning: Teacher's reference shows very low functional activity. Behavior score may be 
+inflated.".to_string());
+    |         ^^^^ not found in this scope
+
+warning: unused variable: `meta`
+   --> src\lib.rs:139:9
+    |
+139 |     let meta: ProjectMeta = serde_json::from_str(project_json).unwrap();
+    |         ^^^^ help: if this is intentional, prefix it with an underscore: `_meta`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `behavior`
+   --> src\lib.rs:140:9
+    |
+140 |     let behavior: BehavioralSnapshot = serde_json::from_str(telemetry_json).unwrap();
+    |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_behavior`
+
+warning: unused variable: `validation_errors`
+   --> src\lib.rs:141:9
+    |
+141 |     let validation_errors: Vec<String> = serde_json::from_str(validation_errors_json).unwrap_or_default();
+    |         ^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_validation_errors`
+
+warning: unused variable: `e`
+   --> src\lib.rs:214:13
+    |
+214 |         Err(e) => {
+    |             ^ help: if this is intentional, prefix it with an underscore: `_e`
+
+warning: value assigned to `logic_score` is never read
+   --> src\lib.rs:164:27
+    |
+164 |     let mut logic_score = 100;
+    |                           ^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0425`.
+warning: `openhw-studio-grading-engine` (lib) generated 5 warnings
+error: could not compile `openhw-studio-grading-engine` (lib) due to 2 previous errors; 5 warnings emitted

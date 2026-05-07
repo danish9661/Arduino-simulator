@@ -1,0 +1,6914 @@
+{
+  "events": [
+    {
+      "PinChange": {
+        "pin": "0",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "1",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "2",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "3",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "4",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "5",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "6",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "7",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "8",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "9",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "10",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "11",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "12",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "A0",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "A1",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "A2",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "A3",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "A4",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "A5",
+        "state": false,
+        "time_ms": 38
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 38
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 38
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 38
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 38
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 38
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 38
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 74
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 74
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 74
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 74
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 74
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 74
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 109
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 109
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 109
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 109
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 109
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 109
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 143
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 143
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 143
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 143
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 143
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 143
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 178
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 178
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 178
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 178
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 178
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 178
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 216
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 216
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 216
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 216
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 216
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 216
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 256
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 256
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 256
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 256
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 256
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 256
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 291
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 291
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 291
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 291
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 291
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 291
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 326
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 326
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 326
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 326
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 326
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 326
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 361
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 361
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 361
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 361
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 361
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 361
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 398
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 398
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 398
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 398
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 398
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 398
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 433
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 433
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 433
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 433
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 433
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 433
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 469
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 469
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 469
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 469
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 469
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 469
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 506
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 506
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 506
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 506
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 506
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 506
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 542
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 542
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 542
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 542
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 542
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 542
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 618
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 618
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 618
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 618
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 618
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 618
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 705
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 705
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 705
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 705
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 705
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 705
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 805
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 805
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 805
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 805
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 805
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 805
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 905
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 905
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 905
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 905
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 905
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 905
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1005
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1005
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1005
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1005
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1005
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1005
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1105
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1105
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1105
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1105
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1105
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1105
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1205
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1205
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1205
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1205
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1205
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1205
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1305
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1305
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1305
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1305
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1305
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1305
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1405
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1405
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1405
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1405
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1405
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1405
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1505
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1505
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1505
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1505
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1505
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1505
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1605
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1605
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1605
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1605
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1605
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1605
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1705
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1705
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1705
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1705
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1705
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1705
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1805
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1805
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1805
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1805
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1805
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1805
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1905
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1905
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1905
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 1905
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 1905
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 1905
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2005
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2005
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2005
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2005
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2005
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2005
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2105
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2105
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2105
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2105
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2105
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2105
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2205
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2205
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2205
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2205
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2205
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2205
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2305
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2305
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2305
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2305
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2305
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2305
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2405
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2405
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2405
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2405
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2405
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2405
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2505
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2505
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2505
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2505
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2505
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2505
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2605
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2605
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2605
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2605
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2605
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2605
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2705
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2705
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2705
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2705
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2705
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2705
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2805
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2805
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2805
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2805
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2805
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2805
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2905
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2905
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2905
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2905
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2905
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2905
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2942
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2942
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2942
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2942
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2942
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2942
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2978
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2978
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2978
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 2978
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 2978
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 2978
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3017
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3017
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3017
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3017
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3017
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3017
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3051
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3051
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3051
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3051
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3051
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3051
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3095
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3095
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3095
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3095
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3095
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3095
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3135
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3135
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3135
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3135
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3135
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3135
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3169
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3169
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3169
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3169
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3169
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3169
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3203
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3203
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3203
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3203
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3203
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3203
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3241
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3241
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3241
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3241
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3241
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3241
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3280
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3280
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3280
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3280
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3280
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3280
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3316
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3316
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3316
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3316
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3316
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3316
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3350
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3350
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3350
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3350
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3350
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3350
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3395
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3395
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3395
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3395
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3395
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3395
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3435
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3435
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3435
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3435
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3435
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3435
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3482
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3482
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3482
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3482
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3482
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3482
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3529
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3529
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3529
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3529
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3529
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3529
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3566
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3566
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3566
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3566
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3566
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3566
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3603
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3603
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3603
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3603
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3603
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3603
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3647
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3647
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3647
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3647
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3647
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3647
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3694
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3694
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3694
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3694
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3694
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3694
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3738
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3738
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3738
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3738
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3738
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3738
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3776
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3776
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3776
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3776
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3776
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3776
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3813
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3813
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3813
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3813
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3813
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3813
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3855
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3855
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3855
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3855
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3855
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3855
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3889
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3889
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3889
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3889
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3889
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3889
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3935
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3935
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3935
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3935
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3935
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3935
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3984
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3984
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3984
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 3984
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 3984
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 3984
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4018
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4018
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4018
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4018
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4018
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4018
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4057
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4057
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4057
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4057
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4057
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4057
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4098
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4098
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4098
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4098
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4098
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4098
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4145
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4145
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4145
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4145
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4145
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4145
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4181
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4181
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4181
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4181
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4181
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4181
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4218
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4218
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4218
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4218
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4218
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4218
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4256
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4256
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4256
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4256
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4256
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4256
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4293
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4293
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4293
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4293
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4293
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4293
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4330
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4330
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4330
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4330
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4330
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4330
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4365
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4365
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4365
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4365
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4365
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4365
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4401
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4401
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4401
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4401
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4401
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4401
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4436
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4436
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4436
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4436
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4436
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4436
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4476
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4476
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4476
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4476
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4476
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4476
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4512
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4512
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4512
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4512
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4512
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4512
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4552
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4552
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4552
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4552
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4552
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4552
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4588
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4588
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4588
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4588
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4588
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4588
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4630
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4630
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4630
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4630
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4630
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4630
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4668
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4668
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4668
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4668
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4668
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4668
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4706
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4706
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4706
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4706
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4706
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4706
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4750
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4750
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4750
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4750
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4750
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4750
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4792
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4792
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4792
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4792
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4792
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4792
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4831
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4831
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4831
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4831
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4831
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4831
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4874
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4874
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4874
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4874
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4874
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4874
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4916
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4916
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4916
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4916
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4916
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4916
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4962
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4962
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4962
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 4962
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 4962
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 4962
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5007
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5007
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5007
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5007
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5007
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5007
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5055
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5055
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5055
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5055
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5055
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5055
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5088
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5088
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5088
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5088
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5088
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5088
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5124
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5124
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5124
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5124
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5124
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5124
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5162
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5162
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5162
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5162
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5162
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5162
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5197
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5197
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5197
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5197
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5197
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5197
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5249
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5249
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5249
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5249
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5249
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5249
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5293
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5293
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5293
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5293
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5293
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5293
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5335
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5335
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5335
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5335
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5335
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5335
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5376
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5376
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5376
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5376
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5376
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5376
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5419
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5419
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5419
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5419
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5419
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5419
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5462
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5462
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5462
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5462
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5462
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5462
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5507
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5507
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5507
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5507
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5507
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5507
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5555
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5555
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5555
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5555
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5555
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5555
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5589
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5589
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5589
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5589
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5589
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5589
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5632
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5632
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5632
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5632
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5632
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5632
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5674
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5674
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5674
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5674
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5674
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5674
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5719
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5719
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5719
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5719
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5719
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5719
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5767
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5767
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5767
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5767
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5767
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5767
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5801
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5801
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5801
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5801
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5801
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5801
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5844
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5844
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5844
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5844
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5844
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5844
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5880
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5880
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5880
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5880
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5880
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5880
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5915
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5915
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5915
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5915
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5915
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5915
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5951
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5951
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5951
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5951
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5951
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5951
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5986
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5986
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5986
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 5986
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 5986
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 5986
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6030
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6030
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6030
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6030
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6030
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6030
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6065
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6065
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6065
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6065
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6065
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6065
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6109
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6109
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6109
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6109
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6109
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6109
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6146
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6146
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6146
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6146
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6146
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6146
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6188
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6188
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6188
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6188
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6188
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6188
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6232
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6232
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6232
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6232
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6232
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6232
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6275
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6275
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6275
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6275
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6275
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6275
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6317
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6317
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6317
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6317
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6317
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6317
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6365
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6365
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6365
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6365
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6365
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6365
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6415
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6415
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6415
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6415
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6415
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6415
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6448
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6448
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6448
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6448
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6448
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6448
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6485
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6485
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6485
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6485
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6485
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6485
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6520
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6520
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6520
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6520
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6520
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6520
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6570
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6570
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6570
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6570
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6570
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6570
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6605
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6605
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6605
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6605
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6605
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6605
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6652
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6652
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6652
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6652
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6652
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6652
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6693
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6693
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6693
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6693
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6693
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6693
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6735
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6735
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6735
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6735
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6735
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6735
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6781
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6781
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6781
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6781
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6781
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6781
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6818
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6818
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6818
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6818
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6818
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6818
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6856
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6856
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6856
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6856
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6856
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6856
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6895
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6895
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6895
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6895
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6895
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6895
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6933
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6933
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6933
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6933
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6933
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6933
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6976
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6976
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6976
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 6976
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 6976
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 6976
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 7015
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 7015
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 7015
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "glow",
+        "value": "false",
+        "time_ms": 7015
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0",
+        "time_ms": 7015
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0",
+        "time_ms": 7015
+      }
+    }
+  ],
+  "duration_ms": 8000,
+  "rich_metrics": "{\"boardId\":\"uno1\",\"components\":[{\"id\":\"uno1\",\"type\":\"wokwi-arduino-uno\",\"metrics\":{\"updateFreq\":36.394,\"timing\":{\"totalMs\":3.4000000208616257,\"maxMs\":0.10000000149011612,\"avgMs\":0.011111111179286358,\"count\":306,\"lastUpdateAtMs\":1778140238613},\"pinToggles\":{},\"stateSize\":55,\"stateStability\":{\"lastStateChangeAtMs\":1778140230322,\"lastStateChangeCycles\":null,\"stateMutationCount\":5,\"idleMs\":8302},\"ioThroughput\":{\"i2cTransactions\":0,\"i2cBytes\":0,\"spiTransactions\":0,\"spiBytes\":0,\"uartBytes\":0,\"lastIoAtMs\":0},\"interactionAudit\":{\"onEventCount\":0,\"onPinStateChangeCount\":0,\"byType\":{},\"lastEventAtMs\":0},\"powerProfile\":{\"vcc\":{\"current\":0,\"average\":0,\"samples\":0},\"gnd\":{\"current\":0,\"average\":0,\"samples\":0},\"railDelta\":0},\"custom\":{}},\"heuristics\":{\"status\":\"State has been stable for 8302ms while updates continue.\",\"summary\":\"STATE HAS BEEN STABLE FOR 8302MS WHILE UPDATES CONTINUE.: warn\",\"findings\":[\"warn\"]},\"capturedAt\":\"2026-05-07T07:50:38.624Z\"},{\"id\":\"wokwi_led_1\",\"type\":\"wokwi-led\",\"metrics\":{\"updateFreq\":36.398,\"timing\":{\"totalMs\":17.30000004172325,\"maxMs\":0.20000000298023224,\"avgMs\":0.056535947848768794,\"count\":306,\"lastUpdateAtMs\":1778140238613},\"pinToggles\":{},\"stateSize\":162,\"stateStability\":{\"lastStateChangeAtMs\":1778140230496,\"lastStateChangeCycles\":null,\"stateMutationCount\":20,\"idleMs\":8128},\"ioThroughput\":{\"i2cTransactions\":0,\"i2cBytes\":0,\"spiTransactions\":0,\"spiBytes\":0,\"uartBytes\":0,\"lastIoAtMs\":0},\"interactionAudit\":{\"onEventCount\":0,\"onPinStateChangeCount\":0,\"byType\":{},\"lastEventAtMs\":0},\"powerProfile\":{\"vcc\":{\"current\":0,\"average\":0,\"samples\":0},\"gnd\":{\"current\":0,\"average\":0,\"samples\":0},\"railDelta\":0},\"custom\":{\"status\":\"off\",\"color\":\"red\",\"voltageDrop\":\"0.00 V\",\"current\":\"0.00 mA\"}},\"heuristics\":{\"status\":\"State has been stable for 8128ms while updates continue.\",\"summary\":\"STATE HAS BEEN STABLE FOR 8128MS WHILE UPDATES CONTINUE.: warn\",\"findings\":[\"warn\"]},\"capturedAt\":\"2026-05-07T07:50:38.624Z\"},{\"id\":\"res_wokwi_led_1\",\"type\":\"wokwi-resistor\",\"metrics\":{\"updateFreq\":36.398,\"timing\":{\"totalMs\":2.9999999925494194,\"maxMs\":0.10000000149011612,\"avgMs\":0.009803921544279148,\"count\":306,\"lastUpdateAtMs\":1778140238613},\"pinToggles\":{},\"stateSize\":105,\"stateStability\":{\"lastStateChangeAtMs\":1778140230496,\"lastStateChangeCycles\":null,\"stateMutationCount\":20,\"idleMs\":8128},\"ioThroughput\":{\"i2cTransactions\":0,\"i2cBytes\":0,\"spiTransactions\":0,\"spiBytes\":0,\"uartBytes\":0,\"lastIoAtMs\":0},\"interactionAudit\":{\"onEventCount\":0,\"onPinStateChangeCount\":0,\"byType\":{},\"lastEventAtMs\":0},\"powerProfile\":{\"vcc\":{\"current\":0,\"average\":0,\"samples\":0},\"gnd\":{\"current\":0,\"average\":0,\"samples\":0},\"railDelta\":0},\"custom\":{\"voltageDrop\":\"0.00 V\",\"current\":\"0.00 mA\",\"power\":\"0.00 mW\"}},\"heuristics\":{\"status\":\"State has been stable for 8128ms while updates continue.\",\"summary\":\"STATE HAS BEEN STABLE FOR 8128MS WHILE UPDATES CONTINUE.: warn\",\"findings\":[\"warn\"]},\"capturedAt\":\"2026-05-07T07:50:38.624Z\"}],\"capturedAt\":\"2026-05-07T07:50:38.624Z\",\"mode\":\"deep\",\"isDelta\":false}"
+}
