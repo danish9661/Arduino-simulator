@@ -97,8 +97,30 @@ const GradingPage = () => {
             return groups;
         };
 
+        const teacherIgnored = Array.isArray(teacherTelemetry.ignored_events) ? teacherTelemetry.ignored_events : [];
+        const studentIgnored = Array.isArray(studentTelemetry.ignored_events) ? studentTelemetry.ignored_events : [];
+
         const tGroups = groupEvents(teacherEvents, false);
         const sGroups = groupEvents(studentEvents, true);
+
+        // Merge ignored events into groups but mark them so the UI can show 'Ignored'
+        const mergeIgnored = (ignoredList, groups, isStudent) => {
+            ignoredList.forEach(event => {
+                const { type, data } = getTelemetryEvent(event);
+                let groupId = 'other';
+                if (type === 'PinChange') groupId = canonicalPinId(data.pin);
+                else if (type === 'SerialOutput') groupId = 'Serial Console';
+                else if (type === 'ComponentState') {
+                    const mappedId = isStudent ? (idMap[data.id] || data.id) : data.id;
+                    groupId = normalizeTemporalId(mappedId);
+                }
+                if (!groups[groupId]) groups[groupId] = [];
+                groups[groupId].push({ ...data, _type: type, _ignored: true });
+            });
+        };
+
+        mergeIgnored(teacherIgnored, tGroups, false);
+        mergeIgnored(studentIgnored, sGroups, true);
         const allIds = Array.from(new Set([...Object.keys(tGroups), ...Object.keys(sGroups)])).sort();
         const idStats = allIds.map(groupId => {
             const tList = tGroups[groupId] || [];
@@ -213,9 +235,10 @@ const GradingPage = () => {
             const teacherList = tGroups[statId] || tGroups[stat.id] || [];
             const studentList = sGroups[statId] || sGroups[stat.id] || [];
             const rowCount = Math.max(teacherList.length, studentList.length);
+            // If there are no rows at all, show a single 'grace' row so UI isn't empty
+            const effectiveRowCount = rowCount === 0 ? 1 : rowCount;
             const eventRows = [];
-
-            for (let index = 0; index < rowCount; index += 1) {
+            for (let index = 0; index < effectiveRowCount; index += 1) {
                 const teacherEvent = teacherList[index] || null;
                 const studentEvent = studentList[index] || null;
                 const teacherTime = Number(teacherEvent?.time_ms || 0);
@@ -228,13 +251,17 @@ const GradingPage = () => {
 
                 let matchStatus = 'unmatched';
                 if (!teacherEvent && studentEvent) {
-                    matchStatus = 'student extra';
+                    if (studentEvent._ignored) matchStatus = 'ignored';
+                    else matchStatus = 'student extra';
                 } else if (teacherEvent && !studentEvent) {
-                    matchStatus = 'missing';
+                    if (teacherEvent._ignored) matchStatus = 'ignored';
+                    else matchStatus = 'missing';
                 } else if (teacherMatchesStudent && timeDelta <= 250) {
                     matchStatus = 'matched';
                 } else if (teacherMatchesStudent || sameType) {
                     matchStatus = 'time drift';
+                } else if (!teacherEvent && !studentEvent) {
+                    matchStatus = 'grace';
                 }
 
                 eventRows.push({
@@ -841,7 +868,7 @@ const GradingPage = () => {
                                                                             <span className="percentage-text">{Number(stat.match_percentage || 0).toFixed(1)}%</span>
                                                                         </div>
                                                                     </td>
-                                                                    <td className="silent-cell">{stat.is_silent_teacher ? '✓ (Grace)' : '-'}</td>
+                                                                    <td className="silent-cell">{stat.is_silent_teacher ? '✓ (Grace)' : (stat.ignored_events ? `Ignored: ${stat.ignored_events}` : '-')}</td>
                                                                 </tr>
                                                                 {expandedTemporalIds[stat.id] && (
                                                                     <tr id={`temporal-detail-${idx}`} className="temporal-detail-row">

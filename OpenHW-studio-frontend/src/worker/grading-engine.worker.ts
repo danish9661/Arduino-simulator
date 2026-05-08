@@ -289,12 +289,19 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
         telemetry.rich_metrics = JSON.stringify(richSnapshot);
         (telemetry as any).simulation_speed = normalizedSpeed;
         (telemetry as any).telemetry_cutoff_ms = effectiveCutoffMs;
-        (telemetry as any).events = telemetry.events.filter((evt: any) => {
+        const allEvents = telemetry.events || [];
+        const keptEvents: any[] = [];
+        const ignoredEvents: any[] = [];
+        for (const evt of allEvents) {
             const eventType = Object.keys(evt || {})[0];
             const eventData = eventType ? evt?.[eventType] : null;
             const eventTime = Number(eventData?.time_ms);
-            return Number.isFinite(eventTime) && eventTime <= effectiveCutoffMs;
-        });
+            if (!Number.isFinite(eventTime)) continue;
+            if (eventTime <= effectiveCutoffMs) keptEvents.push(evt);
+            else ignoredEvents.push(evt);
+        }
+        (telemetry as any).events = keptEvents;
+        (telemetry as any).ignored_events = ignoredEvents;
         
         runner.stop();
         sendJsonLog(`[v2.3] ${label} complete. (${telemetry.events.length} events, speed=${normalizedSpeed}x, cutoff=${effectiveCutoffMs}ms)`, 'info');

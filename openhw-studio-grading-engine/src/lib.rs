@@ -103,6 +103,8 @@ pub struct BehavioralSnapshot {
     pub events: Vec<TelemetryEvent>,
     pub duration_ms: u32,
     pub rich_metrics: Option<String>,
+    #[serde(default)]
+    pub ignored_events: Vec<TelemetryEvent>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -132,6 +134,7 @@ pub struct IdTemporalStats {
     pub match_percentage: f32,
     pub matched_events: usize,
     pub is_silent_teacher: bool, // True if teacher has 0 events for this ID (grace = 100%)
+    pub ignored_events: usize,
 }
 
 /// Temporal breakdown returned alongside behavioral_score.
@@ -283,7 +286,7 @@ pub fn grade_circuits_wasm(
                 // In a real scenario, we might return an error here to force re-gen
             }
             let meta: ProjectMeta = serde_json::from_str(&v.meta_json).unwrap_or(ProjectMeta { board: "".to_string(), components: Vec::new(), connections: Vec::new(), code: None, blocklyXml: None, projectFiles: None });
-            let behavior: BehavioralSnapshot = serde_json::from_str(&v.behavior_json).unwrap_or(BehavioralSnapshot { events: Vec::new(), duration_ms: 0, rich_metrics: None });
+            let behavior: BehavioralSnapshot = serde_json::from_str(&v.behavior_json).unwrap_or(BehavioralSnapshot { events: Vec::new(), duration_ms: 0, rich_metrics: None, ignored_events: Vec::new() });
             (meta, behavior, v.health)
         },
         Err(_) => {
@@ -306,7 +309,7 @@ pub fn grade_circuits_wasm(
                     }).unwrap();
                 }
             };
-            (meta, BehavioralSnapshot { events: Vec::new(), duration_ms: 0, rich_metrics: None }, 100)
+            (meta, BehavioralSnapshot { events: Vec::new(), duration_ms: 0, rich_metrics: None, ignored_events: Vec::new() }, 100)
         }
     };
 
@@ -339,7 +342,7 @@ pub fn grade_circuits_wasm(
         }
     };
 
-    let student_behavior: BehavioralSnapshot = serde_json::from_str(student_telemetry_json).unwrap_or(BehavioralSnapshot { events: Vec::new(), duration_ms: 0, rich_metrics: None });
+    let student_behavior: BehavioralSnapshot = serde_json::from_str(student_telemetry_json).unwrap_or(BehavioralSnapshot { events: Vec::new(), duration_ms: 0, rich_metrics: None, ignored_events: Vec::new() });
 
     // 2. Spatial Eye Analysis (Physical Layout & Inventory)
     logs.push("Starting Spatial Eye Analysis...".to_string());
@@ -621,6 +624,10 @@ fn compare_behavior(
     let mut electrical_score_sum = 0.0;
     let mut electrical_weight_sum = 0.0;
 
+    // Build ignored-event groups so we can treat cutoff-only mismatches as ignored
+    let t_ignored_groups = if teacher.ignored_events.is_empty() { HashMap::new() } else { group_events_ext(&teacher.ignored_events, &id_map, false) };
+    let s_ignored_groups = if student.ignored_events.is_empty() { HashMap::new() } else { group_events_ext(&student.ignored_events, &HashMap::new(), true) };
+
     for (t_id, t_timeline) in &t_groups {
         let is_pin = t_id.starts_with("pin:") || t_id.starts_with("p") || t_id.starts_with("pinstate:");
         let weight = 1.0;
@@ -630,10 +637,11 @@ fn compare_behavior(
         // SILENT-PIN GRACE: if teacher has 0 or 1 event (static/unchanged), mark as 100% match
         let is_silent_teacher = t_timeline.len() <= 1;
         
+        let mut ignored_count = 0usize;
         let (group_score, matched_count) = if let Some(s_timeline) = s_groups.get(s_id) {
             if is_silent_teacher {
                 // Teacher pin is static/silent: student doesn't need to match anything
-                (1.0, t_timeline.len())
+                (1.0_f32, t_timeline.len())
             } else {
                 // INDEX-BY-INDEX MATCHING with sliding window fallback
                 compare_events_indexed(t_timeline, s_timeline, time_scale, adaptive_tolerance_ms)
@@ -641,10 +649,16 @@ fn compare_behavior(
         } else {
             if is_silent_teacher {
                 // Teacher is silent, student has no events: perfect match
-                (1.0, 0)
+                (1.0_f32, 0)
             } else {
-                // Teacher has events, student has none: 0% match
-                (0.0, 0)
+                // Teacher has events, student has none: check if student had only ignored events for this id
+                if let Some(ignored) = s_ignored_groups.get(s_id) {
+                    ignored_count = ignored.len();
+                    (1.0_f32, t_timeline.len())
+                } else {
+                    // Real mismatch
+                    (0.0, 0)
+                }
             }
         };
 
@@ -654,9 +668,10 @@ fn compare_behavior(
             id_type: if is_pin { "pin".to_string() } else { "component".to_string() },
             teacher_event_count: t_timeline.len(),
             student_event_count: s_groups.get(s_id).map(|v| v.len()).unwrap_or(0),
-            match_percentage: (group_score * 100.0).min(100.0),
+            match_percentage: (group_score * 100.0_f32).min(100.0_f32),
             matched_events: matched_count,
             is_silent_teacher,
+            ignored_events: ignored_count,
         });
 
         if is_pin {
@@ -666,6 +681,34 @@ fn compare_behavior(
             functional_score_sum += group_score * weight;
             functional_weight_sum += weight;
         }
+    }
+
+    // Handle student-only groups (teacher missing) so we can optionally treat ignored teacher events as grace
+    for (s_id, s_timeline) in &s_groups {
+        if t_groups.contains_key(s_id) { continue; }
+
+        let is_pin = s_id.starts_with("pin:") || s_id.starts_with("p") || s_id.starts_with("pinstate:");
+        let mut ignored_count = 0usize;
+        if let Some(t_ignored) = t_ignored_groups.get(s_id) {
+            ignored_count = t_ignored.len();
+        }
+
+        let (group_score, matched_count) = if ignored_count > 0 {
+            (1.0_f32, s_timeline.len())
+        } else {
+            (0.0_f32, 0)
+        };
+
+        temporal_stats.push(IdTemporalStats {
+            id: s_id.clone(),
+            id_type: if is_pin { "pin".to_string() } else { "component".to_string() },
+            teacher_event_count: 0,
+            student_event_count: s_timeline.len(),
+            match_percentage: (group_score * 100.0).min(100.0_f32),
+            matched_events: matched_count,
+            is_silent_teacher: false,
+            ignored_events: ignored_count,
+        });
     }
 
     let f_match = if functional_weight_sum > 0.0 { functional_score_sum / functional_weight_sum } else { 1.0 };
