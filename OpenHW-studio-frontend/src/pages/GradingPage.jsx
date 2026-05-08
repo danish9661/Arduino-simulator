@@ -49,6 +49,13 @@ const GradingPage = () => {
         return { type, data: event[type] || {} };
     }, []);
 
+    const normalizeTemporalId = useCallback((rawId) => String(rawId || '').trim().toLowerCase().replace(/\s+/g, ''), []);
+
+    const canonicalPinId = useCallback((pin) => {
+        const normalized = String(pin || '').trim().toLowerCase().replace(/^pin:/, '');
+        return `pin:${normalized}`;
+    }, []);
+
     const formatTelemetryToken = useCallback((event) => {
         const { type, data } = getTelemetryEvent(event);
         if (type === 'PinChange') {
@@ -78,10 +85,11 @@ const GradingPage = () => {
             events.forEach(event => {
                 const { type, data } = getTelemetryEvent(event);
                 let groupId = 'other';
-                if (type === 'PinChange') groupId = `Pin ${data.pin}`;
+                if (type === 'PinChange') groupId = canonicalPinId(data.pin);
                 else if (type === 'SerialOutput') groupId = 'Serial Console';
                 else if (type === 'ComponentState') {
-                    groupId = isStudent ? (idMap[data.id] || data.id) : data.id;
+                    const mappedId = isStudent ? (idMap[data.id] || data.id) : data.id;
+                    groupId = normalizeTemporalId(mappedId);
                 }
                 if (!groups[groupId]) groups[groupId] = [];
                 groups[groupId].push({ ...data, _type: type });
@@ -144,7 +152,7 @@ const GradingPage = () => {
             id_stats: idStats,
             overall_temporal_score: overall
         };
-    }, [getTelemetryEvent, safeParseTelemetry]);
+    }, [canonicalPinId, getTelemetryEvent, normalizeTemporalId, safeParseTelemetry]);
 
     const buildTemporalEventDetails = useCallback((currentReport, temporalData) => {
         const teacherTelemetry = safeParseTelemetry(currentReport?.teacher_telemetry);
@@ -161,10 +169,11 @@ const GradingPage = () => {
             events.forEach(event => {
                 const { type, data } = getTelemetryEvent(event);
                 let groupId = 'other';
-                if (type === 'PinChange') groupId = `Pin ${data.pin}`;
+                if (type === 'PinChange') groupId = canonicalPinId(data.pin);
                 else if (type === 'SerialOutput') groupId = 'Serial Console';
                 else if (type === 'ComponentState') {
-                    groupId = isStudent ? (idMap[data.id] || data.id) : data.id;
+                    const mappedId = isStudent ? (idMap[data.id] || data.id) : data.id;
+                    groupId = normalizeTemporalId(mappedId);
                 }
                 if (!groups[groupId]) groups[groupId] = [];
                 groups[groupId].push({ ...data, _type: type });
@@ -200,8 +209,9 @@ const GradingPage = () => {
         const details = {};
 
         rows.forEach(stat => {
-            const teacherList = tGroups[stat.id] || [];
-            const studentList = sGroups[stat.id] || [];
+            const statId = normalizeTemporalId(stat.id);
+            const teacherList = tGroups[statId] || tGroups[stat.id] || [];
+            const studentList = sGroups[statId] || sGroups[stat.id] || [];
             const rowCount = Math.max(teacherList.length, studentList.length);
             const eventRows = [];
 
@@ -241,10 +251,11 @@ const GradingPage = () => {
             }
 
             details[stat.id] = eventRows;
+            details[statId] = eventRows;
         });
 
         return details;
-    }, [getTelemetryEvent, safeParseTelemetry]);
+    }, [canonicalPinId, getTelemetryEvent, normalizeTemporalId, safeParseTelemetry]);
 
     const buildAiAuditModel = useCallback((currentReport) => {
         const teacherTelemetry = safeParseTelemetry(currentReport?.teacher_telemetry);
@@ -310,7 +321,8 @@ const GradingPage = () => {
             }
             if (e.data.type === 'GRADING_COMPLETE') {
                 if (e.data.result.logs) {
-                    e.data.result.logs.forEach(log => addLog(log, 'info'));
+                    const runSpeed = Number(e.data.result?.simulation_speed || simulationSpeed || 1);
+                    e.data.result.logs.forEach(log => addLog(`[${runSpeed}x] ${log}`, 'info'));
                 }
 
                 // Cache the teacher key if it was generated/returned
@@ -329,6 +341,8 @@ const GradingPage = () => {
                     pin_fidelity: 0,
                     code_score: 0,
                     verified_code_score: 0,
+                    simulation_speed: Number(simulationSpeed) || 1,
+                    telemetry_cutoff_ms: 7900,
                     feedback: [],
                     logs: [],
                     teacher_telemetry: null,
@@ -349,6 +363,7 @@ const GradingPage = () => {
                     student_metrics: { pins: 0, functional: 0, serial: 0 },
                     ...e.data.result // Override defaults with actual result
                 };
+                addLog(`Run metadata: speed=${Number(finalReport.simulation_speed || 1)}x, telemetry cutoff=${Number(finalReport.telemetry_cutoff_ms || 7900)}ms`, 'info');
                 setReport(finalReport);
                 setIsGrading(false); // Unlock UI immediately so user sees deterministic results and logs
 
@@ -439,7 +454,8 @@ const GradingPage = () => {
                         type: 'GRADE_SEMANTICS',
                         teacherTelemetry: finalReport.teacher_telemetry,
                         studentTelemetry: finalReport.student_telemetry,
-                        idMapping: finalReport.id_mapping
+                        idMapping: finalReport.id_mapping,
+                        simulationSpeed: Number(finalReport.simulation_speed || simulationSpeed || 1)
                     });
                 } else {
                     setIsGrading(false);
@@ -477,12 +493,13 @@ const GradingPage = () => {
                 a.click();
                 setIsGrading(false);
             } else if (e.data.type === 'LOG') {
-                addLog(e.data.msg, e.data.logType);
+                const liveSpeed = Number(simulationSpeed || 1);
+                addLog(`[${liveSpeed}x] ${e.data.msg}`, e.data.logType);
             }
         };
 
         return () => workerRef.current?.terminate();
-    }, [addLog, teacherFile]);
+    }, [addLog, simulationSpeed, teacherFile]);
 
     useEffect(() => {
         logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -770,7 +787,8 @@ const GradingPage = () => {
                                     </div>
                                     {(() => {
                                         const temporalData = report.temporal_breakdown || buildTemporalBreakdownFallback(report);
-                                        const temporalRows = Array.isArray(temporalData?.id_stats) ? temporalData.id_stats : [];
+                                        const temporalRows = (Array.isArray(temporalData?.id_stats) ? temporalData.id_stats : [])
+                                            .filter(stat => String(stat?.id_type || '').toLowerCase() !== 'pin');
                                         const temporalDetails = buildTemporalEventDetails(report, temporalData);
                                         return (
                                             <div className="temporal-content">

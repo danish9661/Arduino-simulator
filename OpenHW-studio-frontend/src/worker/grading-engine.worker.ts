@@ -150,6 +150,7 @@ async function compileSourceCode(payload: any, board: string): Promise<string> {
 }
 
 async function captureBehavior(meta: any, durationMs: number, label: string, simulationSpeed = 1): Promise<any> {
+    const TELEMETRY_CUTOFF_MS = 7900;
     const telemetry = {
         events: [] as any[],
         serial: "",
@@ -164,6 +165,15 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
     let runner: any = null;
     const startTime = Date.now();
     const normalizedSpeed = Number.isFinite(simulationSpeed) && simulationSpeed > 0 ? simulationSpeed : 1;
+    const effectiveCutoffMs = Math.min(durationMs, TELEMETRY_CUTOFF_MS);
+
+    const pushTelemetryEvent = (event: any, nowMs: number): boolean => {
+        if (!Number.isFinite(nowMs) || nowMs > effectiveCutoffMs) {
+            return false;
+        }
+        telemetry.events.push(event);
+        return true;
+    };
 
     try {
         const { createRunnerForBoard } = await import('./execute');
@@ -200,7 +210,7 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
         }
 
         console.log(`[TRACE] ${label}: Starting capture behavior. Source detected: ${isSourceCode}, Hex Length: ${firmwareHex?.length || 0}`);
-        postMessage({ type: 'LOG', msg: `[TRACE] ${label}: Initializing Runner for ${boardType} at ${normalizedSpeed}x speed...` });
+        postMessage({ type: 'LOG', msg: `[TRACE] ${label}: Initializing Runner for ${boardType} at ${normalizedSpeed}x speed (telemetry cutoff: ${effectiveCutoffMs}ms)...` });
 
         runner = await createRunnerForBoard(
             meta.board || boardComp?.type || 'wokwi-arduino-uno',
@@ -213,16 +223,16 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
                     for (const pinId in state.pins) {
                         const newState = !!state.pins[pinId];
                         if (newState !== lastPinStates[pinId]) {
-                            telemetry.events.push({
+                            pushTelemetryEvent({
                                 PinChange: { pin: pinId, state: newState, time_ms: nowMs }
-                            });
+                            }, nowMs);
                             lastPinStates[pinId] = newState;
                         }
                     }
                 } else if (state.type === 'serial') {
-                    telemetry.events.push({
+                    pushTelemetryEvent({
                         SerialOutput: { data: state.data, time_ms: nowMs }
-                    });
+                    }, nowMs);
                     telemetry.serial += state.data;
                 }
             },
@@ -236,7 +246,8 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
         console.log(`[TRACE] ${label}: Simulation loop entered.`);
 
         while (runner.getSimulatedTimeMs() - simStartMs < durationMs) {
-            await new Promise(resolve => setTimeout(resolve, 50));
+            const pollIntervalMs = Math.max(10, Math.round(50 / normalizedSpeed));
+            await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
 
             const nowMs = runner.getSimulatedTimeMs();
             if (nowMs - lastTraceTime > 1000) {
@@ -258,9 +269,9 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
                         
                         // Per-key filtering for extreme cleanliness
                         if (JSON.stringify(val) !== JSON.stringify(lastComponentStates[stateKey])) {
-                            telemetry.events.push({ 
+                            pushTelemetryEvent({ 
                                 ComponentState: { id: cid, key: key, value: val, time_ms: nowMs } 
-                            });
+                            }, nowMs);
                             lastComponentStates[stateKey] = JSON.parse(JSON.stringify(val));
                         }
                     }
@@ -277,9 +288,16 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
         const richSnapshot = runner.getRichTelemetrySnapshot({ mode: 'deep' });
         telemetry.rich_metrics = JSON.stringify(richSnapshot);
         (telemetry as any).simulation_speed = normalizedSpeed;
+        (telemetry as any).telemetry_cutoff_ms = effectiveCutoffMs;
+        (telemetry as any).events = telemetry.events.filter((evt: any) => {
+            const eventType = Object.keys(evt || {})[0];
+            const eventData = eventType ? evt?.[eventType] : null;
+            const eventTime = Number(eventData?.time_ms);
+            return Number.isFinite(eventTime) && eventTime <= effectiveCutoffMs;
+        });
         
         runner.stop();
-                sendJsonLog(`[v2.3] ${label} complete. (${telemetry.events.length} events)`, 'info');
+        sendJsonLog(`[v2.3] ${label} complete. (${telemetry.events.length} events, speed=${normalizedSpeed}x, cutoff=${effectiveCutoffMs}ms)`, 'info');
         return telemetry;
     } catch (err: any) {
         const errorMsg = String(err);
@@ -311,6 +329,7 @@ onmessage = async (e: MessageEvent<GradingMessage>) => {
         if (type === 'GENERATE_KEY') {
             const teacherData = teacher as any;
             postMessage({ type: 'LOG', msg: "Generating Reference Key: Running simulation..." });
+            sendJsonLog(`[Run Config] mode=GENERATE_KEY speed=${runSpeed}x telemetry_cutoff_ms=7900`, 'info');
             
             let teacherMeta;
             let projectJson: string;
@@ -347,6 +366,7 @@ onmessage = async (e: MessageEvent<GradingMessage>) => {
 
         } else if (type === 'GRADE' && student) {
             postMessage({ type: 'LOG', msg: "Starting Intelligent Grading Process..." });
+            sendJsonLog(`[Run Config] mode=GRADE speed=${runSpeed}x telemetry_cutoff_ms=7900`, 'info');
             
             // 1. Student Metadata
             const studentMeta = extractProjectMetaFromPng(new Uint8Array(student));
@@ -430,6 +450,10 @@ onmessage = async (e: MessageEvent<GradingMessage>) => {
             const finalResult = result && typeof result === 'object' ? { ...result } : result;
             if (finalResult && typeof finalResult === 'object') {
                 (finalResult as any).simulation_speed = runSpeed;
+                (finalResult as any).telemetry_cutoff_ms = 7900;
+                if (Array.isArray((finalResult as any).logs)) {
+                    (finalResult as any).logs = (finalResult as any).logs.map((line: any) => `[${runSpeed}x] ${String(line)}`);
+                }
                 const codeScore = Number(finalResult.code_score);
                 const pinFidelity = Number(finalResult.pin_fidelity);
                 const verifiedScore = Number(finalResult.verified_code_score);

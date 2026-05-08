@@ -75,7 +75,7 @@ function buildNormalizedTrace(input: any, label: string = ''): { functional: str
 
             if (lastComponentValues.get(cacheKey) !== value) {
                 compTransitions++;
-                functionalTokens.push(`${token}@${event.ComponentState.time_ms}`);
+                functionalTokens.push(`${token}`);
                 lastComponentValues.set(cacheKey, value);
             }
             continue;
@@ -88,7 +88,7 @@ function buildNormalizedTrace(input: any, label: string = ''): { functional: str
 
             if (serialValue && serialValue !== lastSerialValue) {
                 serialTransitions++;
-                functionalTokens.push(`ser:"${serialValue}"@${event.SerialOutput.time_ms}`);
+                functionalTokens.push(`ser:"${serialValue}"`);
                 lastSerialValue = serialValue;
             }
         }
@@ -305,13 +305,15 @@ function flattenTelemetry(input: any): { functional: string, electrical: string,
 
 
 self.onmessage = async (e) => {
-    const { type, teacherTelemetry, studentTelemetry } = e.data;
+    const { type, teacherTelemetry, studentTelemetry, simulationSpeed } = e.data;
 
     if (type === 'GRADE_SEMANTICS') {
         try {
             await initModel();
 
             const auditStart = performance.now();
+            const runSpeed = Number.isFinite(Number(simulationSpeed)) && Number(simulationSpeed) > 0 ? Number(simulationSpeed) : 1;
+            sendJsonLog(`[RUN-CONFIG] speed=${runSpeed}x`, 'info');
             sendStatus('Processing Delta-Reports (Pre-Normalized in Rust)...');
             
             const teacherEvents = typeof teacherTelemetry === 'string' ? JSON.parse(teacherTelemetry) : teacherTelemetry;

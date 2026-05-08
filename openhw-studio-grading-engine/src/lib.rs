@@ -229,6 +229,12 @@ pub struct GradingOptions {
     pub ignore_pin_changes: bool,
     pub validation_health: i32,
     pub validation_errors: Vec<String>,
+    #[serde(default = "default_simulation_speed")]
+    pub simulation_speed: f32,
+}
+
+fn default_simulation_speed() -> f32 {
+    1.0
 }
 
 #[wasm_bindgen]
@@ -375,7 +381,7 @@ pub fn grade_circuits_wasm(
     logs.push(format!("Logic: Graph isomorphism complete. Score: {}. ({} of {} teacher connections validated in student circuit)", logic_score, teacher_meta.connections.len() as i32 * logic_score / 100, teacher_meta.connections.len()));
 
     // 4. Behavioral Comparison (WASM-based Timeline Audit)
-    let (behavioral_score, b_feedback, t_metrics, s_metrics, id_mapping, temporal_breakdown) = compare_behavior(teacher_behavior, &student_behavior, teacher_meta, &student_meta, &mut logs, &options);
+    let (behavioral_score, pin_fidelity_val, b_feedback, t_metrics, s_metrics, id_mapping, temporal_breakdown) = compare_behavior(teacher_behavior, &student_behavior, teacher_meta, &student_meta, &mut logs, &options);
     feedback.extend(b_feedback);
     
     // Extract diagnostic info from feedback (hacky but works for now to get it into logs)
@@ -385,7 +391,7 @@ pub fn grade_circuits_wasm(
 
     let student_serial: String = student_behavior.events.iter().filter_map(|e| if let TelemetryEvent::SerialOutput { data, .. } = e { Some(data.clone()) } else { None }).collect();
     
-    logs.push(format!("Behavior: Telemetry diffing complete. Score: {}. (Captured {} student events vs {} teacher events)", behavioral_score, student_behavior.events.len(), teacher_behavior.events.len()));
+    logs.push(format!("Behavior: Telemetry diffing complete. Score: {}. (Captured {} student events vs {} teacher events, speed={}x)", behavioral_score, student_behavior.events.len(), teacher_behavior.events.len(), options.simulation_speed.max(1.0)));
     if !student_serial.is_empty() {
         let preview: String = student_serial.chars().take(50).collect();
         logs.push(format!("Behavior: Student Serial Output detected: '{}'{}", preview, if student_serial.len() > 50 { "..." } else { "" }));
@@ -420,7 +426,6 @@ pub fn grade_circuits_wasm(
     let t_norm = normalize_telemetry(&teacher_behavior.events, &HashMap::new(), false);
     let s_norm = normalize_telemetry(&student_behavior.events, &id_mapping, true);
 
-    let pin_fidelity_val = (s_metrics.pins as f32 / t_metrics.pins.max(1) as f32 * 100.0).min(100.0) as i32;
     let verified_code_score_val = ((code_score as f32 * VERIFIED_CODE_WEIGHT) + (pin_fidelity_val as f32 * PIN_FIDELITY_WEIGHT)).round() as i32;
 
     let report = GradingReport {
@@ -504,8 +509,8 @@ fn compare_behavior(
     t_meta: &ProjectMeta,
     s_meta: &ProjectMeta,
     logs: &mut Vec<String>,
-    _options: &GradingOptions,
-) -> (i32, Vec<String>, ActivityMetrics, ActivityMetrics, HashMap<String, String>, TemporalBreakdown) {
+    options: &GradingOptions,
+) -> (i32, i32, Vec<String>, ActivityMetrics, ActivityMetrics, HashMap<String, String>, TemporalBreakdown) {
     let mut feedback = Vec::new();
     let mut temporal_stats = Vec::new();
 
@@ -574,7 +579,7 @@ fn compare_behavior(
             let s_pins_vec = extract_pins(&s_conn, &s_comp.id);
             let pin_match = t_pins_vec.iter().any(|tp| s_pins_vec.contains(tp));
 
-            if _options.exact_match {
+            if options.exact_match {
                 if !pin_match && !t_pins_vec.is_empty() {
                     match_score = 0.0; // strict mode requires pin connectivity
                 } else {
@@ -607,13 +612,17 @@ fn compare_behavior(
         teacher.duration_ms as f32 / student.duration_ms as f32
     } else { 1.0 };
 
+    let speed_factor = options.simulation_speed.max(1.0).min(4.0);
+    let adaptive_tolerance_ms = (TIMELINE_TOLERANCE_MS * speed_factor).min(1200.0);
+    logs.push(format!("Behavior: Temporal matcher configured with adaptive tolerance {:.0}ms at {}x speed.", adaptive_tolerance_ms, speed_factor));
+
     let mut functional_score_sum = 0.0;
     let mut functional_weight_sum = 0.0;
     let mut electrical_score_sum = 0.0;
     let mut electrical_weight_sum = 0.0;
 
     for (t_id, t_timeline) in &t_groups {
-        let is_pin = t_id.starts_with("pin:") || t_id.starts_with("p");
+        let is_pin = t_id.starts_with("pin:") || t_id.starts_with("p") || t_id.starts_with("pinstate:");
         let weight = 1.0;
 
         let s_id = id_map.get(t_id).unwrap_or(t_id);
@@ -627,7 +636,7 @@ fn compare_behavior(
                 (1.0, t_timeline.len())
             } else {
                 // INDEX-BY-INDEX MATCHING with sliding window fallback
-                compare_events_indexed(t_timeline, s_timeline, time_scale)
+                compare_events_indexed(t_timeline, s_timeline, time_scale, adaptive_tolerance_ms)
             }
         } else {
             if is_silent_teacher {
@@ -673,7 +682,7 @@ fn compare_behavior(
         overall_temporal_score: behavioral_score as i32,
     };
 
-    (behavioral_score as i32, feedback, 
+    (behavioral_score as i32, pin_fidelity, feedback,
      ActivityMetrics { pins: t_pins as u32, functional: t_active_count as u32, serial: t_serial as u32 }, 
      ActivityMetrics { pins: s_pins as u32, functional: s_active_count as u32, serial: s_serial as u32 }, 
      return_id_map,
@@ -686,6 +695,7 @@ fn compare_events_indexed(
     teacher_events: &[TelemetryEvent],
     student_events: &[TelemetryEvent],
     time_scale: f32,
+    tolerance_ms: f32,
 ) -> (f32, usize) {
     let mut matched_count = 0;
     let mut last_s_idx = 0;
@@ -698,7 +708,7 @@ fn compare_events_indexed(
             let s_event = &student_events[t_idx];
             let s_time_norm = get_event_time(s_event) * time_scale;
             
-            if is_event_match_fuzzy(t_event, s_event, t_time, s_time_norm, TIMELINE_TOLERANCE_MS) {
+            if is_event_match_fuzzy(t_event, s_event, t_time, s_time_norm, tolerance_ms) {
                 matched_count += 1;
                 last_s_idx = t_idx + 1;
                 continue;
@@ -717,7 +727,7 @@ fn compare_events_indexed(
             let s_event = &student_events[s_idx];
             let s_time_norm = get_event_time(s_event) * time_scale;
 
-            if is_event_match_fuzzy(t_event, s_event, t_time, s_time_norm, TIMELINE_TOLERANCE_MS) {
+            if is_event_match_fuzzy(t_event, s_event, t_time, s_time_norm, tolerance_ms) {
                 matched_count += 1;
                 last_s_idx = s_idx + 1;
                 found = true;
@@ -770,8 +780,18 @@ fn group_events_ext(events: &[TelemetryEvent], id_alias_map: &HashMap<String, St
             TelemetryEvent::PinChange { pin, .. } => format!("pin:{}", normalize_id(pin)),
             TelemetryEvent::ComponentState { id, .. } => {
                 let normalized_id = normalize_id(id);
-                if is_student { normalized_id } 
-                else { id_alias_map.get(&normalized_id).cloned().unwrap_or_else(|| normalized_id.clone()) }
+                let key_norm = match e {
+                    TelemetryEvent::ComponentState { key, .. } => normalize_id(key),
+                    _ => String::new(),
+                };
+                let mapped_id = if is_student { normalized_id.clone() }
+                else { id_alias_map.get(&normalized_id).cloned().unwrap_or_else(|| normalized_id.clone()) };
+                let is_pin_like_state = key_norm.contains("analog") || key_norm.starts_with("pin") || key_norm.contains("gpio");
+                if is_pin_like_state {
+                    format!("pinstate:{}:{}", mapped_id, key_norm)
+                } else {
+                    mapped_id
+                }
             },
             TelemetryEvent::SerialOutput { .. } => "serial".to_string(),
             _ => "other".to_string()
