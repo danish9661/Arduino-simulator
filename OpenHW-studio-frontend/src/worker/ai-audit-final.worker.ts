@@ -25,10 +25,17 @@ function getEventTime(event: any): number {
 }
 
 function buildNormalizedTrace(input: any, label: string = ''): { functional: string, electrical: string, normalized: string, raw: string } {
-    const events = Array.isArray(input) ? input : (input?.events || []);
+    let events = Array.isArray(input) ? input : (input?.events || []);
     const orderedEvents = [...events].filter(Boolean).sort((a, b) => getEventTime(a) - getEventTime(b));
 
     sendJsonLog(`[TRACE-BUILD] ${label} - Input: ${events.length} events → ${orderedEvents.length} ordered`, 'debug');
+
+    // Apply entropy filtering to remove static noise (values that never change)
+    const filteredEvents = entropyFilter(orderedEvents);
+    const eventsRemoved = orderedEvents.length - filteredEvents.length;
+    if (eventsRemoved > 0) {
+        sendJsonLog(`[TRACE-BUILD] ${label} - Entropy filter removed ${eventsRemoved} static events (kept ${filteredEvents.length})`, 'debug');
+    }
 
     const rawTokens: string[] = [];
     const functionalTokens: string[] = [];
@@ -41,7 +48,7 @@ function buildNormalizedTrace(input: any, label: string = ''): { functional: str
     let pinChangeCount = 0, compStateCount = 0, serialCount = 0;
     let pinTransitions = 0, compTransitions = 0, serialTransitions = 0;
 
-    for (const event of orderedEvents) {
+    for (const event of filteredEvents) {
         if (event.PinChange) {
             pinChangeCount++;
             const pin = String(event.PinChange.pin || '');
@@ -397,9 +404,12 @@ self.onmessage = async (e) => {
                 }
             }
 
-            // 3. Final Blending (The 85/15 Rule)
-            const similarity = (functionalSim * 0.85) + (electricalSim * 0.15);
-            sendJsonLog(`[SIMILARITY-FINAL] Final blend: (${functionalSim.toFixed(4)} * 0.85) + (${electricalSim.toFixed(4)} * 0.15) = ${similarity.toFixed(4)}`, 'info');
+            // 3. Final Blending
+            // NOTE: electrical/pin-change signals are retained for reporting, but
+            // we no longer fold them into the AI semantic final score. The AI
+            // semantic audit focuses on high-level functional similarity only.
+            const similarity = functionalSim;
+            sendJsonLog(`[SIMILARITY-FINAL] Final blend: using functionalSim only = ${similarity.toFixed(4)} (electricalSim reported separately as ${electricalSim.toFixed(4)})`, 'info');
             
             const auditTime = Math.round(performance.now() - auditStart);
 

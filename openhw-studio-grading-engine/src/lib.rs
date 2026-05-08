@@ -705,9 +705,9 @@ fn compare_events_indexed(
             }
         }
 
-        // SLIDING WINDOW FALLBACK: search ±10 events around last matched position
-        let search_start = if last_s_idx > TIMELINE_WINDOW { last_s_idx - TIMELINE_WINDOW } else { 0 };
-        let search_end = (last_s_idx + (TIMELINE_WINDOW * 2)).min(student_events.len());
+        // FORWARD LOOKAHEAD: only inspect the next 10 candidate events after the current anchor.
+        let search_start = last_s_idx.min(student_events.len());
+        let search_end = (last_s_idx + TIMELINE_WINDOW + 1).min(student_events.len());
 
         let mut found = false;
         for s_idx in search_start..search_end {

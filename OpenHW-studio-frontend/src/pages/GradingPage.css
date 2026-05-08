@@ -536,6 +536,39 @@
     color: #e2e8f0;
 }
 
+.temporal-disclosure-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    padding: 0;
+    font: inherit;
+}
+
+.temporal-disclosure-btn:hover {
+    color: #60a5fa;
+}
+
+.temporal-disclosure-btn:focus-visible {
+    outline: 2px solid #60a5fa;
+    outline-offset: 3px;
+    border-radius: 6px;
+}
+
+.temporal-disclosure-icon {
+    display: inline-block;
+    transition: transform 0.18s ease;
+    color: #60a5fa;
+    width: 1ch;
+}
+
+.temporal-disclosure-icon.open {
+    transform: rotate(90deg);
+}
+
 .temporal-table .count-cell {
     text-align: center;
     color: #94a3b8;
@@ -594,6 +627,78 @@
 
 .temporal-table tr.partial-match {
     background: rgba(245, 158, 11, 0.05);
+}
+
+.temporal-detail-row td {
+    padding: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.temporal-detail-panel {
+    padding: 14px 16px 18px;
+    background: rgba(2, 6, 23, 0.9);
+    border-top: 1px solid rgba(96, 165, 250, 0.2);
+}
+
+.temporal-detail-title {
+    margin-bottom: 10px;
+    color: #93c5fd;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.78rem;
+}
+
+.temporal-detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.temporal-detail-table th,
+.temporal-detail-table td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+    font-size: 0.88rem;
+}
+
+.temporal-detail-table th {
+    color: #93c5fd;
+    background: rgba(30, 41, 59, 0.8);
+}
+
+.temporal-detail-table td {
+    color: #cbd5e1;
+}
+
+.temporal-detail-table tr:last-child td {
+    border-bottom: 0;
+}
+
+.temporal-detail-table tr.detail-status-matched {
+    background: rgba(16, 185, 129, 0.08);
+}
+
+.temporal-detail-table tr.detail-status-time-drift {
+    background: rgba(59, 130, 246, 0.08);
+}
+
+.temporal-detail-table tr.detail-status-missing,
+.temporal-detail-table tr.detail-status-unmatched {
+    background: rgba(248, 113, 113, 0.08);
+}
+
+.temporal-detail-table tr.detail-status-student-extra {
+    background: rgba(250, 204, 21, 0.08);
+}
+
+.detail-status-cell {
+    font-weight: 700;
+    text-transform: capitalize;
 }
 
 .temporal-legend {

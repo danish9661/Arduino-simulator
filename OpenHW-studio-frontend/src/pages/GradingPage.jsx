@@ -15,6 +15,7 @@ const GradingPage = () => {
         ignore_pin_changes: true
     });
     const [activeTab, setActiveTab] = useState('summary');
+    const [expandedTemporalIds, setExpandedTemporalIds] = useState({});
 
     const workerRef = useRef(null);
     const logEndRef = useRef(null);
@@ -144,6 +145,106 @@ const GradingPage = () => {
         };
     }, [getTelemetryEvent, safeParseTelemetry]);
 
+    const buildTemporalEventDetails = useCallback((currentReport, temporalData) => {
+        const teacherTelemetry = safeParseTelemetry(currentReport?.teacher_telemetry);
+        const studentTelemetry = safeParseTelemetry(currentReport?.student_telemetry);
+        const teacherEvents = Array.isArray(teacherTelemetry.events) ? teacherTelemetry.events : [];
+        const studentEvents = Array.isArray(studentTelemetry.events) ? studentTelemetry.events : [];
+        const idMap = currentReport?.id_mapping || {};
+        const scale = teacherTelemetry.duration_ms && studentTelemetry.duration_ms
+            ? teacherTelemetry.duration_ms / studentTelemetry.duration_ms
+            : 1;
+
+        const groupEvents = (events, isStudent) => {
+            const groups = {};
+            events.forEach(event => {
+                const { type, data } = getTelemetryEvent(event);
+                let groupId = 'other';
+                if (type === 'PinChange') groupId = `Pin ${data.pin}`;
+                else if (type === 'SerialOutput') groupId = 'Serial Console';
+                else if (type === 'ComponentState') {
+                    groupId = isStudent ? (idMap[data.id] || data.id) : data.id;
+                }
+                if (!groups[groupId]) groups[groupId] = [];
+                groups[groupId].push({ ...data, _type: type });
+            });
+            return groups;
+        };
+
+        const describeEvent = (event) => {
+            if (!event) return 'No event';
+            if (event._type === 'PinChange') {
+                return `Pin ${event.pin} = ${event.state ? 'H' : 'L'}`;
+            }
+            if (event._type === 'ComponentState') {
+                return `${event.id}.${event.key} = ${String(event.value ?? '')}`;
+            }
+            if (event._type === 'SerialOutput') {
+                return `Serial: ${String(event.data || '').trim()}`;
+            }
+            return event._type || 'Unknown event';
+        };
+
+        const cleanEvent = (event) => {
+            if (!event) return null;
+            const copy = { ...event };
+            delete copy.time_ms;
+            delete copy._type;
+            return copy;
+        };
+
+        const tGroups = groupEvents(teacherEvents, false);
+        const sGroups = groupEvents(studentEvents, true);
+        const rows = Array.isArray(temporalData?.id_stats) ? temporalData.id_stats : [];
+        const details = {};
+
+        rows.forEach(stat => {
+            const teacherList = tGroups[stat.id] || [];
+            const studentList = sGroups[stat.id] || [];
+            const rowCount = Math.max(teacherList.length, studentList.length);
+            const eventRows = [];
+
+            for (let index = 0; index < rowCount; index += 1) {
+                const teacherEvent = teacherList[index] || null;
+                const studentEvent = studentList[index] || null;
+                const teacherTime = Number(teacherEvent?.time_ms || 0);
+                const studentTime = Number(studentEvent?.time_ms || 0);
+                const timeDelta = Math.abs(teacherTime - (studentTime * scale));
+                const teacherClean = cleanEvent(teacherEvent);
+                const studentClean = cleanEvent(studentEvent);
+                const teacherMatchesStudent = teacherClean && studentClean && JSON.stringify(teacherClean) === JSON.stringify(studentClean);
+                const sameType = teacherEvent?._type && teacherEvent._type === studentEvent?._type;
+
+                let matchStatus = 'unmatched';
+                if (!teacherEvent && studentEvent) {
+                    matchStatus = 'student extra';
+                } else if (teacherEvent && !studentEvent) {
+                    matchStatus = 'missing';
+                } else if (teacherMatchesStudent && timeDelta <= 250) {
+                    matchStatus = 'matched';
+                } else if (teacherMatchesStudent || sameType) {
+                    matchStatus = 'time drift';
+                }
+
+                eventRows.push({
+                    index: index + 1,
+                    teacher_time_ms: teacherTime,
+                    student_time_ms: studentTime,
+                    time_delta_ms: Number.isFinite(timeDelta) ? timeDelta : 0,
+                    teacher_label: describeEvent(teacherEvent),
+                    student_label: describeEvent(studentEvent),
+                    match_status: matchStatus,
+                    teacher_event: teacherEvent,
+                    student_event: studentEvent
+                });
+            }
+
+            details[stat.id] = eventRows;
+        });
+
+        return details;
+    }, [getTelemetryEvent, safeParseTelemetry]);
+
     const buildAiAuditModel = useCallback((currentReport) => {
         const teacherTelemetry = safeParseTelemetry(currentReport?.teacher_telemetry);
         const studentTelemetry = safeParseTelemetry(currentReport?.student_telemetry);
@@ -267,7 +368,9 @@ const GradingPage = () => {
                             // Update report with AI results
                             setReport(prevReport => {
                                 if (!prevReport) return null;
-                                const rawScore = (prevReport.spatial_score * 20 + prevReport.logic_score * 30 + prevReport.behavioral_score * 40 + (prevReport.code_score || 0) * 10) / 100;
+                                // New weighting: move 15% to verified_code_score (from behavioral)
+                                // Final composition: spatial 20, logic 30, behavioral 25, verified_code 15, code 10
+                                const rawScore = (prevReport.spatial_score * 20 + prevReport.logic_score * 30 + prevReport.behavioral_score * 25 + (prevReport.verified_code_score || 0) * 15 + (prevReport.code_score || 0) * 10) / 100;
 
                                 const updatedReport = {
                                     ...prevReport,
@@ -646,6 +749,7 @@ const GradingPage = () => {
                                     {(() => {
                                         const temporalData = report.temporal_breakdown || buildTemporalBreakdownFallback(report);
                                         const temporalRows = Array.isArray(temporalData?.id_stats) ? temporalData.id_stats : [];
+                                        const temporalDetails = buildTemporalEventDetails(report, temporalData);
                                         return (
                                             <div className="temporal-content">
                                                 <div className="temporal-meta">
@@ -673,8 +777,20 @@ const GradingPage = () => {
                                                         </thead>
                                                         <tbody>
                                                             {temporalRows.map((stat, idx) => (
-                                                                <tr key={idx} className={stat.is_silent_teacher ? 'silent-teacher' : (stat.match_percentage === 100 ? 'perfect-match' : stat.match_percentage >= 75 ? 'good-match' : 'partial-match')}>
-                                                                    <td className="id-cell">{stat.id}</td>
+                                                                <React.Fragment key={stat.id || idx}>
+                                                                <tr className={stat.is_silent_teacher ? 'silent-teacher' : (stat.match_percentage === 100 ? 'perfect-match' : stat.match_percentage >= 75 ? 'good-match' : 'partial-match')}>
+                                                                    <td className="id-cell">
+                                                                        <button
+                                                                            type="button"
+                                                                            className="temporal-disclosure-btn"
+                                                                            onClick={() => setExpandedTemporalIds(prev => ({ ...prev, [stat.id]: !prev[stat.id] }))}
+                                                                            aria-expanded={!!expandedTemporalIds[stat.id]}
+                                                                            aria-controls={`temporal-detail-${idx}`}
+                                                                        >
+                                                                            <span className={`temporal-disclosure-icon ${expandedTemporalIds[stat.id] ? 'open' : ''}`}>▸</span>
+                                                                            <span>{stat.id}</span>
+                                                                        </button>
+                                                                    </td>
                                                                     <td>{stat.id_type}</td>
                                                                     <td className="count-cell">{stat.teacher_event_count}</td>
                                                                     <td className="count-cell">{stat.student_event_count}</td>
@@ -687,6 +803,42 @@ const GradingPage = () => {
                                                                     </td>
                                                                     <td className="silent-cell">{stat.is_silent_teacher ? '✓ (Grace)' : '-'}</td>
                                                                 </tr>
+                                                                {expandedTemporalIds[stat.id] && (
+                                                                    <tr id={`temporal-detail-${idx}`} className="temporal-detail-row">
+                                                                        <td colSpan="7">
+                                                                            <div className="temporal-detail-panel">
+                                                                                <div className="temporal-detail-title">Events for {stat.id}</div>
+                                                                                <table className="temporal-detail-table">
+                                                                                    <thead>
+                                                                                        <tr>
+                                                                                            <th>#</th>
+                                                                                            <th>Teacher Event</th>
+                                                                                            <th>Teacher Time</th>
+                                                                                            <th>Student Event</th>
+                                                                                            <th>Student Time</th>
+                                                                                            <th>Delta</th>
+                                                                                            <th>Status</th>
+                                                                                        </tr>
+                                                                                    </thead>
+                                                                                    <tbody>
+                                                                                        {(temporalDetails[stat.id] || []).map((eventRow) => (
+                                                                                            <tr key={`${stat.id}-${eventRow.index}`} className={`detail-status-${eventRow.match_status.replace(/\s+/g, '-')}`}>
+                                                                                                <td>{eventRow.index}</td>
+                                                                                                <td>{eventRow.teacher_label}</td>
+                                                                                                <td>{Number(eventRow.teacher_time_ms || 0)}ms</td>
+                                                                                                <td>{eventRow.student_label}</td>
+                                                                                                <td>{Number(eventRow.student_time_ms || 0)}ms</td>
+                                                                                                <td>{Math.round(Number(eventRow.time_delta_ms || 0))}ms</td>
+                                                                                                <td className="detail-status-cell">{eventRow.match_status}</td>
+                                                                                            </tr>
+                                                                                        ))}
+                                                                                    </tbody>
+                                                                                </table>
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+                                                                )}
+                                                                </React.Fragment>
                                                             ))}
                                                         </tbody>
                                                     </table>
