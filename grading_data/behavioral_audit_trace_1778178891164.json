@@ -1,0 +1,1360 @@
+{
+  "explanation": "This trace shows normalized student timing scaled to teacher clock.",
+  "time_scale_factor": "1.000",
+  "teacher_telemetry": [
+    {
+      "PinChange": {
+        "pin": "0",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "1",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "2",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "3",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "4",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "5",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "6",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "7",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "8",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "9",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "10",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "11",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "12",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": true,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "A0",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "A1",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "A2",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "A3",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "A4",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "A5",
+        "state": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "status",
+        "value": "fully lit",
+        "time_ms": 51
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": false,
+        "time_ms": 51
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "color",
+        "value": "red",
+        "time_ms": 51
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "1.80 V",
+        "time_ms": 51
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "1.36 mA",
+        "time_ms": 51
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.20 V",
+        "time_ms": 51
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0.20 mA",
+        "time_ms": 51
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "power",
+        "value": "0.04 mW",
+        "time_ms": 51
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": false,
+        "time_ms": 515
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "status",
+        "value": "off",
+        "time_ms": 527
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.00 V",
+        "time_ms": 527
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0.00 mA",
+        "time_ms": 527
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.00 V",
+        "time_ms": 527
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0.00 mA",
+        "time_ms": 527
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "power",
+        "value": "0.00 mW",
+        "time_ms": 527
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": true,
+        "time_ms": 1013
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "status",
+        "value": "fully lit",
+        "time_ms": 1025
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "1.80 V",
+        "time_ms": 1025
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "1.36 mA",
+        "time_ms": 1025
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.20 V",
+        "time_ms": 1025
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0.20 mA",
+        "time_ms": 1025
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "power",
+        "value": "0.04 mW",
+        "time_ms": 1025
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "status",
+        "value": "off",
+        "time_ms": 1512
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.00 V",
+        "time_ms": 1512
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0.00 mA",
+        "time_ms": 1512
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.00 V",
+        "time_ms": 1512
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0.00 mA",
+        "time_ms": 1512
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "power",
+        "value": "0.00 mW",
+        "time_ms": 1512
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": false,
+        "time_ms": 1519
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": true,
+        "time_ms": 2002
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "status",
+        "value": "fully lit",
+        "time_ms": 2009
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "1.80 V",
+        "time_ms": 2009
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "1.36 mA",
+        "time_ms": 2009
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.20 V",
+        "time_ms": 2009
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0.20 mA",
+        "time_ms": 2009
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "power",
+        "value": "0.04 mW",
+        "time_ms": 2009
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": false,
+        "time_ms": 2510
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "status",
+        "value": "off",
+        "time_ms": 2524
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.00 V",
+        "time_ms": 2524
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0.00 mA",
+        "time_ms": 2524
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.00 V",
+        "time_ms": 2524
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0.00 mA",
+        "time_ms": 2524
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "power",
+        "value": "0.00 mW",
+        "time_ms": 2524
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": true,
+        "time_ms": 3007
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "status",
+        "value": "fully lit",
+        "time_ms": 3023
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "1.80 V",
+        "time_ms": 3023
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "1.36 mA",
+        "time_ms": 3023
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.20 V",
+        "time_ms": 3023
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0.20 mA",
+        "time_ms": 3023
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "power",
+        "value": "0.04 mW",
+        "time_ms": 3023
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": false,
+        "time_ms": 3518
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "status",
+        "value": "off",
+        "time_ms": 3526
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.00 V",
+        "time_ms": 3526
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0.00 mA",
+        "time_ms": 3526
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.00 V",
+        "time_ms": 3526
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0.00 mA",
+        "time_ms": 3526
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "power",
+        "value": "0.00 mW",
+        "time_ms": 3526
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": true,
+        "time_ms": 4015
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "status",
+        "value": "fully lit",
+        "time_ms": 4022
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "1.80 V",
+        "time_ms": 4022
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "1.36 mA",
+        "time_ms": 4022
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.20 V",
+        "time_ms": 4022
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0.20 mA",
+        "time_ms": 4022
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "power",
+        "value": "0.04 mW",
+        "time_ms": 4022
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": false,
+        "time_ms": 4508
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "status",
+        "value": "off",
+        "time_ms": 4531
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.00 V",
+        "time_ms": 4531
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0.00 mA",
+        "time_ms": 4531
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.00 V",
+        "time_ms": 4531
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0.00 mA",
+        "time_ms": 4531
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "power",
+        "value": "0.00 mW",
+        "time_ms": 4531
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": true,
+        "time_ms": 5016
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "status",
+        "value": "fully lit",
+        "time_ms": 5016
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "1.80 V",
+        "time_ms": 5016
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "1.36 mA",
+        "time_ms": 5016
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.20 V",
+        "time_ms": 5016
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0.20 mA",
+        "time_ms": 5016
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "power",
+        "value": "0.04 mW",
+        "time_ms": 5016
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "status",
+        "value": "off",
+        "time_ms": 5511
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.00 V",
+        "time_ms": 5511
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0.00 mA",
+        "time_ms": 5511
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.00 V",
+        "time_ms": 5511
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0.00 mA",
+        "time_ms": 5511
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "power",
+        "value": "0.00 mW",
+        "time_ms": 5511
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": false,
+        "time_ms": 5519
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": true,
+        "time_ms": 6007
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "status",
+        "value": "fully lit",
+        "time_ms": 6007
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "1.80 V",
+        "time_ms": 6007
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "1.36 mA",
+        "time_ms": 6007
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.20 V",
+        "time_ms": 6007
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0.20 mA",
+        "time_ms": 6007
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "power",
+        "value": "0.04 mW",
+        "time_ms": 6007
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": false,
+        "time_ms": 6506
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "status",
+        "value": "off",
+        "time_ms": 6521
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.00 V",
+        "time_ms": 6521
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0.00 mA",
+        "time_ms": 6521
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.00 V",
+        "time_ms": 6521
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0.00 mA",
+        "time_ms": 6521
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "power",
+        "value": "0.00 mW",
+        "time_ms": 6521
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": true,
+        "time_ms": 7007
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "status",
+        "value": "fully lit",
+        "time_ms": 7030
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "1.80 V",
+        "time_ms": 7030
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "1.36 mA",
+        "time_ms": 7030
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.20 V",
+        "time_ms": 7030
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0.20 mA",
+        "time_ms": 7030
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "power",
+        "value": "0.04 mW",
+        "time_ms": 7030
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": false,
+        "time_ms": 7506
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "status",
+        "value": "off",
+        "time_ms": 7514
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.00 V",
+        "time_ms": 7514
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0.00 mA",
+        "time_ms": 7514
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.00 V",
+        "time_ms": 7514
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "current",
+        "value": "0.00 mA",
+        "time_ms": 7514
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "res_wokwi_led_1",
+        "key": "power",
+        "value": "0.00 mW",
+        "time_ms": 7514
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": true,
+        "time_ms": 8000
+      }
+    }
+  ],
+  "student_telemetry_normalized": [
+    {
+      "PinChange": {
+        "pin": "0",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "1",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "2",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "3",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "4",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "5",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "6",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "7",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "8",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "9",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "10",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "11",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "12",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": true,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "A0",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "A1",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "A2",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "A3",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "A4",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "A5",
+        "state": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi-resistor_1777999183638_0",
+        "key": "voltageDrop",
+        "value": "0.00 V",
+        "time_ms": 19
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi-resistor_1777999183638_0",
+        "key": "current",
+        "value": "0.00 mA",
+        "time_ms": 19
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi-resistor_1777999183638_0",
+        "key": "power",
+        "value": "0.00 mW",
+        "time_ms": 19
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "status",
+        "value": "off",
+        "time_ms": 19
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "glow",
+        "value": false,
+        "time_ms": 19
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "color",
+        "value": "red",
+        "time_ms": 19
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "voltageDrop",
+        "value": "0.00 V",
+        "time_ms": 19
+      }
+    },
+    {
+      "ComponentState": {
+        "id": "wokwi_led_1",
+        "key": "current",
+        "value": "0.00 mA",
+        "time_ms": 19
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": false,
+        "time_ms": 513
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": true,
+        "time_ms": 1011
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": false,
+        "time_ms": 1507
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": true,
+        "time_ms": 2008
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": false,
+        "time_ms": 2508
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": true,
+        "time_ms": 3010
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": false,
+        "time_ms": 3521
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": true,
+        "time_ms": 4013
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": false,
+        "time_ms": 4509
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": true,
+        "time_ms": 5023
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": false,
+        "time_ms": 5512
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": true,
+        "time_ms": 6014
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": false,
+        "time_ms": 6500
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": true,
+        "time_ms": 7005
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": false,
+        "time_ms": 7502
+      }
+    },
+    {
+      "PinChange": {
+        "pin": "13",
+        "state": true,
+        "time_ms": 8010
+      }
+    }
+  ]
+}

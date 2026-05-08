@@ -10,6 +10,8 @@ dist/
 **/dist/
 build/
 **/build/
+target/
+**/target/
 
 # Environment & secrets
 env

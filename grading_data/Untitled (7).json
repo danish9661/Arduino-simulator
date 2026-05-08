@@ -6,8 +6,8 @@
       "id": "uno1",
       "type": "wokwi-arduino-uno",
       "label": "Arduino Uno",
-      "x": 79.5,
-      "y": 167.8,
+      "x": 403.5,
+      "y": 189.79999923706055,
       "w": 311,
       "h": 228,
       "rotation": 0,
@@ -17,8 +17,8 @@
       "id": "wokwi_led_1",
       "type": "wokwi-led",
       "label": "LED",
-      "x": 512,
-      "y": 392,
+      "x": 99,
+      "y": 234,
       "w": 38,
       "h": 38,
       "rotation": 0,
@@ -27,21 +27,61 @@
         "breadboard": {
           "anchorPin": "A"
         }
-      }
+      },
+      "snap": true
+    },
+    {
+      "id": "bb_2",
+      "type": "wokwi-breadboard-mini",
+      "label": "Breadboard",
+      "x": 64,
+      "y": 229,
+      "w": 270,
+      "h": 195,
+      "rotation": 0,
+      "attrs": {},
+      "snap": true
     },
     {
       "id": "res_wokwi_led_1",
       "type": "wokwi-resistor",
       "label": "220R",
-      "x": 425,
-      "y": 351,
+      "x": 109,
+      "y": 294,
       "w": 70,
       "h": 32,
       "rotation": 0,
-      "attrs": {}
+      "attrs": {},
+      "snap": true
     }
   ],
   "connections": [
+    {
+      "id": "wire_lb33f7tqq",
+      "from": "wokwi_led_1:A",
+      "to": "res_wokwi_led_1:p1",
+      "color": "orange",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "A",
+      "toLabel": "p1"
+    },
+    {
+      "id": "wire_ufufk8lx8",
+      "from": "res_wokwi_led_1:p2",
+      "to": "uno1:13",
+      "color": "green",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "p2",
+      "toLabel": "13"
+    },
     {
       "id": "wire_y69wz58vi",
       "from": "wokwi_led_1:K",
@@ -54,6 +94,58 @@
       "isHelp": false,
       "fromLabel": "K",
       "toLabel": "GND"
+    },
+    {
+      "id": "w_socket_wokwi_led_1_A_1778147966608_q0h2l",
+      "from": "wokwi_led_1:A",
+      "to": "bb_2:3c",
+      "color": "transparent",
+      "waypoints": [],
+      "isBelow": true,
+      "isSocket": true,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "A",
+      "toLabel": "3c"
+    },
+    {
+      "id": "w_socket_wokwi_led_1_K_1778147966608_wt686",
+      "from": "wokwi_led_1:K",
+      "to": "bb_2:4c",
+      "color": "transparent",
+      "waypoints": [],
+      "isBelow": true,
+      "isSocket": true,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "K",
+      "toLabel": "4c"
+    },
+    {
+      "id": "w_socket_res_wokwi_led_1_p1_1778147971622_vewv3",
+      "from": "res_wokwi_led_1:p1",
+      "to": "bb_2:3a",
+      "color": "transparent",
+      "waypoints": [],
+      "isBelow": true,
+      "isSocket": true,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "p1",
+      "toLabel": "3a"
+    },
+    {
+      "id": "w_socket_res_wokwi_led_1_p2_1778147971622_wb4mj",
+      "from": "res_wokwi_led_1:p2",
+      "to": "bb_2:7a",
+      "color": "transparent",
+      "waypoints": [],
+      "isBelow": true,
+      "isSocket": true,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "p2",
+      "toLabel": "7a"
     }
   ],
   "blocklyXml": "",
@@ -86,5 +178,5 @@
   "activeCodeFileId": "project/library.txt",
   "code": "Adafruit BusIO\nServo\n107-Arduino-24LCxx\nAdafruit TouchScreen\nAdafruit SSD1306\nAdafruit NeoPixel\nSparkFun MAX3010x Pulse and Proximity Sensor Library\n107-Arduino-Servo-RP2040\nAdafruit STMPE610\nAdafruit ILI9341\nAdafruit LiquidCrystal\nLiquidCrystal I2C\nAdafruit TSC2007\nAdafruit GFX Library\nAdafruit MCP23017 Arduino Library\nAdafruit SH110X",
   "name": "Untitled",
-  "exportedAt": "2026-05-08T14:30:59.735Z"
+  "exportedAt": "2026-05-08T14:31:16.262Z"
 }

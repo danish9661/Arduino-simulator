@@ -1,1 +1,0 @@
-C:\Users\Danish\Documents\simulator\openhw-studio-autofix-rust\target\wasm32-unknown-unknown\release\libopenhw_studio_autofix_rust.rlib: C:\Users\Danish\Documents\simulator\openhw-studio-autofix-rust\src\lib.rs

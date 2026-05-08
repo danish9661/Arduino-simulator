@@ -32,7 +32,7 @@ import AutofixPreviewPanel from '../../components/AutofixPreviewPanel.jsx';
 import { saveProject, loadProject, listProjects, deleteProject, renameProject, generateProjectId, formatProjectDate } from '../../services/projectStore.js'
 import html2canvas from 'html2canvas'
 import JSZip from 'jszip';
-import { GENERATED_ROOT_FILE_IDS, fileExt, isFileDisabled, normalizeProjectFiles, getBoardCompileFiles as getBoardCompileFilesShared } from '../../utils/projectCompilerUtils';
+import { GENERATED_ROOT_FILE_IDS, fileExt, isFileDisabled, normalizeProjectFiles, getBoardCompileFiles as getBoardCompileFilesShared, extractProjectMetaFromPng } from '../../utils/projectCompilerUtils';
 
 // ── Lazy loaders — heavy libs loaded on first use, NOT on page paint ──────────
 // @babel/standalone is ~800KB — loading it eagerly was causing the 3.73s LCP.
@@ -7871,6 +7871,22 @@ useEffect(() => {
           scrollX: 0,
           scrollY: 0,
           onclone: (_clonedDoc, clonedEl) => {
+            // Fix for "unsupported color function color()" error in html2canvas
+            const allElements = clonedEl.querySelectorAll('*');
+            allElements.forEach(el => {
+              if (!el.style) return;
+              const props = ['color', 'backgroundColor', 'borderColor', 'fill', 'stroke', 'outlineColor', 'stopColor'];
+              props.forEach(prop => {
+                const val = el.style[prop];
+                if (val && val.includes('color(')) {
+                  // html2canvas fails on color(display-p3 ...) or color(srgb ...)
+                  // We strip it to a fallback or attempt a simple regex replacement if possible
+                  // For now, replacing with a visible fallback to avoid crash
+                  el.style[prop] = '#777'; 
+                }
+              });
+            });
+
             // Inline shadow DOM content from live elements into the cloned document
             shadowHostEls.forEach((liveEl, idx) => {
               const cloned = clonedEl.querySelector(`[data-h2c-shadow="${idx}"]`);
@@ -7970,8 +7986,7 @@ useEffect(() => {
         activeCodeFileId,
         exportedAt: new Date().toISOString(),
       });
-      const MARKER = '\x00OPENHW_META\x00';
-      const jsonPayload = MARKER + JSON.stringify(fullMetadata);
+      const jsonPayload = '\x00OPENHW_META\x00' + JSON.stringify(fullMetadata);
 
       // 4. Append metadata bytes after PNG IEND → still renders fine in all image viewers
       const dateStr = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-').replace(':', '-');
@@ -8665,34 +8680,7 @@ useEffect(() => {
     reader.onload = (e) => {
       try {
         if (isPng) {
-          const bytes = new Uint8Array(e.target.result);
-          const marker = '\x00OPENHW_META\x00';
-          const markerBytes = new TextEncoder().encode(marker);
-
-          // Search payload marker from the end so very large metadata remains importable.
-          let markerByteIdx = -1;
-          for (let i = bytes.length - markerBytes.length; i >= 0; i--) {
-            let ok = true;
-            for (let j = 0; j < markerBytes.length; j++) {
-              if (bytes[i + j] !== markerBytes[j]) {
-                ok = false;
-                break;
-              }
-            }
-            if (ok) {
-              markerByteIdx = i;
-              break;
-            }
-          }
-
-          if (markerByteIdx === -1) {
-            alert('This PNG does not contain OpenHW-Studio circuit data.\nOnly PNGs exported from this simulator can be imported.');
-            return;
-          }
-
-          const payloadBytes = bytes.slice(markerByteIdx + markerBytes.length);
-          const jsonStr = new TextDecoder('utf-8', { fatal: false }).decode(payloadBytes);
-          const meta = JSON.parse(jsonStr);
+          const meta = extractProjectMetaFromPng(new Uint8Array(e.target.result));
           applyImportedProjectMeta(meta, 'PNG project');
           return;
         }
