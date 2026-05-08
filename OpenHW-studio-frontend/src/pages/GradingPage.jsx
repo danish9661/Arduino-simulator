@@ -700,6 +700,7 @@ const GradingPage = () => {
                                     <option value="1">1x</option>
                                     <option value="2">2x</option>
                                     <option value="4">4x</option>
+                                    <option value="8">8x</option>
                                 </select>
                             </div>
                             <button className="key-action-btn" onClick={generateKey} disabled={isGrading}>
@@ -787,8 +788,7 @@ const GradingPage = () => {
                                     </div>
                                     {(() => {
                                         const temporalData = report.temporal_breakdown || buildTemporalBreakdownFallback(report);
-                                        const temporalRows = (Array.isArray(temporalData?.id_stats) ? temporalData.id_stats : [])
-                                            .filter(stat => String(stat?.id_type || '').toLowerCase() !== 'pin');
+                                        const temporalRows = Array.isArray(temporalData?.id_stats) ? temporalData.id_stats : [];
                                         const temporalDetails = buildTemporalEventDetails(report, temporalData);
                                         return (
                                             <div className="temporal-content">

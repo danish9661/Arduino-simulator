@@ -246,7 +246,7 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
         console.log(`[TRACE] ${label}: Simulation loop entered.`);
 
         while (runner.getSimulatedTimeMs() - simStartMs < durationMs) {
-            const pollIntervalMs = Math.max(10, Math.round(50 / normalizedSpeed));
+            const pollIntervalMs = Math.max(2, Math.round(50 / normalizedSpeed));
             await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
 
             const nowMs = runner.getSimulatedTimeMs();
@@ -442,6 +442,7 @@ onmessage = async (e: MessageEvent<GradingMessage>) => {
                 JSON.stringify(studentTelemetry),
                 {
                     ...options,
+                    simulation_speed: runSpeed,
                     validation_health: healthScore,
                     validation_errors: validationErrors
                 }

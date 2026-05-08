@@ -612,7 +612,7 @@ fn compare_behavior(
         teacher.duration_ms as f32 / student.duration_ms as f32
     } else { 1.0 };
 
-    let speed_factor = options.simulation_speed.max(1.0).min(4.0);
+    let speed_factor = options.simulation_speed.max(1.0).min(8.0);
     let adaptive_tolerance_ms = (TIMELINE_TOLERANCE_MS * speed_factor).min(1200.0);
     logs.push(format!("Behavior: Temporal matcher configured with adaptive tolerance {:.0}ms at {}x speed.", adaptive_tolerance_ms, speed_factor));
 
@@ -697,51 +697,69 @@ fn compare_events_indexed(
     time_scale: f32,
     tolerance_ms: f32,
 ) -> (f32, usize) {
-    let mut matched_count = 0;
-    let mut last_s_idx = 0;
+    fn run_indexed_match(
+        teacher_events: &[TelemetryEvent],
+        student_events: &[TelemetryEvent],
+        time_scale: f32,
+        tolerance_ms: f32,
+        phase_offset: usize,
+    ) -> usize {
+        let mut matched_count = 0;
+        let mut last_s_idx = phase_offset.min(student_events.len());
 
-    for (t_idx, t_event) in teacher_events.iter().enumerate() {
-        let t_time = get_event_time(t_event);
+        for (t_idx, t_event) in teacher_events.iter().enumerate() {
+            let t_time = get_event_time(t_event);
 
-        // INDEX-FIRST: try to match at the same index
-        if t_idx < student_events.len() {
-            let s_event = &student_events[t_idx];
-            let s_time_norm = get_event_time(s_event) * time_scale;
-            
-            if is_event_match_fuzzy(t_event, s_event, t_time, s_time_norm, tolerance_ms) {
-                matched_count += 1;
-                last_s_idx = t_idx + 1;
-                continue;
+            let idx_aligned = t_idx + phase_offset;
+            if idx_aligned < student_events.len() {
+                let s_event = &student_events[idx_aligned];
+                let s_time_norm = get_event_time(s_event) * time_scale;
+
+                if is_event_match_fuzzy(t_event, s_event, t_time, s_time_norm, tolerance_ms) {
+                    matched_count += 1;
+                    last_s_idx = idx_aligned + 1;
+                    continue;
+                }
+            }
+
+            let search_start = last_s_idx.min(student_events.len());
+            let search_end = (last_s_idx + TIMELINE_WINDOW + 1).min(student_events.len());
+
+            for s_idx in search_start..search_end {
+                if s_idx == idx_aligned {
+                    continue;
+                }
+                let s_event = &student_events[s_idx];
+                let s_time_norm = get_event_time(s_event) * time_scale;
+
+                if is_event_match_fuzzy(t_event, s_event, t_time, s_time_norm, tolerance_ms) {
+                    matched_count += 1;
+                    last_s_idx = s_idx + 1;
+                    break;
+                }
             }
         }
 
-        // FORWARD LOOKAHEAD: only inspect the next 10 candidate events after the current anchor.
-        let search_start = last_s_idx.min(student_events.len());
-        let search_end = (last_s_idx + TIMELINE_WINDOW + 1).min(student_events.len());
+        matched_count
+    }
 
-        let mut found = false;
-        for s_idx in search_start..search_end {
-            if s_idx == t_idx {
-                continue; // Already tried this index above
-            }
-            let s_event = &student_events[s_idx];
-            let s_time_norm = get_event_time(s_event) * time_scale;
+    if teacher_events.is_empty() {
+        return (1.0, 0);
+    }
 
-            if is_event_match_fuzzy(t_event, s_event, t_time, s_time_norm, tolerance_ms) {
-                matched_count += 1;
-                last_s_idx = s_idx + 1;
-                found = true;
-                break;
-            }
-        }
+    let mut best_matched = run_indexed_match(teacher_events, student_events, time_scale, tolerance_ms, 0);
 
-        if !found {
-            // Event not found in student timeline within window or tolerance
+    // Phase-shift recovery for periodic signals (common at high speed) by trying small index offsets.
+    let max_phase_offset = TIMELINE_WINDOW.min(student_events.len().saturating_sub(1));
+    for phase_offset in 1..=max_phase_offset {
+        let matched = run_indexed_match(teacher_events, student_events, time_scale, tolerance_ms, phase_offset);
+        if matched > best_matched {
+            best_matched = matched;
         }
     }
 
-    let match_pct = if teacher_events.is_empty() { 1.0 } else { matched_count as f32 / teacher_events.len() as f32 };
-    (match_pct, matched_count)
+    let match_pct = best_matched as f32 / teacher_events.len() as f32;
+    (match_pct, best_matched)
 }
 
 /// Extract time_ms from a TelemetryEvent.
