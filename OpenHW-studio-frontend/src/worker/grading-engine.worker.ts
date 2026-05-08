@@ -101,6 +101,7 @@ interface GradingMessage {
     student?: ArrayBuffer;
     studentTelemetry?: string;
     options: GradingOptions;
+    simulationSpeed?: number;
 }
 
 import { getBoardCompileFiles, extractProjectMetaFromPng } from '../utils/projectCompilerUtils';
@@ -148,7 +149,7 @@ async function compileSourceCode(payload: any, board: string): Promise<string> {
     }
 }
 
-async function captureBehavior(meta: any, durationMs: number, label: string): Promise<any> {
+async function captureBehavior(meta: any, durationMs: number, label: string, simulationSpeed = 1): Promise<any> {
     const telemetry = {
         events: [] as any[],
         serial: "",
@@ -162,6 +163,7 @@ async function captureBehavior(meta: any, durationMs: number, label: string): Pr
     let lastPinStates: Record<string, boolean> = {};
     let runner: any = null;
     const startTime = Date.now();
+    const normalizedSpeed = Number.isFinite(simulationSpeed) && simulationSpeed > 0 ? simulationSpeed : 1;
 
     try {
         const { createRunnerForBoard } = await import('./execute');
@@ -198,7 +200,7 @@ async function captureBehavior(meta: any, durationMs: number, label: string): Pr
         }
 
         console.log(`[TRACE] ${label}: Starting capture behavior. Source detected: ${isSourceCode}, Hex Length: ${firmwareHex?.length || 0}`);
-        postMessage({ type: 'LOG', msg: `[TRACE] ${label}: Initializing Runner for ${boardType}...` });
+        postMessage({ type: 'LOG', msg: `[TRACE] ${label}: Initializing Runner for ${boardType} at ${normalizedSpeed}x speed...` });
 
         runner = await createRunnerForBoard(
             meta.board || boardComp?.type || 'wokwi-arduino-uno',
@@ -224,7 +226,7 @@ async function captureBehavior(meta: any, durationMs: number, label: string): Pr
                     telemetry.serial += state.data;
                 }
             },
-            { speed: 1.0 }
+            { speed: normalizedSpeed }
         );
         
         runner.setTelemetryEnabled(true);
@@ -239,7 +241,7 @@ async function captureBehavior(meta: any, durationMs: number, label: string): Pr
             const nowMs = runner.getSimulatedTimeMs();
             if (nowMs - lastTraceTime > 1000) {
                 console.log(`[TRACE] ${label}: Progress -> ${Math.round(nowMs)}ms / ${durationMs}ms`);
-                postMessage({ type: 'LOG', msg: `[TRACE] ${label}: Simulating... ${Math.round(nowMs)}ms` });
+                postMessage({ type: 'LOG', msg: `[TRACE] ${label}: Simulating... ${Math.round(nowMs)}ms @ ${normalizedSpeed}x` });
                 lastTraceTime = nowMs;
             }
             
@@ -265,7 +267,8 @@ async function captureBehavior(meta: any, durationMs: number, label: string): Pr
                 }
             }
 
-            if (Date.now() - startTime > 30000) { // Increased timeout for compilation buffer
+            const wallTimeoutMs = Math.max(30000, Math.ceil(30000 / normalizedSpeed));
+            if (Date.now() - startTime > wallTimeoutMs) { // Guard against stuck emulation while supporting higher speed runs
                 console.warn(`[v2.4] ${label} simulation timed out!`);
                 break;
             }
@@ -273,6 +276,7 @@ async function captureBehavior(meta: any, durationMs: number, label: string): Pr
         
         const richSnapshot = runner.getRichTelemetrySnapshot({ mode: 'deep' });
         telemetry.rich_metrics = JSON.stringify(richSnapshot);
+        (telemetry as any).simulation_speed = normalizedSpeed;
         
         runner.stop();
                 sendJsonLog(`[v2.3] ${label} complete. (${telemetry.events.length} events)`, 'info');
@@ -298,7 +302,8 @@ function detectSourceCode(code: string): boolean {
 }
 
 onmessage = async (e: MessageEvent<GradingMessage>) => {
-    const { type, teacher, student, options } = e.data;
+    const { type, teacher, student, options, simulationSpeed } = e.data;
+    const runSpeed = Number.isFinite(simulationSpeed) && (simulationSpeed as number) > 0 ? Number(simulationSpeed) : 1;
     console.log(`[HEARTBEAT] Worker: Message Received -> ${type}`);
     try {
         await initEngine();
@@ -330,7 +335,8 @@ onmessage = async (e: MessageEvent<GradingMessage>) => {
                 postMessage({ type: 'LOG', msg: `[Warning] Teacher's reference circuit has spatial/electrical errors! Health: ${teacherHealth}%`, logType: 'warning' });
             }
 
-            const telemetry = await captureBehavior(teacherMeta, 8000, "Teacher Reference");
+            postMessage({ type: 'LOG', msg: `[TRACE] Teacher key capture speed: ${runSpeed}x` });
+            const telemetry = await captureBehavior(teacherMeta, 8000, "Teacher Reference", runSpeed);
             const key = wasmExports.generate_binary_key(
                 projectJson, 
                 JSON.stringify(telemetry),
@@ -364,7 +370,8 @@ onmessage = async (e: MessageEvent<GradingMessage>) => {
                 const tSync = emulatorExports.analyzeCodeHardwareSync(teacherMeta);
                 const tHealth = tValidator.calculateHealthScore(tSync.issues);
                 
-                const teacherTelemetry = await captureBehavior(teacherMeta, 8000, "Teacher Reference");
+                postMessage({ type: 'LOG', msg: `[TRACE] Teacher capture speed: ${runSpeed}x` });
+                const teacherTelemetry = await captureBehavior(teacherMeta, 8000, "Teacher Reference", runSpeed);
                 teacherBinaryKey = wasmExports.generate_binary_key(
                     teacherMetaJson, 
                     JSON.stringify(teacherTelemetry),
@@ -376,7 +383,8 @@ onmessage = async (e: MessageEvent<GradingMessage>) => {
             }
 
             // 4. Behavioral Analysis (Student)
-            const studentTelemetry = await captureBehavior(studentMeta, 8000, "Student Submission");
+            postMessage({ type: 'LOG', msg: `[TRACE] Student capture speed: ${runSpeed}x` });
+            const studentTelemetry = await captureBehavior(studentMeta, 8000, "Student Submission", runSpeed);
 
             // 5. BEHAVIOR-CORRECTED HEALTH (Trusting the simulation results over static analysis)
             const activeComponentIds = new Set(
@@ -421,6 +429,7 @@ onmessage = async (e: MessageEvent<GradingMessage>) => {
 
             const finalResult = result && typeof result === 'object' ? { ...result } : result;
             if (finalResult && typeof finalResult === 'object') {
+                (finalResult as any).simulation_speed = runSpeed;
                 const codeScore = Number(finalResult.code_score);
                 const pinFidelity = Number(finalResult.pin_fidelity);
                 const verifiedScore = Number(finalResult.verified_code_score);

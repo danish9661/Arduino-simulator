@@ -16,6 +16,7 @@ const GradingPage = () => {
     });
     const [activeTab, setActiveTab] = useState('summary');
     const [expandedTemporalIds, setExpandedTemporalIds] = useState({});
+    const [simulationSpeed, setSimulationSpeed] = useState('1');
 
     const workerRef = useRef(null);
     const logEndRef = useRef(null);
@@ -559,7 +560,8 @@ const GradingPage = () => {
             workerRef.current.postMessage({
                 type: 'GENERATE_KEY',
                 teacher: { project: "", projectBuf: buf },
-                options
+                options,
+                simulationSpeed: Number(simulationSpeed) || 1
             });
         } catch (err) {
             addLog(`Error: ${err.message}`, 'error');
@@ -576,7 +578,7 @@ const GradingPage = () => {
 
         setIsGrading(true);
         setReport(null);
-        addLog('Starting grading process...', 'info');
+        addLog(`Starting grading process at ${simulationSpeed}x simulation speed...`, 'info');
 
         try {
             const studentBuf = await studentFile.arrayBuffer();
@@ -606,7 +608,8 @@ const GradingPage = () => {
                 type: 'GRADE',
                 teacher: teacherData,
                 student: studentBuf,
-                options
+                options,
+                simulationSpeed: Number(simulationSpeed) || 1
             }, transferables);
         } catch (err) {
             addLog(`Error preparing files: ${err.message}`, 'error');
@@ -669,6 +672,19 @@ const GradingPage = () => {
                             <button className="grade-action-btn" onClick={runGrading} disabled={isGrading}>
                                 {isGrading ? 'Analyzing...' : 'Compare Circuits'}
                             </button>
+                            <div className="speed-control" aria-label="Simulation speed selector">
+                                <label htmlFor="simulation-speed-select">Speed</label>
+                                <select
+                                    id="simulation-speed-select"
+                                    value={simulationSpeed}
+                                    onChange={(e) => setSimulationSpeed(e.target.value)}
+                                    disabled={isGrading}
+                                >
+                                    <option value="1">1x</option>
+                                    <option value="2">2x</option>
+                                    <option value="4">4x</option>
+                                </select>
+                            </div>
                             <button className="key-action-btn" onClick={generateKey} disabled={isGrading}>
                                 {isGrading ? 'Capturing...' : 'Generate Reference Key'}
                             </button>
