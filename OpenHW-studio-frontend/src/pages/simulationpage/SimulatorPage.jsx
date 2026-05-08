@@ -1747,6 +1747,8 @@ export function SimulatorPage({ gamificationMode = false }) {
   const didPanRef = useRef(false)
 
   const [validationErrors, setValidationErrors] = useState([])
+  const [pendingVerificationRule, setPendingVerificationRule] = useState(null);
+
   const [autofixPlan, setAutofixPlan] = useState(null)
   const [autofixStatus, setAutofixStatus] = useState('Initializing...')
   const [autofixLog, setAutofixLog] = useState([])
@@ -1812,12 +1814,6 @@ export function SimulatorPage({ gamificationMode = false }) {
     };
   }, []);
 
-  // Auto-trigger analysis when validation changes
-  useEffect(() => {
-    if (validationErrors.length > 0) {
-      triggerAutofixAnalysis();
-    }
-  }, [validationErrors, triggerAutofixAnalysis]);
   const [showValidation, setShowValidation] = useState(true)
   const [validationToast, setValidationToast] = useState(null)
   const [isRunning, setIsRunning] = useState(false)
@@ -1898,6 +1894,31 @@ export function SimulatorPage({ gamificationMode = false }) {
     clearConsoleEntries,
     downloadConsoleLog,
   } = useSimulationConsole();
+
+  // --- Autofix Speak & Hear Implementation ---
+
+  // Validation Ear: Listen for validation errors and trigger autofix analysis
+  useEffect(() => {
+    if (validationErrors && validationErrors.length > 0) {
+      // Don't auto-trigger if we just finished a fix (wait for fresh validation pass to stabilize)
+      if (!pendingVerificationRule) {
+        triggerAutofixAnalysis(validationErrors);
+      }
+    } else {
+      setAutofixPlan(null);
+    }
+  }, [validationErrors, triggerAutofixAnalysis, pendingVerificationRule]);
+
+  // Fix Verification Loop: Check if a previously applied fix worked
+  useEffect(() => {
+    if (pendingVerificationRule && validationErrors.length >= 0) {
+      const stillHasRule = (validationErrors || []).some(v => (v.ruleId || v.id) === pendingVerificationRule);
+      if (!stillHasRule) {
+        appendConsoleEntry('success', `✅ [Verification] Fix successful! Rule '${pendingVerificationRule}' resolved.`, 'simulator');
+        setPendingVerificationRule(null);
+      }
+    }
+  }, [validationErrors, pendingVerificationRule, appendConsoleEntry]);
 
   // Pinch-to-zoom state refs
 
@@ -6483,6 +6504,11 @@ useEffect(() => {
   const applyProjectChangePlan = useCallback((plan) => {
     if (!plan) return;
     
+    // Set for verification loop
+    if (plan.targetRuleId) {
+      setPendingVerificationRule(plan.targetRuleId);
+    }
+
     // Calculate the new project state using the centralized utility
     const { components: nextComponents, wires: nextWires } = calculateProjectPlanApplication(plan, components, wires, LOCAL_PIN_DEFS);
 

@@ -95,7 +95,7 @@ function buildNormalizedTrace(input: any, label: string = ''): { functional: str
     }
 
     const raw = rawTokens.join(' ').trim();
-    const functional = functionalTokens.join(' ').trim() || (raw || 'silent');
+    const functional = functionalTokens.join(' ').trim() || 'silent';
     const electrical = electricalTokens.join(' ').trim() || 'silent';
     const normalized = `${functional} ${electrical !== 'silent' ? electrical : ''}`.trim();
 

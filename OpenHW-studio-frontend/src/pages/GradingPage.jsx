@@ -696,6 +696,12 @@ const GradingPage = () => {
                                                 <span className="label">Verified Code Score</span>
                                             </div>
                                         )}
+                                        {typeof report.code_score === 'number' && (
+                                            <div className="stat-box">
+                                                <span className="val">{report.code_score}%</span>
+                                                <span className="label">Code Behaviour</span>
+                                            </div>
+                                        )}
                                         <div className="stat-box">
                                             <span className="val">{report.spatial_score}%</span>
                                             <span className="label">Spatial Eye</span>

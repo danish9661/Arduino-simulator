@@ -662,7 +662,7 @@ fn compare_behavior(
     let f_match = if functional_weight_sum > 0.0 { functional_score_sum / functional_weight_sum } else { 1.0 };
     let e_match = if electrical_weight_sum > 0.0 { electrical_score_sum / electrical_weight_sum } else { 1.0 };
     
-    let behavioral_score = ((f_match * FUNCTIONAL_WEIGHT) + (e_match * ELECTRICAL_WEIGHT)) * 100.0;
+    let behavioral_score = f_match * 100.0;
     let pin_fidelity = (e_match * 100.0) as i32;
 
     let return_id_map: HashMap<String, String> = id_map.iter().map(|(k, v)| (v.clone(), k.clone())).collect();

@@ -4,8 +4,8 @@ This document tracks the parity between the **Circuit Validation Engine** (the d
 
 ## 📊 Summary Status
 - **Total Rules**: 24
-- **Autofixes Implemented**: 10
-- **Coverage**: ~42%
+- **Autofixes Implemented**: 11
+- **Coverage**: ~46%
 - **Engine**: Rust WASM (v2.0.0)
 
 ---
@@ -23,6 +23,7 @@ This document tracks the parity between the **Circuit Validation Engine** (the d
 | `validateRp2040VoltageInputs`| 5V into 3.3V GPIO | Voltage Divider Injection | [x] |
 | `validateRailConflicts`  | VCC-GND or 5V-3.3V tie | Error reporting (Hard Fix) | [/] |
 | `validateShortCircuits` | Direct VCC-GND shorts | Path Removal suggestion | [x] |
+| `potentiometer-floating-wiper`| Unconnected wiper | Auto-route to Analog pin | [x] |
 
 ---
 
@@ -34,7 +35,6 @@ This document tracks the parity between the **Circuit Validation Engine** (the d
 | `validatePowerDissipation` | Resistor getting too hot | Auto-replace with higher watt / Parallel | Low |
 | `validateI2CDeviceWithoutMcu`| I2C device with no brain | Suggest Arduino/Pico addition | Med |
 | `validateSerialPinConflict` | Pins 0/1 used during upload | Move wires to higher pins | Low |
-| `validatePotentiometer` | Wiper not connected | Route wiper to Analog pin | Med |
 | `validateTotalPowerBudget` | Too many components for USB | Suggest Battery/External Supply | Low |
 | `validateThermalLimits` | Component temp > 75°C | Suggest Heatsink addition | Low |
 | `validateBatteryLife` | High drain on battery | Suggest larger Mah battery | Low |
@@ -50,6 +50,7 @@ This document tracks the parity between the **Circuit Validation Engine** (the d
 - [x] **A* Pathfinding**: Optimized grid-based routing implemented.
 - [x] **Unified Editor**: `applyProjectChangePlan` centralized in `projectUtils.js`.
 - [x] **JS/WASM Bridge**: `wasm-bindgen` automated glue code.
+- [x] **Validation Loop API**: "Speak & Hear" automation protocol.
 - [ ] **Multi-Layer Routing**: Support for "Below board" wires.
 - [ ] **Ghost Persistence**: Save repair reasoning to `diagram.json` metadata.
 

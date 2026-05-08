@@ -43,6 +43,7 @@ pub struct Violation {
 #[derive(Serialize, Debug)]
 pub struct FixPlan {
     pub description: String,
+    pub target_rule_id: String,
     pub added_components: Vec<JsComponent>,
     pub added_wires: Vec<JsWire>,
     pub removed_wires: Vec<JsWireShort>,
@@ -166,6 +167,7 @@ impl Engine {
                     if let Some(comp) = self.components.get(comp_id) {
                         self.plans.push(FixPlan {
                             description: format!("Flip polarity of {} to correct reverse bias", comp_id),
+                            target_rule_id: rule.to_string(),
                             added_components: Vec::new(),
                             added_wires: Vec::new(),
                             removed_wires: Vec::new(),
@@ -186,7 +188,6 @@ impl Engine {
             if rule_lc.contains("limit") || rule_lc.contains("resistor") || msg_lc.contains("no series resistance") || msg_lc.contains("burn out") {
                  let mut comp_id_to_fix = vio.component_ids.get(0).filter(|s| !s.is_empty()).cloned();
                  
-                 // Fallback: extract ID from message "[LED id]" or similar
                  if comp_id_to_fix.is_none() {
                      if let Some(start) = msg.find('[') {
                          if let Some(end) = msg.find(']') {
@@ -222,6 +223,7 @@ impl Engine {
                             let target_node = format!("{}:{}", comp_id, final_target_pin);
                             let mut plan = FixPlan {
                                 description: format!("Insert 220Ω protective resistor for {}", comp_id),
+                                target_rule_id: rule.to_string(),
                                 added_components: Vec::new(),
                                 added_wires: Vec::new(),
                                 removed_wires: vec![JsWireShort { from: old_wire.from.clone(), to: old_wire.to.clone() }],
@@ -273,6 +275,7 @@ impl Engine {
                     if let Some(mcu) = self.components.get(mcu_id).cloned() {
                         let mut plan = FixPlan {
                             description: format!("Add 4.7kΩ I2C pull-up resistors for {}", mcu_id),
+                            target_rule_id: rule.to_string(),
                             added_components: Vec::new(),
                             added_wires: Vec::new(),
                             removed_wires: Vec::new(),
@@ -284,7 +287,6 @@ impl Engine {
                         let scl_pin = if mcu.kind.contains("pico") { "GP5" } else { "A5" };
                         let vcc_pin = if mcu.kind.contains("pico") { "3V3" } else { "5V" };
 
-                        // Spawn 2 resistors
                         for (i, pin) in [sda_pin, scl_pin].iter().enumerate() {
                             let res_id = format!("pullup_{}_{}", mcu_id, i);
                             let res_x = mcu.x + 160.0 + (i as f64 * 80.0);
@@ -295,10 +297,9 @@ impl Engine {
                                 kind: "wokwi-resistor".to_string(),
                                 x: res_x,
                                 y: res_y,
-                                rotation: 90.0, // Vertical
+                                rotation: 90.0,
                             });
 
-                            // Wire 1: MCU Pin -> Resistor p1
                             let p_start = self.get_pin_pos(&mcu, pin);
                             let p_mid = Point { x: res_x + 16.0, y: res_y };
                             plan.added_wires.push(JsWire {
@@ -308,7 +309,6 @@ impl Engine {
                                 path: Some(self.find_path(p_start, p_mid)),
                             });
 
-                            // Wire 2: Resistor p2 -> MCU VCC
                             let p_mid2 = Point { x: res_x + 16.0, y: res_y + 70.0 };
                             let p_vcc = self.get_pin_pos(&mcu, vcc_pin);
                             plan.added_wires.push(JsWire {
@@ -328,7 +328,6 @@ impl Engine {
             if rule == "validateRp2040VoltageInputs" || msg.contains("exceeds 3.3v logic limit") {
                 if let Some(comp_id) = vio.component_ids.get(0) {
                     if let Some(comp) = self.components.get(comp_id).cloned() {
-                        // Extract pin from message if possible (e.g., "Over-voltage on GP0")
                         let target_pin = if msg.contains("gp") {
                             msg.split("on ").nth(1).and_then(|s| s.split(':').next()).unwrap_or("1")
                         } else { "1" };
@@ -345,6 +344,7 @@ impl Engine {
                         if let Some(old_wire) = wire_to_replace {
                             let mut plan = FixPlan {
                                 description: format!("Add voltage divider to protect {} pin {}", comp_id, target_pin),
+                                target_rule_id: rule.to_string(),
                                 added_components: Vec::new(),
                                 added_wires: Vec::new(),
                                 removed_wires: vec![JsWireShort { from: old_wire.from.clone(), to: old_wire.to.clone() }],
@@ -356,7 +356,6 @@ impl Engine {
                             let r1_id = format!("vd1_{}", comp_id);
                             let r2_id = format!("vd2_{}", comp_id);
                             
-                            // Place resistors in a divider formation
                             plan.added_components.push(JsComponent {
                                 id: r1_id.clone(), kind: "wokwi-resistor".to_string(),
                                 x: comp.x - 100.0, y: comp.y - 40.0, rotation: 0.0,
@@ -366,25 +365,21 @@ impl Engine {
                                 x: comp.x - 100.0, y: comp.y + 40.0, rotation: 90.0,
                             });
 
-                             // Wire 1: Source -> R1:1
                              plan.added_wires.push(JsWire {
                                  from: other_end.clone(), to: format!("{}:1", r1_id), color: "orange".to_string(),
                                  path: Some(self.find_path(self.get_pin_pos_by_id(&other_end), Point { x: comp.x - 100.0, y: comp.y - 40.0 + 16.0 })),
                              });
  
-                             // Wire 2: R1:2 -> MCU Pin
                              plan.added_wires.push(JsWire {
                                  from: format!("{}:2", r1_id), to: target_node.clone(), color: "green".to_string(),
                                  path: Some(self.find_path(Point { x: comp.x - 30.0, y: comp.y - 40.0 + 16.0 }, self.get_pin_pos(&comp, target_pin))),
                              });
  
-                             // Wire 3: R1:2 -> R2:1 (Divider tap)
                              plan.added_wires.push(JsWire {
                                  from: format!("{}:2", r1_id), to: format!("{}:1", r2_id), color: "green".to_string(),
                                  path: None,
                              });
  
-                             // Wire 4: R2:2 -> GND
                              if let Some(board) = self.find_board() {
                                  plan.added_wires.push(JsWire {
                                      from: format!("{}:2", r2_id), to: format!("{}:GND", board.id), color: "black".to_string(),
@@ -402,6 +397,7 @@ impl Engine {
              if rule == "validateShortCircuits" || msg.contains("short circuit") {
                  let mut plan = FixPlan {
                      description: "Remove short circuit wire".to_string(),
+                     target_rule_id: rule.to_string(),
                      added_components: Vec::new(),
                      added_wires: Vec::new(),
                      removed_wires: Vec::new(),
@@ -431,6 +427,7 @@ impl Engine {
                     if let Some(comp) = self.components.get(comp_id).cloned() {
                         let mut plan = FixPlan {
                             description: "Inject Logic Level Shifter".to_string(),
+                            target_rule_id: rule.to_string(),
                             added_components: Vec::new(),
                             added_wires: Vec::new(),
                             removed_wires: Vec::new(),
@@ -475,9 +472,24 @@ impl Engine {
                          if let Some(board) = self.find_board() {
                              let pin_to_fix = if comp.kind == "wokwi-led" && (msg.contains("cathode") || msg.contains("(k)")) { "K".to_string() } 
                                               else if comp.kind == "wokwi-led" && (msg.contains("anode") || msg.contains("(a)")) { "A".to_string() }
+                                              else if comp.kind == "wokwi-potentiometer" { "SIG".to_string() }
                                               else if comp.kind == "wokwi-led" { "A".to_string() } 
                                               else { "1".to_string() };
                              
+                             let mut target_pin = "GND".to_string();
+                             if comp.kind == "wokwi-potentiometer" {
+                                 let analog_pins = ["A0", "A1", "A2", "A3", "A4", "A5"];
+                                 for p in analog_pins {
+                                     let node = format!("{}:{}", board.id, p);
+                                     if !self.is_pin_occupied(&node) {
+                                         target_pin = p.to_string();
+                                         break;
+                                     }
+                                 }
+                             } else if comp.kind == "wokwi-led" && pin_to_fix == "A" {
+                                 target_pin = "5V".to_string();
+                             }
+
                              // CRITICAL: Check if this pin is ALREADY connected to avoid redundant suggestions
                              let mut already_wired = false;
                              let target_node = format!("{}:{}", comp_id, pin_to_fix);
@@ -525,6 +537,10 @@ impl Engine {
         None
     }
 
+    fn is_pin_occupied(&self, node_id: &str) -> bool {
+        self.wires.iter().any(|w| w.from == node_id || w.to == node_id)
+    }
+
     fn get_pin_pos(&self, comp: &Component, pin_name: &str) -> Point {
         let mut dx: f64 = 20.0;
         let mut dy: f64 = 20.0;
@@ -537,6 +553,11 @@ impl Engine {
             dy = 22.0;
             if pin_name == "A" { dx = 0.0; }
             else if pin_name == "K" { dx = 72.0; }
+        } else if comp.kind == "wokwi-potentiometer" {
+            dy = 68.0;
+            if pin_name == "1" { dx = 15.0; }
+            else if pin_name == "SIG" { dx = 30.0; }
+            else if pin_name == "2" { dx = 45.0; }
         } else if comp.kind.contains("arduino-uno") {
             let ups: f64 = 18.0;
             let start_y: f64 = 34.0;
@@ -626,6 +647,12 @@ pub fn get_fix_plan_count() -> usize {
 pub fn get_fix_description(index: usize) -> String {
     let engine = ENGINE.lock().unwrap();
     engine.plans.get(index).map(|p| p.description.clone()).unwrap_or_default()
+}
+
+#[wasm_bindgen(js_name = getFixTargetRuleId)]
+pub fn get_fix_target_rule_id(index: usize) -> String {
+    let engine = ENGINE.lock().unwrap();
+    engine.plans.get(index).map(|p| p.target_rule_id.clone()).unwrap_or_default()
 }
 
 #[wasm_bindgen(js_name = getFixAddedWireCount)]

@@ -132,6 +132,7 @@ self.onmessage = async (e) => {
 
           suggestions.push({
             description,
+            targetRuleId: engine.getFixTargetRuleId(i),
             addedComponents,
             addedWires,
             removedWires,
