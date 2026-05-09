@@ -258,6 +258,7 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
         let simStartMs = runner.getSimulatedTimeMs();
         let lastTraceTime = 0;
         let lastPollSimMs = simStartMs;
+        let deepSnapshotCache: any | null = null;
 
         const emitComponentStateEvents = (snapshot: any, eventTimeMs: number, requireDelta: boolean) => {
             if (!snapshot?.components) {
@@ -367,6 +368,22 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
                 }
 
                 const snapshot = runner.getRichTelemetrySnapshot({ mode: 'delta' });
+                // If delta snapshots omit metrics (delta:false), merge metrics from a deep snapshot once
+                if (snapshot && Array.isArray(snapshot.components)) {
+                    const missingMetrics = snapshot.components.some((c: any) => !c.metrics);
+                    if (missingMetrics) {
+                        if (!deepSnapshotCache) deepSnapshotCache = runner.getRichTelemetrySnapshot({ mode: 'deep' });
+                        if (deepSnapshotCache && Array.isArray(deepSnapshotCache.components)) {
+                            const deepMap = new Map(deepSnapshotCache.components.map((c: any) => [c.id, c]));
+                            for (const comp of snapshot.components) {
+                                if (!comp.metrics) {
+                                    const deepComp = deepMap.get(comp.id);
+                                    if (deepComp && deepComp.metrics) comp.metrics = deepComp.metrics;
+                                }
+                            }
+                        }
+                    }
+                }
                 
                 // DEBUG: Log snapshot structure to diagnose empty telemetry
                 if (snapshot && !snapshot._debugLogged) {
@@ -419,7 +436,23 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
                 }
                 
                 const snapshot = runner.getRichTelemetrySnapshot({ mode: 'delta' });
-                
+                // If delta snapshots omit metrics (delta:false), merge metrics from a deep snapshot once
+                if (snapshot && Array.isArray(snapshot.components)) {
+                    const missingMetrics = snapshot.components.some((c: any) => !c.metrics);
+                    if (missingMetrics) {
+                        if (!deepSnapshotCache) deepSnapshotCache = runner.getRichTelemetrySnapshot({ mode: 'deep' });
+                        if (deepSnapshotCache && Array.isArray(deepSnapshotCache.components)) {
+                            const deepMap = new Map(deepSnapshotCache.components.map((c: any) => [c.id, c]));
+                            for (const comp of snapshot.components) {
+                                if (!comp.metrics) {
+                                    const deepComp = deepMap.get(comp.id);
+                                    if (deepComp && deepComp.metrics) comp.metrics = deepComp.metrics;
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // DEBUG: Log snapshot structure to diagnose empty telemetry
                 if (snapshot && !snapshot._debugLogged) {
                     const compCount = snapshot.components?.length || 0;
