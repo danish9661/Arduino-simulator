@@ -161,6 +161,7 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
     };
 
     let lastComponentStates: Record<string, any> = {};
+    let lastComponentMetrics: Record<string, any> = {};  // Track all component metrics, not just custom
     let lastPinStates: Record<string, boolean> = {};
     let runner: any = null;
     const startTime = Date.now();
@@ -181,7 +182,9 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
         const boardComp = (meta.components || []).find((c: any) => /(arduino|esp32|stm32|rp2040|pico)/i.test(String(c.type || '')));
         
         const boardCompId = boardComp?.id || 'uno1';
-        const boardType = meta.board || boardComp?.type || 'wokwi-arduino-uno';
+        const boardType = boardComp?.type || meta.board || 'wokwi-arduino-uno';
+        const isRp2040Board = /rp2040|pico/i.test(String(boardType));
+        const effectiveUseSimTimeCapture = useSimTimeCapture && !isRp2040Board;
         const compileUnit: any = getBoardCompileFiles(meta, boardCompId);
         
         let firmwareHex = meta.hex || boardComp?.attrs?.firmwareHex || boardComp?.attrs?.hex || "";
@@ -210,20 +213,30 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
             }
         }
 
+        if (useSimTimeCapture && !effectiveUseSimTimeCapture) {
+            postMessage({ type: 'LOG', msg: `[TRACE] ${label}: Falling back to wall-clock capture for ${boardType} to avoid sim-time stalls.` });
+        }
+
         console.log(`[TRACE] ${label}: Starting capture behavior. Source detected: ${isSourceCode}, Hex Length: ${firmwareHex?.length || 0}`);
         postMessage({ type: 'LOG', msg: `[TRACE] ${label}: Initializing Runner for ${boardType} at ${normalizedSpeed}x speed (telemetry cutoff: ${effectiveCutoffMs}ms)...` });
 
         runner = await createRunnerForBoard(
-            meta.board || boardComp?.type || 'wokwi-arduino-uno',
+            boardType,
             firmwareHex,
             meta.components || [],
             meta.connections || [],
             (state: any) => {
-                const nowMs = runner.getSimulatedTimeMs();
+                const nowMs = runner?.getSimulatedTimeMs?.() ?? 0;
                 if (state.type === 'state' && state.pins) {
                     for (const pinId in state.pins) {
                         const newState = !!state.pins[pinId];
-                        if (newState !== lastPinStates[pinId]) {
+                        const prevState = lastPinStates[pinId];
+                        // First observation is treated as baseline, not an edge event.
+                        if (prevState === undefined) {
+                            lastPinStates[pinId] = newState;
+                            continue;
+                        }
+                        if (newState !== prevState) {
                             pushTelemetryEvent({
                                 PinChange: { pin: pinId, state: newState, time_ms: nowMs }
                             }, nowMs);
@@ -242,37 +255,81 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
         
         runner.setTelemetryEnabled(true);
         const captureWallStartMs = Date.now();
-        const simStartMs = runner.getSimulatedTimeMs();
+        let simStartMs = runner.getSimulatedTimeMs();
         let lastTraceTime = 0;
         let lastPollSimMs = simStartMs;
 
         const emitComponentStateEvents = (snapshot: any, eventTimeMs: number, requireDelta: boolean) => {
-            if (!snapshot?.components) return;
+            if (!snapshot?.components) {
+                console.warn(`[EMIT DEBUG] No snapshot.components to process`);
+                return;
+            }
+            
+            let eventsEmitted = 0;
+            
             for (const comp of snapshot.components) {
-                if (requireDelta && !comp.delta) continue;
                 const cid = comp.id;
-                const custom = comp.metrics?.custom || {};
+                const compType = comp.type || 'unknown';
+                
+                // CRITICAL FIX: Always process custom metrics regardless of delta status
+                // This ensures components like LCD2004 that only expose custom metrics are captured
+                const metrics = comp.metrics || {};
+                const custom = metrics.custom || {};
+                
+                // For each custom metric, check if it changed and emit event
                 for (const key in custom) {
                     const val = custom[key];
                     const stateKey = `${cid}:${key}`;
-                    if (JSON.stringify(val) !== JSON.stringify(lastComponentStates[stateKey])) {
+                    const serialized = JSON.stringify(val);
+                    const lastSerialized = lastComponentStates[stateKey];
+                    
+                    // Emit if:
+                    // 1. First time seeing this key (baseline capture), OR
+                    // 2. Value changed from last capture
+                    if (lastSerialized === undefined || lastSerialized !== serialized) {
                         pushTelemetryEvent({
                             ComponentState: { id: cid, key: key, value: val, time_ms: eventTimeMs }
                         }, eventTimeMs);
-                        lastComponentStates[stateKey] = JSON.parse(JSON.stringify(val));
+                        lastComponentStates[stateKey] = serialized;
+                        eventsEmitted++;
                     }
                 }
+                
+                // Also capture other metrics that might be useful (not just custom)
+                // Examples: pin toggles, io throughput, power profile
+                if (!requireDelta) {
+                    // For baseline (deep mode), capture initial state of all metrics for reference
+                    const metricsSnapshot = {
+                        updateFreq: metrics.updateFreq,
+                        stateSize: metrics.stateSize,
+                        ioThroughput: metrics.ioThroughput,
+                        powerProfile: metrics.powerProfile,
+                        pinToggles: metrics.pinToggles
+                    };
+                    
+                    const metricKey = `${cid}:_metrics`;
+                    const metricSerialized = JSON.stringify(metricsSnapshot);
+                    if (!lastComponentMetrics[cid] || lastComponentMetrics[cid] !== metricSerialized) {
+                        lastComponentMetrics[cid] = metricSerialized;
+                    }
+                }
+            }
+            
+            if (eventsEmitted > 0) {
+                console.log(`[EMIT DEBUG] Emitted ${eventsEmitted} events from snapshot`);
             }
         };
 
         // Capture baseline component states once so teacher/student runs start from a stable anchor.
+        // Use the CURRENT sim-time right before baseline snapshot to ensure time reference alignment.
         const baselineSnapshot = runner.getRichTelemetrySnapshot({ mode: 'deep' });
+        simStartMs = runner.getSimulatedTimeMs(); // Re-sample after snapshot to get accurate epoch
         emitComponentStateEvents(baselineSnapshot, Math.floor(simStartMs), false);
         
         console.log(`[TRACE] ${label}: Simulation loop entered.`);
 
         // Choose capture strategy: sim-time-driven (preferred) or wall-clock (fallback)
-        if (useSimTimeCapture) {
+        if (effectiveUseSimTimeCapture) {
             // Sim-time-driven capture: wait for runner simulated-time to reach each sample point.
             // Benefits: at higher simulation speeds this finishes proportionally faster (8x -> ~1s),
             // and it captures the same simulation-time window deterministically.
@@ -298,10 +355,11 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
             for (let t = simStartMsLoop; t < simEndMs; t += pollIntervalSimMs) {
                 const target = t + pollIntervalSimMs;
                 await waitUntilSim(target);
+                // Use actual sim-time from runner, not quantized/aligned version
+                // This ensures absolute timestamp consistency with baseline snapshot
                 const nowMs = runner.getSimulatedTimeMs();
-                const alignedNowMs = Math.floor(target / pollIntervalSimMs) * pollIntervalSimMs;
-                if (alignedNowMs - lastPollSimMs < pollIntervalSimMs) continue;
-                lastPollSimMs = alignedNowMs;
+                if (nowMs - lastPollSimMs < pollIntervalSimMs) continue;
+                lastPollSimMs = nowMs;
 
                 if (nowMs - lastTraceTime > 1000) {
                     postMessage({ type: 'LOG', msg: `[TRACE] ${label}: Simulating... ${Math.round(nowMs)}ms @ ${normalizedSpeed}x` });
@@ -309,14 +367,31 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
                 }
 
                 const snapshot = runner.getRichTelemetrySnapshot({ mode: 'delta' });
-                emitComponentStateEvents(snapshot, alignedNowMs, true);
+                
+                // DEBUG: Log snapshot structure to diagnose empty telemetry
+                if (snapshot && !snapshot._debugLogged) {
+                    const compCount = snapshot.components?.length || 0;
+                    if (compCount > 0) {
+                        const sampleComps = snapshot.components.slice(0, 3).map(c => ({
+                            id: c.id,
+                            type: c.type,
+                            customMetricKeys: Object.keys(c.metrics?.custom || {})
+                        }));
+                        console.log(`[SNAPSHOT DEBUG] SIM-TIME: Components: ${compCount}, Sample: ${JSON.stringify(sampleComps)}`);
+                    } else {
+                        console.warn(`[SNAPSHOT DEBUG] SIM-TIME: Empty snapshot.components (is null/undefined: ${!snapshot.components})`);
+                    }
+                    snapshot._debugLogged = true;
+                }
+                
+                emitComponentStateEvents(snapshot, nowMs, true);
             }
 
             // Final flush at sim-end boundary to avoid dropping last transition near cutoff.
             await waitUntilSim(simEndMs);
             const finalSnapshot = runner.getRichTelemetrySnapshot({ mode: 'delta' });
-            const finalAlignedMs = Math.floor(simEndMs / pollIntervalSimMs) * pollIntervalSimMs;
-            emitComponentStateEvents(finalSnapshot, finalAlignedMs, true);
+            const finalNowMs = runner.getSimulatedTimeMs();
+            emitComponentStateEvents(finalSnapshot, finalNowMs, true);
         } else {
             const wallClockStart = Date.now();
             const wallClockDurationMs = 8000;  // All speeds: 8 seconds wall-clock time
@@ -344,6 +419,23 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
                 }
                 
                 const snapshot = runner.getRichTelemetrySnapshot({ mode: 'delta' });
+                
+                // DEBUG: Log snapshot structure to diagnose empty telemetry
+                if (snapshot && !snapshot._debugLogged) {
+                    const compCount = snapshot.components?.length || 0;
+                    if (compCount > 0) {
+                        const sampleComps = snapshot.components.slice(0, 3).map(c => ({
+                            id: c.id,
+                            type: c.type,
+                            customMetricKeys: Object.keys(c.metrics?.custom || {})
+                        }));
+                        console.log(`[SNAPSHOT DEBUG] Components: ${compCount}, Sample: ${JSON.stringify(sampleComps)}`);
+                    } else {
+                        console.warn(`[SNAPSHOT DEBUG] Empty snapshot.components (is null/undefined: ${!snapshot.components})`);
+                    }
+                    snapshot._debugLogged = true;
+                }
+                
                 emitComponentStateEvents(snapshot, alignedNowMs, true);
 
                 // Fixed timeout: independent of speed for consistent report times
@@ -360,6 +452,9 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
         (telemetry as any).telemetry_cutoff_ms = effectiveCutoffMs;
         (telemetry as any).real_capture_ms = Date.now() - captureWallStartMs;
         const allEvents = telemetry.events || [];
+        
+        console.log(`[CAPTURE SUMMARY] ${label}: Captured ${allEvents.length} events (real_time: ${(telemetry as any).real_capture_ms}ms, sim_time: ${Math.round(runner.getSimulatedTimeMs())}ms)`);
+        
         const keptEvents: any[] = [];
         const ignoredEvents: any[] = [];
         for (const evt of allEvents) {

@@ -216,7 +216,7 @@ impl Engine {
                         let is_led = comp.kind.contains("led");
                         let target_pins = if is_led { vec!["A", "K"] } else { vec!["1", "2", "pos", "neg"] };
                         
-                        let mut wire_to_replace = None;
+                        let mut wires_to_replace = Vec::new();
                         let mut final_target_pin = "1";
 
                         for pin in target_pins {
@@ -224,12 +224,11 @@ impl Engine {
                             let node_dot = format!("{}.{}", comp_id, pin);
                             for wire in &self.wires {
                                 if wire.from == node_colon || wire.to == node_colon || wire.from == node_dot || wire.to == node_dot {
-                                    wire_to_replace = Some(wire.clone());
+                                    wires_to_replace.push(wire.clone());
                                     final_target_pin = pin;
-                                    break;
                                 }
                             }
-                            if wire_to_replace.is_some() { break; }
+                            if !wires_to_replace.is_empty() { break; }
                         }
 
                         let res_id = format!("res_{}", comp_id);
@@ -255,21 +254,27 @@ impl Engine {
                             ],
                         };
 
-                        if let Some(old_wire) = wire_to_replace {
+                        if !wires_to_replace.is_empty() {
                             let target_node = format!("{}:{}", comp_id, final_target_pin);
-                            plan.removed_wires.push(JsWireShort { from: old_wire.from.clone(), to: old_wire.to.clone() });
-                            plan.reasoning.push(format!("Intercepted existing wire on pin {}.", final_target_pin));
+                            plan.reasoning.push(format!("Intercepted {} existing wires on pin {}.", wires_to_replace.len(), final_target_pin));
 
-                            let other_end = if old_wire.from == target_node || old_wire.from == target_node.replace(':', ".") { old_wire.to.clone() } else { old_wire.from.clone() };
-                            
-                            let start_p = self.get_pin_pos_by_id(&other_end);
-                            let mid_p1 = Point { x: res_x, y: res_y + 16.0 };
-                            plan.added_wires.push(JsWire {
-                                from: other_end,
-                                to: format!("{}:1", res_id),
-                                color: "red".to_string(),
-                                path: Some(self.find_path(start_p, mid_p1)),
-                            });
+                            for (i, old_wire) in wires_to_replace.iter().enumerate() {
+                                plan.removed_wires.push(JsWireShort { from: old_wire.from.clone(), to: old_wire.to.clone() });
+                                
+                                // Only connect the FIRST wire's other end to the resistor input
+                                // Subsequent redundant wires are simply removed to clean up the circuit
+                                if i == 0 {
+                                    let other_end = if old_wire.from == target_node || old_wire.from == target_node.replace(':', ".") { old_wire.to.clone() } else { old_wire.from.clone() };
+                                    let start_p = self.get_pin_pos_by_id(&other_end);
+                                    let mid_p1 = Point { x: res_x, y: res_y + 16.0 };
+                                    plan.added_wires.push(JsWire {
+                                        from: other_end,
+                                        to: format!("{}:1", res_id),
+                                        color: "red".to_string(),
+                                        path: Some(self.find_path(start_p, mid_p1)),
+                                    });
+                                }
+                            }
 
                             let mid_p2 = Point { x: res_x + 70.0, y: res_y + 16.0 };
                             let end_p = self.get_pin_pos(&comp, final_target_pin);
@@ -281,7 +286,6 @@ impl Engine {
                             });
                         } else {
                             // Fallback: Just place the resistor and connect pin 2 to the component
-                            // User will have to connect pin 1 themselves, or we connect to 5V if we find a board
                             plan.reasoning.push("Note: No direct wire found to intercept. Placing resistor nearby.".to_string());
                             let target_pin = if is_led { "A" } else { "1" };
                             let end_p = self.get_pin_pos(&comp, target_pin);
@@ -496,6 +500,26 @@ impl Engine {
                   }
              }
 
+             // --- Pattern 5: Duplicate Wire Removal ---
+             for i in 0..self.wires.len() {
+                 for j in (i + 1)..self.wires.len() {
+                     let w1 = &self.wires[i];
+                     let w2 = &self.wires[j];
+                     if (w1.from == w2.from && w1.to == w2.to) || (w1.from == w2.to && w1.to == w2.from) {
+                         self.plans.push(FixPlan {
+                             description: format!("Remove duplicate wire between {} and {}", w1.from, w1.to),
+                             target_rule_id: "cleanup".to_string(),
+                             added_components: Vec::new(),
+                             added_wires: Vec::new(),
+                             removed_wires: vec![JsWireShort { from: w1.from.clone(), to: w1.to.clone() }],
+                             transformations: Vec::new(),
+                             reasoning: vec![format!("Redundant connection detected between {} and {}.", w1.from, w1.to)],
+                         });
+                         break;
+                     }
+                 }
+             }
+
              if msg.contains("floating") || msg.contains("unconnected") || rule == "validateLedFloatingPins" {
                   if let Some(comp_id) = vio.component_ids.get(0) {
                       if let Some(comp) = self.fuzzy_get_component(comp_id) {
@@ -530,6 +554,17 @@ impl Engine {
                                                    else if pin_to_fix == "K" { "GND".to_string() }
                                                    else { "5V".to_string() };
 
+                               // PREVENT DUPLICATES: Only suggest if this specific connection doesn't exist
+                               let from_node = format!("{}:{}", comp_id, pin_to_fix);
+                               let to_node = format!("{}:{}", board.id, target_to_use);
+                               let already_connected = self.wires.iter().any(|w| 
+                                   (w.from == from_node && w.to == to_node) || (w.from == to_node && w.to == from_node)
+                               );
+
+                               if already_connected {
+                                   continue;
+                               }
+
                                let start_p = self.get_pin_pos(&comp, &pin_to_fix);
                                let end_p = self.get_pin_pos(&board, &target_to_use);
                                
@@ -538,8 +573,8 @@ impl Engine {
                                    target_rule_id: rule.to_string(),
                                    added_components: Vec::new(),
                                    added_wires: vec![JsWire {
-                                       from: format!("{}:{}", comp_id, pin_to_fix),
-                                       to: format!("{}:{}", board.id, target_to_use),
+                                       from: from_node,
+                                       to: to_node,
                                        color: if target_to_use == "GND" { "black".to_string() } else if target_to_use == "5V" { "red".to_string() } else { "#38bdf8".to_string() },
                                        path: Some(self.find_path(start_p, end_p)),
                                    }],

@@ -13,7 +13,7 @@ async function initEngine() {
   console.log("[AutofixWorker] Initializing Rust Engine (v2.0.0-rust)...");
   
   // wasm-bindgen handles the instantiation and memory management
-  await init(wasmUrl);
+  await init({ module_or_path: wasmUrl });
   
   isInitialized = true;
   console.log("Autofix Rust WASM Engine initialized.");

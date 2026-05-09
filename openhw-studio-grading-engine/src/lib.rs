@@ -18,6 +18,35 @@ fn normalize_id(id: &str) -> String {
         .to_lowercase()
 }
 
+fn is_telemetry_rich_component(kind: &str) -> bool {
+    let normalized = normalize_id(kind);
+    [
+        "lcd",
+        "oled",
+        "ssd1306",
+        "ili9341",
+        "nokia",
+        "max7219",
+        "tm1637",
+        "servo",
+        "motor",
+        "stepper",
+        "hc-sr04",
+        "max30102",
+        "joystick",
+        "rotary",
+        "potentiometer",
+        "soil",
+        "ldr",
+        "neopixel",
+        "buzzer",
+        "keypad",
+        "encoder",
+    ]
+    .iter()
+    .any(|needle| normalized.contains(needle))
+}
+
 #[wasm_bindgen]
 pub fn init_panic_hook() {
     console_error_panic_hook::set_once();
@@ -524,6 +553,25 @@ fn compare_behavior(
     let s_serial = student.events.iter().filter(|e| matches!(e, TelemetryEvent::SerialOutput { .. })).count();
     let t_active_count = teacher.events.iter().filter(|e| matches!(e, TelemetryEvent::ComponentState { .. })).count();
     let s_active_count = student.events.iter().filter(|e| matches!(e, TelemetryEvent::ComponentState { .. })).count();
+    let telemetry_rich_components_present = t_meta.components.iter().chain(s_meta.components.iter()).any(|c| is_telemetry_rich_component(&c.kind));
+
+    let mut t_unique_pins: HashMap<String, bool> = HashMap::new();
+    let mut s_unique_pins: HashMap<String, bool> = HashMap::new();
+    for e in &teacher.events {
+        if let TelemetryEvent::PinChange { pin, .. } = e {
+            t_unique_pins.insert(normalize_id(pin), true);
+        }
+    }
+    for e in &student.events {
+        if let TelemetryEvent::PinChange { pin, .. } = e {
+            s_unique_pins.insert(normalize_id(pin), true);
+        }
+    }
+    let teacher_pin_only_baseline = t_pins > 0 && t_pins <= t_unique_pins.len();
+    let student_pin_only_baseline = s_pins > 0 && s_pins <= s_unique_pins.len();
+    let no_functional_or_serial = t_active_count == 0 && s_active_count == 0 && t_serial == 0 && s_serial == 0;
+    let empty_or_baseline_only = (teacher.events.is_empty() && student.events.is_empty())
+        || (teacher_pin_only_baseline && student_pin_only_baseline);
 
     // 2. Build Connectivity Graphs (Hardware Signatures)
     fn build_conn_map(meta: &ProjectMeta) -> HashMap<String, Vec<(String, String, String)>> {
@@ -745,7 +793,15 @@ fn compare_behavior(
     let f_match = if functional_weight_sum > 0.0 { functional_score_sum / functional_weight_sum } else { 1.0 };
     let e_match = if electrical_weight_sum > 0.0 { electrical_score_sum / electrical_weight_sum } else { 1.0 };
     
-    let behavioral_score = f_match * 100.0;
+    let mut behavioral_score = f_match * 100.0;
+    if no_functional_or_serial && empty_or_baseline_only {
+        feedback.push("Behavior Warning: Insufficient runtime telemetry evidence (no serial/component activity; pin data was empty or baseline-only).".to_string());
+        behavioral_score = behavioral_score.min(60.0);
+    }
+    if telemetry_rich_components_present && t_active_count == 0 && s_active_count == 0 && !teacher.events.is_empty() && !student.events.is_empty() {
+        feedback.push("Behavior Warning: Telemetry-rich components were present, but no ComponentState events were captured. Check board selection and telemetry extraction.".to_string());
+        behavioral_score = behavioral_score.min(80.0);
+    }
     let pin_fidelity = (e_match * 100.0) as i32;
 
     let return_id_map: HashMap<String, String> = id_map.iter().map(|(k, v)| (v.clone(), k.clone())).collect();
