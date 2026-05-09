@@ -501,6 +501,27 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
         (telemetry as any).simulation_speed = normalizedSpeed;
         (telemetry as any).telemetry_cutoff_ms = effectiveCutoffMs;
         (telemetry as any).real_capture_ms = Date.now() - captureWallStartMs;
+
+        const coverageIssues = Array.isArray(richSnapshot?.components)
+            ? richSnapshot.components
+                .map((comp: any) => {
+                    const customKeys = Object.keys(comp?.metrics?.custom || comp?.customTelemetry || comp?._metrics?.customTelemetry || {});
+                    const stateKeys = Object.keys(comp?.state || {});
+                    if (customKeys.length === 0 && stateKeys.length === 0) {
+                        return `${comp?.id || 'unknown'}:${comp?.type || 'unknown'}`;
+                    }
+                    return null;
+                })
+                .filter(Boolean)
+            : [];
+
+        if (coverageIssues.length > 0) {
+            (telemetry as any).coverage_issues = coverageIssues;
+            sendJsonLog(`[Telemetry Coverage] Components with no visible telemetry/state: ${coverageIssues.join(', ')}`, 'warn');
+        } else {
+            (telemetry as any).coverage_issues = [];
+        }
+
         const allEvents = telemetry.events || [];
         
         console.log(`[CAPTURE SUMMARY] ${label}: Captured ${allEvents.length} events (real_time: ${(telemetry as any).real_capture_ms}ms, sim_time: ${Math.round(runner.getSimulatedTimeMs())}ms)`);
