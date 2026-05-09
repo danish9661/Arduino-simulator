@@ -616,8 +616,10 @@ fn compare_behavior(
     } else { 1.0 };
 
     let speed_factor = options.simulation_speed.max(1.0).min(8.0);
-    let adaptive_tolerance_ms = (TIMELINE_TOLERANCE_MS * speed_factor).min(1200.0);
-    logs.push(format!("Behavior: Temporal matcher configured with adaptive tolerance {:.0}ms at {}x speed.", adaptive_tolerance_ms, speed_factor));
+    // Fixed hard cap: 400ms tolerance for ALL speeds
+    // Time drift > 400ms = points deducted (no exception based on speed)
+    let adaptive_tolerance_ms = 400.0;  // FIXED: 400ms for 1x/2x/4x/8x
+    logs.push(format!("Behavior: Temporal matcher configured with FIXED 400ms time drift tolerance (hard cap for all speeds).", ));
 
     let mut functional_score_sum = 0.0;
     let mut functional_weight_sum = 0.0;
@@ -632,13 +634,33 @@ fn compare_behavior(
         let is_pin = t_id.starts_with("pin:") || t_id.starts_with("p") || t_id.starts_with("pinstate:");
         let weight = 1.0;
 
-        let s_id = id_map.get(t_id).unwrap_or(t_id);
+        // Extract component ID from t_id (handle pin: and pinstate: prefixes)
+        let t_comp_id = if t_id.starts_with("pin:") {
+            t_id.trim_start_matches("pin:").to_string()
+        } else if t_id.starts_with("pinstate:") {
+            t_id.trim_start_matches("pinstate:").split(':').next().unwrap_or("").to_string()
+        } else {
+            t_id.clone()
+        };
+
+        // Look up mapped student ID
+        let s_comp_id = id_map.get(&t_comp_id).cloned().unwrap_or_else(|| t_comp_id.clone());
+        
+        // Reconstruct s_id with same prefix as t_id
+        let s_id = if t_id.starts_with("pin:") {
+            format!("pin:{}", s_comp_id)
+        } else if t_id.starts_with("pinstate:") {
+            let key_part = t_id.trim_start_matches("pinstate:").split(':').nth(1).unwrap_or("");
+            format!("pinstate:{}:{}", s_comp_id, key_part)
+        } else {
+            s_comp_id.clone()
+        };
 
         // SILENT-PIN GRACE: if teacher has 0 or 1 event (static/unchanged), mark as 100% match
         let is_silent_teacher = t_timeline.len() <= 1;
         
         let mut ignored_count = 0usize;
-        let (group_score, matched_count) = if let Some(s_timeline) = s_groups.get(s_id) {
+        let (group_score, matched_count) = if let Some(s_timeline) = s_groups.get(&s_id) {
             if is_silent_teacher {
                 // Teacher pin is static/silent: student doesn't need to match anything
                 (1.0_f32, t_timeline.len())
@@ -652,12 +674,21 @@ fn compare_behavior(
                 (1.0_f32, 0)
             } else {
                 // Teacher has events, student has none: check if student had only ignored events for this id
-                if let Some(ignored) = s_ignored_groups.get(s_id) {
+                if let Some(ignored) = s_ignored_groups.get(&s_id) {
                     ignored_count = ignored.len();
                     (1.0_f32, t_timeline.len())
+                } else if let Some(last_event_time) = t_timeline.last().and_then(|e| Some(get_event_time(e) as i32)) {
+                    // Grace events: if teacher's last event is near cutoff (>7700ms), treat as grace (no penalty)
+                    if last_event_time > 7700 && last_event_time < 8000 {
+                        // Teacher-only events near cutoff are treated as grace (forgivable)
+                        (1.0_f32, t_timeline.len())
+                    } else {
+                        // Real mismatch (teacher events are well before cutoff)
+                        (0.0_f32, 0)
+                    }
                 } else {
                     // Real mismatch
-                    (0.0, 0)
+                    (0.0_f32, 0)
                 }
             }
         };
@@ -667,7 +698,7 @@ fn compare_behavior(
             id: t_id.clone(),
             id_type: if is_pin { "pin".to_string() } else { "component".to_string() },
             teacher_event_count: t_timeline.len(),
-            student_event_count: s_groups.get(s_id).map(|v| v.len()).unwrap_or(0),
+            student_event_count: s_groups.get(&s_id).map(|v| v.len()).unwrap_or(0),
             match_percentage: (group_score * 100.0_f32).min(100.0_f32),
             matched_events: matched_count,
             is_silent_teacher,
@@ -740,14 +771,21 @@ fn compare_events_indexed(
     time_scale: f32,
     tolerance_ms: f32,
 ) -> (f32, usize) {
+    #[derive(Default, Clone)]
+    struct MatchRun {
+        matched_count: usize,
+        drifts_ms: Vec<f32>,
+    }
+
     fn run_indexed_match(
         teacher_events: &[TelemetryEvent],
         student_events: &[TelemetryEvent],
         time_scale: f32,
         tolerance_ms: f32,
         phase_offset: usize,
-    ) -> usize {
-        let mut matched_count = 0;
+    ) -> MatchRun {
+        let mut matched_count = 0usize;
+        let mut drifts_ms: Vec<f32> = Vec::new();
         let mut last_s_idx = phase_offset.min(student_events.len());
 
         for (t_idx, t_event) in teacher_events.iter().enumerate() {
@@ -760,6 +798,7 @@ fn compare_events_indexed(
 
                 if is_event_match_fuzzy(t_event, s_event, t_time, s_time_norm, tolerance_ms) {
                     matched_count += 1;
+                    drifts_ms.push(s_time_norm - t_time);
                     last_s_idx = idx_aligned + 1;
                     continue;
                 }
@@ -777,32 +816,74 @@ fn compare_events_indexed(
 
                 if is_event_match_fuzzy(t_event, s_event, t_time, s_time_norm, tolerance_ms) {
                     matched_count += 1;
+                    drifts_ms.push(s_time_norm - t_time);
                     last_s_idx = s_idx + 1;
                     break;
                 }
             }
         }
 
-        matched_count
+        MatchRun { matched_count, drifts_ms }
     }
 
     if teacher_events.is_empty() {
         return (1.0, 0);
     }
 
-    let mut best_matched = run_indexed_match(teacher_events, student_events, time_scale, tolerance_ms, 0);
+    let mut best_run = run_indexed_match(teacher_events, student_events, time_scale, tolerance_ms, 0);
 
     // Phase-shift recovery for periodic signals (common at high speed) by trying small index offsets.
     let max_phase_offset = TIMELINE_WINDOW.min(student_events.len().saturating_sub(1));
     for phase_offset in 1..=max_phase_offset {
-        let matched = run_indexed_match(teacher_events, student_events, time_scale, tolerance_ms, phase_offset);
-        if matched > best_matched {
-            best_matched = matched;
+        let candidate = run_indexed_match(teacher_events, student_events, time_scale, tolerance_ms, phase_offset);
+        if candidate.matched_count > best_run.matched_count {
+            best_run = candidate;
+        } else if candidate.matched_count == best_run.matched_count {
+            let best_avg_abs = if best_run.drifts_ms.is_empty() {
+                f32::INFINITY
+            } else {
+                best_run.drifts_ms.iter().map(|d| d.abs()).sum::<f32>() / best_run.drifts_ms.len() as f32
+            };
+            let cand_avg_abs = if candidate.drifts_ms.is_empty() {
+                f32::INFINITY
+            } else {
+                candidate.drifts_ms.iter().map(|d| d.abs()).sum::<f32>() / candidate.drifts_ms.len() as f32
+            };
+            if cand_avg_abs < best_avg_abs {
+                best_run = candidate;
+            }
         }
     }
 
-    let match_pct = best_matched as f32 / teacher_events.len() as f32;
-    (match_pct, best_matched)
+    let match_pct = best_run.matched_count as f32 / teacher_events.len() as f32;
+    
+    // Bonus for extra student events (indicates capture robustness): if student has more events than teacher,
+    // allow up to 20% extra without penalty. More than 20% extra incurs a small penalty.
+    let extra_events = (student_events.len() as i32 - teacher_events.len() as i32).max(0) as usize;
+    let extra_tolerance = (teacher_events.len() as f32 * 0.20).ceil() as usize;
+    
+    let mut match_pct_adjusted = if extra_events <= extra_tolerance {
+        match_pct // No penalty for reasonable extra events
+    } else {
+        let penalty = ((extra_events - extra_tolerance) as f32 / teacher_events.len() as f32).min(0.15);
+        (match_pct - penalty).max(0.0)
+    };
+
+    // Drift-trend penalty: if matched pairs drift progressively in one direction,
+    // apply a light deduction even when individual points still pass tolerance.
+    if best_run.drifts_ms.len() >= 5 {
+        let first = best_run.drifts_ms.first().copied().unwrap_or(0.0);
+        let last = best_run.drifts_ms.last().copied().unwrap_or(0.0);
+        let trend = last - first;
+        let avg_abs = best_run.drifts_ms.iter().map(|d| d.abs()).sum::<f32>() / best_run.drifts_ms.len() as f32;
+
+        if trend.abs() > 300.0 && avg_abs > 150.0 {
+            let trend_penalty = ((trend.abs() - 300.0) / 1200.0).min(0.10);
+            match_pct_adjusted = (match_pct_adjusted - trend_penalty).max(0.0);
+        }
+    }
+
+    (match_pct_adjusted, best_run.matched_count)
 }
 
 /// Extract time_ms from a TelemetryEvent.

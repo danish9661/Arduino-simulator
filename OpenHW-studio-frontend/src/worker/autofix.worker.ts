@@ -46,18 +46,23 @@ self.onmessage = async (e) => {
         engine.reset();
 
         // 1. Ingest components
-        (diagram.components || []).forEach((c: any) => {
+        const components = diagram.components || [];
+        self.postMessage({ type: 'status', payload: `📥 Ingesting ${components.length} components...` });
+        components.forEach((c: any) => {
           engine.ingestComponent(c.id, c.type, c.x || 0, c.y || 0, c.rotation || 0);
         });
 
         // 2. Ingest wires
-        (diagram.connections || []).forEach((w: any) => {
+        const wires = diagram.connections || [];
+        self.postMessage({ type: 'status', payload: `📥 Ingesting ${wires.length} wires...` });
+        wires.forEach((w: any) => {
           engine.ingestWire(w.from, w.to, w.color || 'green');
         });
 
         // 3. Ingest violations
-        self.postMessage({ type: 'status', payload: 'Calculating repairs (A*)...' });
-        (violations || []).forEach((v: any) => {
+        const vios = violations || [];
+        self.postMessage({ type: 'status', payload: `📥 Ingesting ${vios.length} circuit violations...` });
+        vios.forEach((v: any) => {
           const rawIds = v.componentIds || v.compIds || [];
           const compIdsStr = (Array.isArray(rawIds) ? rawIds : [rawIds]).join(',');
           const ruleId = v.ruleId || v.id || 'unknown-rule';
@@ -65,6 +70,7 @@ self.onmessage = async (e) => {
         });
 
         // 4. Generate plan
+        self.postMessage({ type: 'status', payload: '🧠 Calculating optimal repair strategy (Rust A*)...' });
         const planCount = engine.getFixPlanCount();
         const suggestions = [];
 

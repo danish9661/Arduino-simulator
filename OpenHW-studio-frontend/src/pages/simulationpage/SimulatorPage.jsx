@@ -1754,33 +1754,47 @@ export function SimulatorPage({ gamificationMode = false }) {
   const [autofixLog, setAutofixLog] = useState([])
   const autofixWorkerRef = useRef(null);
 
+  const autofixDebounceTimerRef = useRef(null);
+
   const triggerAutofixAnalysis = useCallback((forcedViolations = null) => {
-    const violations = forcedViolations || validationErrors;
-    if (!autofixWorkerRef.current || !violations || violations.length === 0) {
-      console.warn('[Autofix] Cannot trigger: no worker or no violations');
-      return;
+    if (autofixDebounceTimerRef.current) {
+      clearTimeout(autofixDebounceTimerRef.current);
     }
-    
-    setAutofixStatus('Analyzing...');
-    setAutofixPlan(null);
 
-    // Filter connections to remove ':' for engine compatibility
-    const engineConnections = (wires || []).map(w => ({
-      from: String(w.from || ''),
-      to:   String(w.to   || ''),
-      color: w.color
-    }));
-
-    autofixWorkerRef.current.postMessage({
-      type: 'analyze',
-      payload: {
-        diagram: {
-          components: components,
-          connections: engineConnections
-        },
-        violations: validationErrors
+    autofixDebounceTimerRef.current = setTimeout(() => {
+      const violations = forcedViolations || validationErrors;
+      if (!autofixWorkerRef.current || !violations || violations.length === 0) {
+        console.warn('[Autofix] Cannot trigger: no worker or no violations');
+        return;
       }
-    });
+      
+      setAutofixStatus('Analyzing...');
+      setAutofixPlan(null);
+
+      // Filter connections to remove ':' for engine compatibility
+      const engineConnections = (wires || []).map(w => ({
+        from: String(w.from || ''),
+        to:   String(w.to   || ''),
+        color: w.color
+      }));
+
+      setAutofixLog(prev => [
+        ...prev.slice(-19), 
+        { time: new Date().toLocaleTimeString(), msg: `🚀 Ingesting ${components?.length || 0} components and ${wires?.length || 0} wires...` },
+        { time: new Date().toLocaleTimeString(), msg: `🔍 Analyzing ${violations?.length || 0} circuit violations...` }
+      ]);
+
+      autofixWorkerRef.current.postMessage({
+        type: 'analyze',
+        payload: {
+          diagram: {
+            components: components,
+            connections: engineConnections
+          },
+          violations: violations // Use the local filtered/forced violations
+        }
+      });
+    }, 200); // 200ms debounce
   }, [validationErrors, components, wires]);
 
   useEffect(() => {
@@ -1796,11 +1810,13 @@ export function SimulatorPage({ gamificationMode = false }) {
       }
       if (type === 'results') {
         setAutofixStatus('Ready');
+        setAutofixLog(prev => [
+          ...prev.slice(-19), 
+          { time: new Date().toLocaleTimeString(), msg: `✅ Analysis complete. Found ${payload.planCount} repair strategies.` }
+        ]);
         // payload: { planCount, suggestions }
         if (payload.planCount > 0) {
-          // For now, we take the first suggestion (best confidence)
-          const bestFix = payload.suggestions[0];
-          setAutofixPlan(bestFix);
+          setAutofixPlan(payload.suggestions[0]);
         } else {
           setAutofixPlan(null);
         }
@@ -6517,6 +6533,13 @@ useEffect(() => {
     saveHistory();
     
     appendConsoleEntry('info', `🔧 Project Plan Applied: ${plan.addedComponents?.length || 0} components, ${plan.addedWires?.length || 0} wires.`, 'simulator');
+
+    // Force re-validation after fix to continue "Speak & Hear" loop
+    setTimeout(() => {
+      validationRunCacheRef.current = {}; // Clear cache
+      runCircuitValidation();
+      appendConsoleEntry('info', '📡 Re-validating circuit after repair...', 'simulator');
+    }, 100);
   }, [components, wires, saveHistory, appendConsoleEntry]);
 
   const handleApplyPlan = useCallback(() => {
@@ -11714,43 +11737,6 @@ function SimulatorPageContent() {
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>
               <span>WASM MNA Engine Active</span>
             </div>
-          </div>
-        )}
-        {autofixPlan && (
-          <div style={{
-            position: 'fixed',
-            bottom: '30px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: '440px',
-            zIndex: 10000,
-            background: 'rgba(15, 23, 42, 0.95)',
-            backdropFilter: 'blur(16px)',
-            borderRadius: '24px',
-            border: '1px solid rgba(56, 189, 248, 0.4)',
-            boxShadow: '0 30px 60px -12px rgba(0, 0, 0, 0.7)',
-            padding: '24px',
-            pointerEvents: 'auto',
-            animation: 'appear 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
-          }}>
-            <AutofixPreviewPanel 
-              autofixPlan={autofixPlan} 
-              onApplyPlan={handleApplyPlan}
-              validationErrors={validationErrors}
-              autofixStatus={autofixStatus}
-              autofixLog={autofixLog}
-              onRefresh={triggerAutofixAnalysis}
-            />
-            <button 
-              onClick={() => setAutofixPlan(null)}
-              style={{
-                position: 'absolute', top: 12, right: 12,
-                background: 'rgba(255,255,255,0.05)', border: 'none',
-                width: 24, height: 24, borderRadius: '50%',
-                color: 'rgba(255,255,255,0.4)', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14
-              }}
-            >×</button>
           </div>
         )}
       </div>

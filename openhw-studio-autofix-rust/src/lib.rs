@@ -99,6 +99,17 @@ impl Engine {
         }
     }
 
+    pub fn fuzzy_get_component(&self, id: &str) -> Option<Component> {
+        if let Some(c) = self.components.get(id) {
+            return Some(c.clone());
+        }
+        let alt_id = if id.contains('_') { id.replace('_', "-") } else { id.replace('-', "_") };
+        if let Some(c) = self.components.get(&alt_id) {
+            return Some(c.clone());
+        }
+        None
+    }
+
     pub fn reset(&mut self) {
         self.components.clear();
         self.wires.clear();
@@ -164,7 +175,7 @@ impl Engine {
             // --- Pattern 1: Polarity Correction ---
             if rule == "validateReversePolarity" || rule == "validateDiodePolarity" || msg.contains("reverse polarity") {
                 if let Some(comp_id) = vio.component_ids.get(0) {
-                    if let Some(comp) = self.components.get(comp_id) {
+                    if let Some(comp) = self.fuzzy_get_component(comp_id) {
                         self.plans.push(FixPlan {
                             description: format!("Flip polarity of {} to correct reverse bias", comp_id),
                             target_rule_id: rule.to_string(),
@@ -201,16 +212,18 @@ impl Engine {
                  }
 
                  if let Some(comp_id) = comp_id_to_fix {
-                    if let Some(comp) = self.components.get(&comp_id).cloned() {
-                        let target_pins = if comp.kind == "wokwi-led" { vec!["A", "K"] } else { vec!["1", "2", "pos", "neg"] };
+                    if let Some(comp) = self.fuzzy_get_component(&comp_id) {
+                        let is_led = comp.kind.contains("led");
+                        let target_pins = if is_led { vec!["A", "K"] } else { vec!["1", "2", "pos", "neg"] };
                         
                         let mut wire_to_replace = None;
                         let mut final_target_pin = "1";
 
                         for pin in target_pins {
-                            let target_node = format!("{}:{}", comp_id, pin);
+                            let node_colon = format!("{}:{}", comp_id, pin);
+                            let node_dot = format!("{}.{}", comp_id, pin);
                             for wire in &self.wires {
-                                if wire.from == target_node || wire.to == target_node {
+                                if wire.from == node_colon || wire.to == node_colon || wire.from == node_dot || wire.to == node_dot {
                                     wire_to_replace = Some(wire.clone());
                                     final_target_pin = pin;
                                     break;
@@ -219,31 +232,36 @@ impl Engine {
                             if wire_to_replace.is_some() { break; }
                         }
 
-                        if let Some(old_wire) = wire_to_replace {
-                            let target_node = format!("{}:{}", comp_id, final_target_pin);
-                            let mut plan = FixPlan {
-                                description: format!("Insert 220Ω protective resistor for {}", comp_id),
-                                target_rule_id: rule.to_string(),
-                                added_components: Vec::new(),
-                                added_wires: Vec::new(),
-                                removed_wires: vec![JsWireShort { from: old_wire.from.clone(), to: old_wire.to.clone() }],
-                                transformations: Vec::new(),
-                                reasoning: vec![format!("Component {} lacks current limiting. Injecting series resistor.", comp_id)],
-                            };
-
-                            let other_end = if old_wire.from == target_node { old_wire.to.clone() } else { old_wire.from.clone() };
-                            let res_id = format!("res_{}", comp_id);
-                            let res_x = comp.x;
-                            let res_y = comp.y - 60.0;
-                            
-                            plan.added_components.push(JsComponent {
+                        let res_id = format!("res_{}", comp_id);
+                        let res_x = comp.x;
+                        let res_y = comp.y - 60.0;
+                        
+                        let mut plan = FixPlan {
+                            description: format!("Insert 220Ω protective resistor for {}", comp_id),
+                            target_rule_id: rule.to_string(),
+                            added_components: vec![JsComponent {
                                 id: res_id.clone(),
                                 kind: "wokwi-resistor".to_string(),
                                 x: res_x,
                                 y: res_y,
                                 rotation: 0.0,
-                            });
+                            }],
+                            added_wires: Vec::new(),
+                            removed_wires: Vec::new(),
+                            transformations: Vec::new(),
+                            reasoning: vec![
+                                format!("Violation: Current limit exceeded on {}.", comp_id),
+                                "Strategy: Injecting 220Ω current-limiting resistor.".to_string()
+                            ],
+                        };
 
+                        if let Some(old_wire) = wire_to_replace {
+                            let target_node = format!("{}:{}", comp_id, final_target_pin);
+                            plan.removed_wires.push(JsWireShort { from: old_wire.from.clone(), to: old_wire.to.clone() });
+                            plan.reasoning.push(format!("Intercepted existing wire on pin {}.", final_target_pin));
+
+                            let other_end = if old_wire.from == target_node || old_wire.from == target_node.replace(':', ".") { old_wire.to.clone() } else { old_wire.from.clone() };
+                            
                             let start_p = self.get_pin_pos_by_id(&other_end);
                             let mid_p1 = Point { x: res_x, y: res_y + 16.0 };
                             plan.added_wires.push(JsWire {
@@ -261,10 +279,22 @@ impl Engine {
                                 color: "red".to_string(),
                                 path: Some(self.find_path(mid_p2, end_p)),
                             });
-
-                            self.plans.push(plan);
-                            continue;
+                        } else {
+                            // Fallback: Just place the resistor and connect pin 2 to the component
+                            // User will have to connect pin 1 themselves, or we connect to 5V if we find a board
+                            plan.reasoning.push("Note: No direct wire found to intercept. Placing resistor nearby.".to_string());
+                            let target_pin = if is_led { "A" } else { "1" };
+                            let end_p = self.get_pin_pos(&comp, target_pin);
+                            plan.added_wires.push(JsWire {
+                                from: format!("{}:2", res_id),
+                                to: format!("{}:{}", comp_id, target_pin),
+                                color: "red".to_string(),
+                                path: None,
+                            });
                         }
+
+                        self.plans.push(plan);
+                        continue;
                     }
                  }
             }
@@ -327,7 +357,7 @@ impl Engine {
             // --- Pattern 4: Voltage Divider (Over-voltage Protection) ---
             if rule == "validateRp2040VoltageInputs" || msg.contains("exceeds 3.3v logic limit") {
                 if let Some(comp_id) = vio.component_ids.get(0) {
-                    if let Some(comp) = self.components.get(comp_id).cloned() {
+                    if let Some(comp) = self.fuzzy_get_component(comp_id) {
                         let target_pin = if msg.contains("gp") {
                             msg.split("on ").nth(1).and_then(|s| s.split(':').next()).unwrap_or("1")
                         } else { "1" };
@@ -369,17 +399,17 @@ impl Engine {
                                  from: other_end.clone(), to: format!("{}:1", r1_id), color: "orange".to_string(),
                                  path: Some(self.find_path(self.get_pin_pos_by_id(&other_end), Point { x: comp.x - 100.0, y: comp.y - 40.0 + 16.0 })),
                              });
- 
+  
                              plan.added_wires.push(JsWire {
                                  from: format!("{}:2", r1_id), to: target_node.clone(), color: "green".to_string(),
                                  path: Some(self.find_path(Point { x: comp.x - 30.0, y: comp.y - 40.0 + 16.0 }, self.get_pin_pos(&comp, target_pin))),
                              });
- 
+  
                              plan.added_wires.push(JsWire {
                                  from: format!("{}:2", r1_id), to: format!("{}:1", r2_id), color: "green".to_string(),
                                  path: None,
                              });
- 
+  
                              if let Some(board) = self.find_board() {
                                  plan.added_wires.push(JsWire {
                                      from: format!("{}:2", r2_id), to: format!("{}:GND", board.id), color: "black".to_string(),
@@ -395,36 +425,36 @@ impl Engine {
             }
 
              if rule == "validateShortCircuits" || msg.contains("short circuit") {
-                 let mut plan = FixPlan {
-                     description: "Remove short circuit wire".to_string(),
-                     target_rule_id: rule.to_string(),
-                     added_components: Vec::new(),
-                     added_wires: Vec::new(),
-                     removed_wires: Vec::new(),
-                     transformations: Vec::new(),
-                     reasoning: vec!["Detected direct wire between power and ground rails. Suggesting removal.".to_string()],
-                 };
-                 let mut wire_to_remove = None;
-                 for w in &self.wires {
-                     let f_vcc = w.from.contains("5V") || w.from.contains("VCC") || w.from.contains("3V3");
-                     let t_vcc = w.to.contains("5V") || w.to.contains("VCC") || w.to.contains("3V3");
-                     let f_gnd = w.from.contains("GND");
-                     let t_gnd = w.to.contains("GND");
-                     if (f_vcc && t_gnd) || (t_vcc && f_gnd) {
-                         wire_to_remove = Some(w.clone());
-                         break;
-                     }
-                 }
-                 if let Some(w) = wire_to_remove {
-                     plan.removed_wires.push(JsWireShort { from: w.from, to: w.to });
-                     self.plans.push(plan);
-                     continue;
-                 }
+                  let mut plan = FixPlan {
+                      description: "Remove short circuit wire".to_string(),
+                      target_rule_id: rule.to_string(),
+                      added_components: Vec::new(),
+                      added_wires: Vec::new(),
+                      removed_wires: Vec::new(),
+                      transformations: Vec::new(),
+                      reasoning: vec!["Detected direct wire between power and ground rails. Suggesting removal.".to_string()],
+                  };
+                  let mut wire_to_remove = None;
+                  for w in &self.wires {
+                      let f_vcc = w.from.contains("5V") || w.from.contains("VCC") || w.from.contains("3V3");
+                      let t_vcc = w.to.contains("5V") || w.to.contains("VCC") || w.to.contains("3V3");
+                      let f_gnd = w.from.contains("GND");
+                      let t_gnd = w.to.contains("GND");
+                      if (f_vcc && t_gnd) || (t_vcc && f_gnd) {
+                          wire_to_remove = Some(w.clone());
+                          break;
+                      }
+                  }
+                  if let Some(w) = wire_to_remove {
+                      plan.removed_wires.push(JsWireShort { from: w.from, to: w.to });
+                      self.plans.push(plan);
+                      continue;
+                  }
              }
 
              if rule == "validateLogicLevels" || msg.contains("logic mismatch") {
-                 if let Some(comp_id) = vio.component_ids.get(0) {
-                    if let Some(comp) = self.components.get(comp_id).cloned() {
+                  if let Some(comp_id) = vio.component_ids.get(0) {
+                    if let Some(comp) = self.fuzzy_get_component(comp_id) {
                         let mut plan = FixPlan {
                             description: "Inject Logic Level Shifter".to_string(),
                             target_rule_id: rule.to_string(),
@@ -463,68 +493,92 @@ impl Engine {
                             continue;
                         }
                     }
-                 }
+                  }
              }
 
              if msg.contains("floating") || msg.contains("unconnected") || rule == "validateLedFloatingPins" {
-                 if let Some(comp_id) = vio.component_ids.get(0) {
-                     if let Some(comp) = self.components.get(comp_id).cloned() {
-                         if let Some(board) = self.find_board() {
-                             let pin_to_fix = if comp.kind == "wokwi-led" && (msg.contains("cathode") || msg.contains("(k)")) { "K".to_string() } 
-                                              else if comp.kind == "wokwi-led" && (msg.contains("anode") || msg.contains("(a)")) { "A".to_string() }
-                                              else if comp.kind == "wokwi-potentiometer" { "SIG".to_string() }
-                                              else if comp.kind == "wokwi-led" { "A".to_string() } 
-                                              else { "1".to_string() };
-                             
-                             let mut target_pin = "GND".to_string();
-                             if comp.kind == "wokwi-potentiometer" {
-                                 let analog_pins = ["A0", "A1", "A2", "A3", "A4", "A5"];
-                                 for p in analog_pins {
-                                     let node = format!("{}:{}", board.id, p);
-                                     if !self.is_pin_occupied(&node) {
-                                         target_pin = p.to_string();
-                                         break;
-                                     }
-                                 }
-                             } else if comp.kind == "wokwi-led" && pin_to_fix == "A" {
-                                 target_pin = "5V".to_string();
-                             }
+                  if let Some(comp_id) = vio.component_ids.get(0) {
+                      if let Some(comp) = self.fuzzy_get_component(comp_id) {
+                          if let Some(board) = self.find_board() {
+                               let msg_lc = msg.to_lowercase();
+                               let is_led = comp.kind.contains("led");
+                               let is_pot = comp.kind.contains("potentiometer");
+                               let pin_to_fix = if is_led && (msg_lc.contains("cathode") || msg_lc.contains("(k)") || msg_lc.contains(" pin k")) { "K".to_string() } 
+                                                else if is_led && (msg_lc.contains("anode") || msg_lc.contains("(a)") || msg_lc.contains(" pin a")) { "A".to_string() }
+                                                else if is_pot && (msg_lc.contains("wiper") || msg_lc.contains("sig")) { "SIG".to_string() }
+                                                else if is_pot && msg_lc.contains("pin 1") { "1".to_string() }
+                                                else if is_pot && msg_lc.contains("pin 2") { "2".to_string() }
+                                                else if is_led && !self.is_pin_occupied(&format!("{}:A", comp_id)) { "A".to_string() } 
+                                                else if is_led && !self.is_pin_occupied(&format!("{}:K", comp_id)) { "K".to_string() }
+                                                else { "1".to_string() };
+                              
+                              let mut target_pin = "GND".to_string();
+                              if is_pot {
+                                  let analog_pins = ["A0", "A1", "A2", "A3", "A4", "A5"];
+                                  for p in analog_pins {
+                                      let node = format!("{}:{}", board.id, p);
+                                      if !self.is_pin_occupied(&node) {
+                                          target_pin = p.to_string();
+                                          break;
+                                      }
+                                  }
+                              } else if comp.kind.contains("led") && pin_to_fix == "A" {
+                                  target_pin = "5V".to_string();
+                              }
 
-                             // CRITICAL: Check if this pin is ALREADY connected to avoid redundant suggestions
-                             let mut already_wired = false;
-                             let target_node = format!("{}:{}", comp_id, pin_to_fix);
-                             for w in &self.wires {
-                                 if w.from == target_node || w.to == target_node {
-                                     already_wired = true;
-                                     break;
-                                 }
-                             }
+                              let target_to_use = if comp.kind.contains("potentiometer") { target_pin.clone() } 
+                                                   else if pin_to_fix == "K" { "GND".to_string() }
+                                                   else { "5V".to_string() };
 
-                             if already_wired {
-                                 continue; // Skip if already wired, validator might be lagging
-                             }
-
-                             let target_rail = if pin_to_fix == "K" { "GND" } else { "5V" };
-                             let start_p = self.get_pin_pos(&comp, &pin_to_fix);
-                             let end_p = self.get_pin_pos(&board, target_rail);
-                             
-                             self.plans.push(FixPlan {
-                                 description: format!("Connect floating {} on {} to {} rail", pin_to_fix, comp_id, target_rail),
-                                 added_components: Vec::new(),
-                                 added_wires: vec![JsWire {
-                                     from: format!("{}:{}", comp_id, pin_to_fix),
-                                     to: format!("{}:{}", board.id, target_rail),
-                                     color: if target_rail == "GND" { "black".to_string() } else { "red".to_string() },
-                                     path: Some(self.find_path(start_p, end_p)),
-                                 }],
-                                 removed_wires: Vec::new(),
-                                 transformations: Vec::new(),
-                                 reasoning: vec![format!("Detected floating pin: {}", vio.message)],
-                             });
+                               let start_p = self.get_pin_pos(&comp, &pin_to_fix);
+                               let end_p = self.get_pin_pos(&board, &target_to_use);
+                               
+                               self.plans.push(FixPlan {
+                                   description: format!("Connect floating {} on {} to {}", pin_to_fix, comp_id, target_to_use),
+                                   target_rule_id: rule.to_string(),
+                                   added_components: Vec::new(),
+                                   added_wires: vec![JsWire {
+                                       from: format!("{}:{}", comp_id, pin_to_fix),
+                                       to: format!("{}:{}", board.id, target_to_use),
+                                       color: if target_to_use == "GND" { "black".to_string() } else if target_to_use == "5V" { "red".to_string() } else { "#38bdf8".to_string() },
+                                       path: Some(self.find_path(start_p, end_p)),
+                                   }],
+                                   removed_wires: Vec::new(),
+                                   transformations: Vec::new(),
+                                   reasoning: vec![format!("Detected floating pin: {}", vio.message)],
+                               });
                          }
-                     }
-                 }
+                      }
+                  }
              }
+        }
+
+        // --- Post-Analysis Diagnostic ---
+        if self.plans.is_empty() && !violations.is_empty() {
+            let mut reasoning = vec![
+                "⚠️ No repair strategy found for detected violations.".to_string(),
+                format!("Diagnostic: Ingested {} components and {} wires.", self.components.len(), self.wires.len()),
+            ];
+            
+            let comps_info: Vec<String> = self.components.values().map(|c| format!("{} ({})", c.id, c.kind)).collect();
+            reasoning.push(format!("Seen Components: {}", comps_info.join(", ")));
+            
+            if let Some(vio) = violations.get(0) {
+                reasoning.push(format!("Primary Violation: [{}] {}", vio.rule_id, vio.message));
+                reasoning.push(format!("Targeted IDs: {:?}", vio.component_ids));
+            }
+
+            reasoning.push("Checked Patterns: Polarity, Resistor-Injection, Logic-Level, Floating-Pin, I2C-Infrastructure".to_string());
+
+            self.plans.push(FixPlan {
+                description: "🛠️ Engine Diagnostic Report".to_string(),
+                target_rule_id: "diagnostic".to_string(),
+                added_components: Vec::new(),
+                added_wires: Vec::new(),
+                removed_wires: Vec::new(),
+                transformations: Vec::new(),
+                reasoning,
+            });
         }
     }
 
@@ -679,6 +733,38 @@ pub fn get_added_wire_to(fix_index: usize, wire_index: usize) -> String {
         .unwrap_or_default()
 }
 
+#[wasm_bindgen(js_name = getAddedWirePathPointCount)]
+pub fn get_added_wire_path_point_count(fix_index: usize, wire_index: usize) -> usize {
+    let engine = ENGINE.lock().unwrap();
+    engine.plans.get(fix_index)
+        .and_then(|p| p.added_wires.get(wire_index))
+        .and_then(|w| w.path.as_ref())
+        .map(|path| path.len())
+        .unwrap_or(0)
+}
+
+#[wasm_bindgen(js_name = getAddedWirePathPointX)]
+pub fn get_added_wire_path_point_x(fix_index: usize, wire_index: usize, point_index: usize) -> f64 {
+    let engine = ENGINE.lock().unwrap();
+    engine.plans.get(fix_index)
+        .and_then(|p| p.added_wires.get(wire_index))
+        .and_then(|w| w.path.as_ref())
+        .and_then(|path| path.get(point_index))
+        .map(|p| p.x)
+        .unwrap_or(0.0)
+}
+
+#[wasm_bindgen(js_name = getAddedWirePathPointY)]
+pub fn get_added_wire_path_point_y(fix_index: usize, wire_index: usize, point_index: usize) -> f64 {
+    let engine = ENGINE.lock().unwrap();
+    engine.plans.get(fix_index)
+        .and_then(|p| p.added_wires.get(wire_index))
+        .and_then(|w| w.path.as_ref())
+        .and_then(|path| path.get(point_index))
+        .map(|p| p.y)
+        .unwrap_or(0.0)
+}
+
 #[wasm_bindgen(js_name = getFixAddedComponentCount)]
 pub fn get_fix_added_component_count(index: usize) -> usize {
     let engine = ENGINE.lock().unwrap();
@@ -732,32 +818,8 @@ pub fn get_fix_reasoning_step(fix_index: usize, step_index: usize) -> String {
     let engine = ENGINE.lock().unwrap();
     engine.plans.get(fix_index)
         .and_then(|p| p.reasoning.get(step_index))
-        .map(|s| s.clone())
+        .cloned()
         .unwrap_or_default()
-}
-
-#[wasm_bindgen(js_name = getFixTransformationCount)]
-pub fn get_fix_transformation_count(index: usize) -> usize {
-    let engine = ENGINE.lock().unwrap();
-    engine.plans.get(index).map(|p| p.transformations.len()).unwrap_or(0)
-}
-
-#[wasm_bindgen(js_name = getTransformationComponentId)]
-pub fn get_transformation_component_id(fix_index: usize, trans_index: usize) -> String {
-    let engine = ENGINE.lock().unwrap();
-    engine.plans.get(fix_index)
-        .and_then(|p| p.transformations.get(trans_index))
-        .map(|t| t.component_id.clone())
-        .unwrap_or_default()
-}
-
-#[wasm_bindgen(js_name = getTransformationRotation)]
-pub fn get_transformation_rotation(fix_index: usize, trans_index: usize) -> f64 {
-    let engine = ENGINE.lock().unwrap();
-    engine.plans.get(fix_index)
-        .and_then(|p| p.transformations.get(trans_index))
-        .map(|t| t.rotation)
-        .unwrap_or(0.0)
 }
 
 #[wasm_bindgen(js_name = getFixRemovedWireCount)]
@@ -784,34 +846,26 @@ pub fn get_removed_wire_to(fix_index: usize, wire_index: usize) -> String {
         .unwrap_or_default()
 }
 
-#[wasm_bindgen(js_name = getAddedWirePathPointCount)]
-pub fn get_added_wire_path_point_count(fix_index: usize, wire_index: usize) -> usize {
+#[wasm_bindgen(js_name = getFixTransformationCount)]
+pub fn get_fix_transformation_count(index: usize) -> usize {
     let engine = ENGINE.lock().unwrap();
-    engine.plans.get(fix_index)
-        .and_then(|p| p.added_wires.get(wire_index))
-        .and_then(|w| w.path.as_ref())
-        .map(|path| path.len())
-        .unwrap_or(0)
+    engine.plans.get(index).map(|p| p.transformations.len()).unwrap_or(0)
 }
 
-#[wasm_bindgen(js_name = getAddedWirePathPointX)]
-pub fn get_added_wire_path_point_x(fix_index: usize, wire_index: usize, point_index: usize) -> f64 {
+#[wasm_bindgen(js_name = getTransformationComponentId)]
+pub fn get_transformation_component_id(fix_index: usize, trans_index: usize) -> String {
     let engine = ENGINE.lock().unwrap();
     engine.plans.get(fix_index)
-        .and_then(|p| p.added_wires.get(wire_index))
-        .and_then(|w| w.path.as_ref())
-        .and_then(|path| path.get(point_index))
-        .map(|p| p.x)
-        .unwrap_or(0.0)
+        .and_then(|p| p.transformations.get(trans_index))
+        .map(|t| t.component_id.clone())
+        .unwrap_or_default()
 }
 
-#[wasm_bindgen(js_name = getAddedWirePathPointY)]
-pub fn get_added_wire_path_point_y(fix_index: usize, wire_index: usize, point_index: usize) -> f64 {
+#[wasm_bindgen(js_name = getTransformationRotation)]
+pub fn get_transformation_rotation(fix_index: usize, trans_index: usize) -> f64 {
     let engine = ENGINE.lock().unwrap();
     engine.plans.get(fix_index)
-        .and_then(|p| p.added_wires.get(wire_index))
-        .and_then(|w| w.path.as_ref())
-        .and_then(|path| path.get(point_index))
-        .map(|p| p.y)
+        .and_then(|p| p.transformations.get(trans_index))
+        .map(|t| t.rotation)
         .unwrap_or(0.0)
 }

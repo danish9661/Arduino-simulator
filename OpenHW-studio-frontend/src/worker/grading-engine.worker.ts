@@ -149,7 +149,7 @@ async function compileSourceCode(payload: any, board: string): Promise<string> {
     }
 }
 
-async function captureBehavior(meta: any, durationMs: number, label: string, simulationSpeed = 1): Promise<any> {
+async function captureBehavior(meta: any, durationMs: number, label: string, simulationSpeed = 1, useSimTimeCapture = true): Promise<any> {
     const TELEMETRY_CUTOFF_MS = 7900;
     const telemetry = {
         events: [] as any[],
@@ -164,6 +164,7 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
     let lastPinStates: Record<string, boolean> = {};
     let runner: any = null;
     const startTime = Date.now();
+    const wallTimeoutMs = 35000;
     const normalizedSpeed = Number.isFinite(simulationSpeed) && simulationSpeed > 0 ? simulationSpeed : 1;
     const effectiveCutoffMs = Math.min(durationMs, TELEMETRY_CUTOFF_MS);
 
@@ -240,48 +241,116 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
         );
         
         runner.setTelemetryEnabled(true);
+        const captureWallStartMs = Date.now();
         const simStartMs = runner.getSimulatedTimeMs();
         let lastTraceTime = 0;
-        
-        console.log(`[TRACE] ${label}: Simulation loop entered.`);
+        let lastPollSimMs = simStartMs;
 
-        while (runner.getSimulatedTimeMs() - simStartMs < durationMs) {
-            const pollIntervalMs = Math.max(2, Math.round(50 / normalizedSpeed));
-            await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
-
-            const nowMs = runner.getSimulatedTimeMs();
-            if (nowMs - lastTraceTime > 1000) {
-                console.log(`[TRACE] ${label}: Progress -> ${Math.round(nowMs)}ms / ${durationMs}ms`);
-                postMessage({ type: 'LOG', msg: `[TRACE] ${label}: Simulating... ${Math.round(nowMs)}ms @ ${normalizedSpeed}x` });
-                lastTraceTime = nowMs;
-            }
-            
-            const snapshot = runner.getRichTelemetrySnapshot({ mode: 'delta' });
-            
-            if (snapshot.components) {
-                for (const comp of snapshot.components) {
-                    if (!comp.delta) continue;
-                    const cid = comp.id;
-                    const custom = comp.metrics?.custom || {};
-                    for (const key in custom) {
-                        const val = custom[key];
-                        const stateKey = `${cid}:${key}`;
-                        
-                        // Per-key filtering for extreme cleanliness
-                        if (JSON.stringify(val) !== JSON.stringify(lastComponentStates[stateKey])) {
-                            pushTelemetryEvent({ 
-                                ComponentState: { id: cid, key: key, value: val, time_ms: nowMs } 
-                            }, nowMs);
-                            lastComponentStates[stateKey] = JSON.parse(JSON.stringify(val));
-                        }
+        const emitComponentStateEvents = (snapshot: any, eventTimeMs: number, requireDelta: boolean) => {
+            if (!snapshot?.components) return;
+            for (const comp of snapshot.components) {
+                if (requireDelta && !comp.delta) continue;
+                const cid = comp.id;
+                const custom = comp.metrics?.custom || {};
+                for (const key in custom) {
+                    const val = custom[key];
+                    const stateKey = `${cid}:${key}`;
+                    if (JSON.stringify(val) !== JSON.stringify(lastComponentStates[stateKey])) {
+                        pushTelemetryEvent({
+                            ComponentState: { id: cid, key: key, value: val, time_ms: eventTimeMs }
+                        }, eventTimeMs);
+                        lastComponentStates[stateKey] = JSON.parse(JSON.stringify(val));
                     }
                 }
             }
+        };
 
-            const wallTimeoutMs = Math.max(30000, Math.ceil(30000 / normalizedSpeed));
-            if (Date.now() - startTime > wallTimeoutMs) { // Guard against stuck emulation while supporting higher speed runs
-                console.warn(`[v2.4] ${label} simulation timed out!`);
-                break;
+        // Capture baseline component states once so teacher/student runs start from a stable anchor.
+        const baselineSnapshot = runner.getRichTelemetrySnapshot({ mode: 'deep' });
+        emitComponentStateEvents(baselineSnapshot, Math.floor(simStartMs), false);
+        
+        console.log(`[TRACE] ${label}: Simulation loop entered.`);
+
+        // Choose capture strategy: sim-time-driven (preferred) or wall-clock (fallback)
+        if (useSimTimeCapture) {
+            // Sim-time-driven capture: wait for runner simulated-time to reach each sample point.
+            // Benefits: at higher simulation speeds this finishes proportionally faster (8x -> ~1s),
+            // and it captures the same simulation-time window deterministically.
+            const targetSimDurationMs = Math.min(durationMs, effectiveCutoffMs);
+            const simStartMsLoop = runner.getSimulatedTimeMs();
+            const simEndMs = simStartMsLoop + targetSimDurationMs;
+
+            // Choose a sim-time sampling step small enough to catch pin toggles.
+            const pollIntervalSimMs = 2; // 2ms simulated-time step (tunable)
+
+            async function waitUntilSim(targetSimMs: number) {
+                // Wait until runner.getSimulatedTimeMs() >= targetSimMs
+                // Use short yields to avoid blocking the event loop.
+                while (runner.getSimulatedTimeMs() < targetSimMs) {
+                    if (Date.now() - startTime > wallTimeoutMs) {
+                        throw new Error(`Simulation wait timeout after ${wallTimeoutMs}ms at ${normalizedSpeed}x`);
+                    }
+                    // yield, allow other tasks; at high speed this loop exits quickly
+                    await new Promise((r) => setTimeout(r, 0));
+                }
+            }
+
+            for (let t = simStartMsLoop; t < simEndMs; t += pollIntervalSimMs) {
+                const target = t + pollIntervalSimMs;
+                await waitUntilSim(target);
+                const nowMs = runner.getSimulatedTimeMs();
+                const alignedNowMs = Math.floor(target / pollIntervalSimMs) * pollIntervalSimMs;
+                if (alignedNowMs - lastPollSimMs < pollIntervalSimMs) continue;
+                lastPollSimMs = alignedNowMs;
+
+                if (nowMs - lastTraceTime > 1000) {
+                    postMessage({ type: 'LOG', msg: `[TRACE] ${label}: Simulating... ${Math.round(nowMs)}ms @ ${normalizedSpeed}x` });
+                    lastTraceTime = nowMs;
+                }
+
+                const snapshot = runner.getRichTelemetrySnapshot({ mode: 'delta' });
+                emitComponentStateEvents(snapshot, alignedNowMs, true);
+            }
+
+            // Final flush at sim-end boundary to avoid dropping last transition near cutoff.
+            await waitUntilSim(simEndMs);
+            const finalSnapshot = runner.getRichTelemetrySnapshot({ mode: 'delta' });
+            const finalAlignedMs = Math.floor(simEndMs / pollIntervalSimMs) * pollIntervalSimMs;
+            emitComponentStateEvents(finalSnapshot, finalAlignedMs, true);
+        } else {
+            const wallClockStart = Date.now();
+            const wallClockDurationMs = 8000;  // All speeds: 8 seconds wall-clock time
+            
+            while (Date.now() - wallClockStart < wallClockDurationMs) {
+                // Ultra-aggressive polling at 8x: capture more events per cycle
+                const pollIntervalMs = normalizedSpeed >= 4
+                    ? Math.max(2, Math.round(25 / normalizedSpeed))  // 8x → 3.125ms
+                    : Math.max(10, Math.round(50 / normalizedSpeed));
+                
+                // Sleep with max aggression: divide by 2.5x speed factor
+                const sleepWallMs = Math.max(0.5, Math.round(pollIntervalMs / (normalizedSpeed * 2.5)));
+                await new Promise(resolve => setTimeout(resolve, sleepWallMs));
+
+                const nowMs = runner.getSimulatedTimeMs();
+                // Deterministic rounding: align to poll interval boundaries for consistency
+                const alignedNowMs = Math.floor(nowMs / Math.max(1, Math.round(pollIntervalMs))) * Math.max(1, Math.round(pollIntervalMs));
+                if (alignedNowMs - lastPollSimMs < pollIntervalMs) { continue; }
+                lastPollSimMs = alignedNowMs;
+
+                if (nowMs - lastTraceTime > 1000) {
+                    console.log(`[TRACE] ${label}: Progress -> ${Math.round(nowMs)}ms / ${durationMs}ms`);
+                    postMessage({ type: 'LOG', msg: `[TRACE] ${label}: Simulating... ${Math.round(nowMs)}ms @ ${normalizedSpeed}x` });
+                    lastTraceTime = nowMs;
+                }
+                
+                const snapshot = runner.getRichTelemetrySnapshot({ mode: 'delta' });
+                emitComponentStateEvents(snapshot, alignedNowMs, true);
+
+                // Fixed timeout: independent of speed for consistent report times
+                if (Date.now() - startTime > wallTimeoutMs) {
+                    console.warn(`[v2.4] ${label} simulation timed out after ${Date.now() - startTime}ms!`);
+                    break;
+                }
             }
         }
         
@@ -289,6 +358,7 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
         telemetry.rich_metrics = JSON.stringify(richSnapshot);
         (telemetry as any).simulation_speed = normalizedSpeed;
         (telemetry as any).telemetry_cutoff_ms = effectiveCutoffMs;
+        (telemetry as any).real_capture_ms = Date.now() - captureWallStartMs;
         const allEvents = telemetry.events || [];
         const keptEvents: any[] = [];
         const ignoredEvents: any[] = [];
@@ -304,7 +374,7 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
         (telemetry as any).ignored_events = ignoredEvents;
         
         runner.stop();
-        sendJsonLog(`[v2.3] ${label} complete. (${telemetry.events.length} events, speed=${normalizedSpeed}x, cutoff=${effectiveCutoffMs}ms)`, 'info');
+        sendJsonLog(`[v2.3] ${label} complete. (${telemetry.events.length} events, speed=${normalizedSpeed}x, cutoff=${effectiveCutoffMs}ms, real_capture=${(telemetry as any).real_capture_ms}ms)`, 'info');
         return telemetry;
     } catch (err: any) {
         const errorMsg = String(err);
@@ -362,7 +432,7 @@ onmessage = async (e: MessageEvent<GradingMessage>) => {
             }
 
             postMessage({ type: 'LOG', msg: `[TRACE] Teacher key capture speed: ${runSpeed}x` });
-            const telemetry = await captureBehavior(teacherMeta, 8000, "Teacher Reference", runSpeed);
+            const telemetry = await captureBehavior(teacherMeta, 8000, "Teacher Reference", runSpeed, true);
             const key = wasmExports.generate_binary_key(
                 projectJson, 
                 JSON.stringify(telemetry),
@@ -398,7 +468,7 @@ onmessage = async (e: MessageEvent<GradingMessage>) => {
                 const tHealth = tValidator.calculateHealthScore(tSync.issues);
                 
                 postMessage({ type: 'LOG', msg: `[TRACE] Teacher capture speed: ${runSpeed}x` });
-                const teacherTelemetry = await captureBehavior(teacherMeta, 8000, "Teacher Reference", runSpeed);
+                const teacherTelemetry = await captureBehavior(teacherMeta, 8000, "Teacher Reference", runSpeed, true);
                 teacherBinaryKey = wasmExports.generate_binary_key(
                     teacherMetaJson, 
                     JSON.stringify(teacherTelemetry),
@@ -411,7 +481,7 @@ onmessage = async (e: MessageEvent<GradingMessage>) => {
 
             // 4. Behavioral Analysis (Student)
             postMessage({ type: 'LOG', msg: `[TRACE] Student capture speed: ${runSpeed}x` });
-            const studentTelemetry = await captureBehavior(studentMeta, 8000, "Student Submission", runSpeed);
+            const studentTelemetry = await captureBehavior(studentMeta, 8000, "Student Submission", runSpeed, true);
 
             // 5. BEHAVIOR-CORRECTED HEALTH (Trusting the simulation results over static analysis)
             const activeComponentIds = new Set(
