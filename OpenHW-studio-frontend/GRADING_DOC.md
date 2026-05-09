@@ -26,6 +26,29 @@ Location in repo:
 
 Notes: the frontend now normalizes missing telemetry (falls back to `{events:[], duration_ms:0}`) so missing/partial traces no longer crash `.map()`.
 
+### Current grading issue observed in RP2040 + LCD2004 runs
+
+The latest grading logs show that the worker starts correctly and the simulation loop runs, but the behavioral capture still ends with:
+
+- `Components: 2`
+- `customMetricKeys: []`
+- `Captured 0 events`
+
+That means the grading problem is not the worker startup path; it is the telemetry shape being empty or mismatched at capture time. The worker now tries to normalize telemetry from multiple snapshot shapes (`metrics.custom`, `customTelemetry`, and `_metrics.customTelemetry`), but this issue can still appear if the browser is holding an older worker bundle or if the component snapshot path is not emitting custom fields for the current runtime.
+
+The `ws://localhost:3333/` WebSocket warning is a separate RP2040 GDB bridge connection failure. It is noisy, but it is not what prevents telemetry capture. The real behavioral data path is the component snapshot payload, and the current fix now also falls back to component `state` when `custom` telemetry is empty.
+
+Retest checklist:
+
+1. Start the stack with `start_all.bat`.
+2. Open DevTools in the browser.
+3. In Network, enable `Disable cache`.
+4. Hard-reload the page with `Ctrl+Shift+R`.
+5. Re-run grading and confirm the console shows `[WORKER VERSION] grading-engine.worker.ts v3.9-debug`.
+6. Confirm the snapshot log now shows non-empty custom telemetry keys for Pico or LCD2004.
+
+If the worker version is correct but `customMetricKeys` is still empty, check the new `stateKeys` field in the log. If `stateKeys` is populated but custom telemetry is still empty, the fallback should still produce events. If both are empty, inspect the component logic classes and `BaseComponent.ts` for missing state updates.
+
 ---
 
 ## 2) Why `verified_code_score` can be 0

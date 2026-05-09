@@ -18,6 +18,7 @@ if (typeof window === 'undefined') {
 
 console.log("[HEARTBEAT] Worker [v3.8]: Environment Polyfilled.");
 self.postMessage({ type: 'LOG', msg: "Worker is ALIVE (Dynamic Loader Mode)." });
+console.log("[WORKER VERSION] grading-engine.worker.ts v3.9-debug");
 
 function timeStamp() {
     return new Date().toLocaleTimeString();
@@ -272,14 +273,16 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
                 const cid = comp.id;
                 const compType = comp.type || 'unknown';
                 
-                // CRITICAL FIX: Always process custom metrics regardless of delta status
-                // This ensures components like LCD2004 that only expose custom metrics are captured
+                // CRITICAL FIX: Normalize telemetry across snapshot shapes.
+                // Some components expose data under metrics.custom, while others surface it as customTelemetry.
                 const metrics = comp.metrics || {};
-                const custom = metrics.custom || {};
+                const custom = metrics.custom || comp.customTelemetry || comp._metrics?.customTelemetry || {};
+                const stateLike = comp.state && typeof comp.state === 'object' ? comp.state : {};
+                const emitSource = Object.keys(custom).length > 0 ? custom : stateLike;
                 
-                // For each custom metric, check if it changed and emit event
-                for (const key in custom) {
-                    const val = custom[key];
+                // For each available field, check if it changed and emit event
+                for (const key in emitSource) {
+                    const val = emitSource[key];
                     const stateKey = `${cid}:${key}`;
                     const serialized = JSON.stringify(val);
                     const lastSerialized = lastComponentStates[stateKey];
@@ -305,7 +308,9 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
                         stateSize: metrics.stateSize,
                         ioThroughput: metrics.ioThroughput,
                         powerProfile: metrics.powerProfile,
-                        pinToggles: metrics.pinToggles
+                        pinToggles: metrics.pinToggles,
+                        customTelemetry: custom,
+                        state: stateLike
                     };
                     
                     const metricKey = `${cid}:_metrics`;
@@ -370,15 +375,20 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
                 const snapshot = runner.getRichTelemetrySnapshot({ mode: 'delta' });
                 // If delta snapshots omit metrics (delta:false), merge metrics from a deep snapshot once
                 if (snapshot && Array.isArray(snapshot.components)) {
-                    const missingMetrics = snapshot.components.some((c: any) => !c.metrics);
+                    const missingMetrics = snapshot.components.some((c: any) => {
+                        const customKeys = Object.keys(c?.metrics?.custom || {});
+                        return !c.metrics || customKeys.length === 0;
+                    });
                     if (missingMetrics) {
                         if (!deepSnapshotCache) deepSnapshotCache = runner.getRichTelemetrySnapshot({ mode: 'deep' });
                         if (deepSnapshotCache && Array.isArray(deepSnapshotCache.components)) {
                             const deepMap = new Map(deepSnapshotCache.components.map((c: any) => [c.id, c]));
                             for (const comp of snapshot.components) {
-                                if (!comp.metrics) {
-                                    const deepComp = deepMap.get(comp.id);
-                                    if (deepComp && deepComp.metrics) comp.metrics = deepComp.metrics;
+                                const deepComp = deepMap.get(comp.id);
+                                if (!deepComp || !deepComp.metrics) continue;
+                                const currentKeys = Object.keys(comp?.metrics?.custom || {});
+                                if (!comp.metrics || currentKeys.length === 0) {
+                                    comp.metrics = deepComp.metrics;
                                 }
                             }
                         }
@@ -392,7 +402,8 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
                         const sampleComps = snapshot.components.slice(0, 3).map(c => ({
                             id: c.id,
                             type: c.type,
-                            customMetricKeys: Object.keys(c.metrics?.custom || {})
+                            customMetricKeys: Object.keys(c.metrics?.custom || {}),
+                            stateKeys: Object.keys(c.state || {})
                         }));
                         console.log(`[SNAPSHOT DEBUG] SIM-TIME: Components: ${compCount}, Sample: ${JSON.stringify(sampleComps)}`);
                     } else {
@@ -438,15 +449,20 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
                 const snapshot = runner.getRichTelemetrySnapshot({ mode: 'delta' });
                 // If delta snapshots omit metrics (delta:false), merge metrics from a deep snapshot once
                 if (snapshot && Array.isArray(snapshot.components)) {
-                    const missingMetrics = snapshot.components.some((c: any) => !c.metrics);
+                    const missingMetrics = snapshot.components.some((c: any) => {
+                        const customKeys = Object.keys(c?.metrics?.custom || {});
+                        return !c.metrics || customKeys.length === 0;
+                    });
                     if (missingMetrics) {
                         if (!deepSnapshotCache) deepSnapshotCache = runner.getRichTelemetrySnapshot({ mode: 'deep' });
                         if (deepSnapshotCache && Array.isArray(deepSnapshotCache.components)) {
                             const deepMap = new Map(deepSnapshotCache.components.map((c: any) => [c.id, c]));
                             for (const comp of snapshot.components) {
-                                if (!comp.metrics) {
-                                    const deepComp = deepMap.get(comp.id);
-                                    if (deepComp && deepComp.metrics) comp.metrics = deepComp.metrics;
+                                const deepComp = deepMap.get(comp.id);
+                                if (!deepComp || !deepComp.metrics) continue;
+                                const currentKeys = Object.keys(comp?.metrics?.custom || {});
+                                if (!comp.metrics || currentKeys.length === 0) {
+                                    comp.metrics = deepComp.metrics;
                                 }
                             }
                         }
@@ -460,7 +476,8 @@ async function captureBehavior(meta: any, durationMs: number, label: string, sim
                         const sampleComps = snapshot.components.slice(0, 3).map(c => ({
                             id: c.id,
                             type: c.type,
-                            customMetricKeys: Object.keys(c.metrics?.custom || {})
+                            customMetricKeys: Object.keys(c.metrics?.custom || {}),
+                            stateKeys: Object.keys(c.state || {})
                         }));
                         console.log(`[SNAPSHOT DEBUG] Components: ${compCount}, Sample: ${JSON.stringify(sampleComps)}`);
                     } else {

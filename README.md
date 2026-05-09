@@ -190,6 +190,13 @@ cd ..
 start_all.bat
 ```
 
+If you are iterating on the grading worker or emulator code, open the browser with DevTools and disable cache once before grading. The worker bundle is cached aggressively, so a hard refresh is sometimes required after rebuilding the frontend.
+
+Recommended check:
+```text
+DevTools -> Network -> Disable cache -> Hard reload (Ctrl+Shift+R)
+```
+
 **Option B — Manual (three separate terminals):**
 
 ```bash
