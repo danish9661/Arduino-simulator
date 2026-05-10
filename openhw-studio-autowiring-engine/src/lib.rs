@@ -81,6 +81,7 @@ pub struct WirePlan {
     pub path:      Option<Vec<Point>>,
     pub is_socket: bool,
     pub is_hidden: bool,
+    pub lane:      i32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -96,11 +97,13 @@ pub struct NewComponentPlan {
     pub attrs: Option<HashMap<String, serde_json::Value>>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AutonomousPlan {
     pub main_component:  NewComponentPlan,
     pub added_components: Vec<NewComponentPlan>,
     pub added_wires:     Vec<WirePlan>,
+    pub removed_wires:   Vec<String>,
+    pub removed_components: Vec<String>,
     pub code_snippet:    Option<AutocodingSnippet>,
     pub reasoning:       Vec<String>,
 }
@@ -130,11 +133,27 @@ impl Engine {
         self.occupied_rows.clear();
     }
 
-    pub fn build_state(&mut self, existing_wires: Vec<serde_json::Value>) {
+    pub fn build_state(&mut self, existing_wires: Vec<serde_json::Value>, rewire_id: Option<&String>) -> (Vec<String>, Vec<String>) {
         self.occupancy_grid.clear();
         self.occupied_pins.clear();
         self.occupied_rows.clear();
 
+        let mut removed_wires = Vec::new();
+        let mut removed_components = Vec::new();
+
+        // 1. Identify helper components to remove if re-wiring
+        if let Some(rid) = rewire_id {
+            let helpers: Vec<String> = self.components.keys()
+                .filter(|id| id.contains(&format!("_{}_", rid)) || id.contains(&format!("_{}", rid)))
+                .cloned()
+                .collect();
+            for h in helpers {
+                removed_components.push(h.clone());
+                self.components.remove(&h);
+            }
+        }
+
+        // 2. Occupancy & Wire Removal
         for comp in self.components.values() {
             let sx = (comp.x / GRID_SIZE as f32) as i32;
             let sy = (comp.y / GRID_SIZE as f32) as i32;
@@ -146,29 +165,97 @@ impl Engine {
         }
 
         for wire in &existing_wires {
-            if let (Some(from), Some(to)) = (wire.get("from"), wire.get("to")) {
-                for ps in &[from, to] {
-                    if let Some(p) = ps.as_str() {
-                        let parts: Vec<&str> = p.split(|c| c == ':' || c == '.').collect();
-                        if parts.len() >= 2 {
-                            self.occupied_pins
-                                .entry(parts[0].to_string())
-                                .or_default()
-                                .push(parts[1].to_string());
-                        }
-                        // Track occupied breadboard rows (hole ids like "12e")
-                        if parts.len() >= 2 {
-                            if let Some(num_str) = parts[1].chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse::<i32>().ok() {
-                                if !self.occupied_rows.contains(&num_str) {
-                                    self.occupied_rows.push(num_str);
-                                }
+            let from_str = wire.get("from").and_then(|v| v.as_str()).unwrap_or("");
+            let to_str = wire.get("to").and_then(|v| v.as_str()).unwrap_or("");
+            let wire_id = wire.get("id").and_then(|v| v.as_str()).unwrap_or("");
+
+            if let Some(rid) = rewire_id {
+                let from_id = from_str.split(':').next().unwrap_or("");
+                let to_id = to_str.split(':').next().unwrap_or("");
+                
+                // Remove if connected to the main component OR any identified helper
+                if from_id == rid || to_id == rid || 
+                   removed_components.contains(&from_id.to_string()) || 
+                   removed_components.contains(&to_id.to_string()) {
+                    removed_wires.push(wire_id.to_string());
+                    continue; 
+                }
+            }
+
+            for ps in &[from_str, to_str] {
+                if !ps.is_empty() {
+                    let parts: Vec<&str> = ps.split(|c| c == ':' || c == '.').collect();
+                    if parts.len() >= 2 {
+                        self.occupied_pins
+                            .entry(parts[0].to_string())
+                            .or_default()
+                            .push(parts[1].to_string());
+                    }
+                    if parts.len() >= 2 {
+                        if let Some(num_str) = parts[1].chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse::<i32>().ok() {
+                            if !self.occupied_rows.contains(&num_str) {
+                                self.occupied_rows.push(num_str);
                             }
                         }
                     }
                 }
             }
         }
+        (removed_wires, removed_components)
     }
+
+    pub fn pin_exists(&self, board_id: &str, pin_id: &str) -> bool {
+        if let Some(board) = self.components.get(board_id) {
+            return board.pins.iter().any(|p| p.id == pin_id);
+        }
+        false
+    }
+
+    pub fn is_pin_taken(&self, board_id: &str, pin_id: &str) -> bool {
+        if !self.pin_exists(board_id, pin_id) { return true; }
+        self.occupied_pins.get(board_id).map(|os| os.contains(&pin_id.to_string())).unwrap_or(false)
+    }
+
+    pub fn resolve_bus_pair(&mut self, board_id: &str, bus_type: &str) -> Option<(String, String, String, i32)> {
+        let is_pico = self.components.get(board_id)?.kind.contains("pico");
+        
+        if bus_type == "i2c" {
+            let pairs = if is_pico {
+                vec![
+                    ("GP4", "GP5", "", 0), ("GP0", "GP1", "", 0), ("GP8", "GP9", "", 0), ("GP12", "GP13", "", 0), ("GP20", "GP21", "", 0),
+                    ("GP6", "GP7", "", 1), ("GP2", "GP3", "", 1), ("GP10", "GP11", "", 1), ("GP14", "GP15", "", 1), ("GP26", "GP27", "", 1),
+                ]
+            } else {
+                vec![("A4", "A5", "", 0)]
+            };
+            for (p1, p2, p3, idx) in pairs {
+                if !self.is_pin_taken(board_id, p1) && !self.is_pin_taken(board_id, p2) {
+                    self.occupied_pins.entry(board_id.to_string()).or_default().push(p1.to_string());
+                    self.occupied_pins.entry(board_id.to_string()).or_default().push(p2.to_string());
+                    return Some((p1.to_string(), p2.to_string(), p3.to_string(), idx));
+                }
+            }
+        } else if bus_type == "spi" {
+            let groups = if is_pico {
+                vec![
+                    ("GP18", "GP19", "GP16", 0), // SCK, MOSI, MISO (Bus 0)
+                    ("GP10", "GP11", "GP8", 1),  // SCK, MOSI, MISO (Bus 1)
+                ]
+            } else {
+                vec![("13", "11", "12", 0)] // Uno SPI: 13=SCK, 11=MOSI, 12=MISO
+            };
+            for (sck, mosi, miso, idx) in groups {
+                if !self.is_pin_taken(board_id, sck) && !self.is_pin_taken(board_id, mosi) && !self.is_pin_taken(board_id, miso) {
+                    self.occupied_pins.entry(board_id.to_string()).or_default().push(sck.to_string());
+                    self.occupied_pins.entry(board_id.to_string()).or_default().push(mosi.to_string());
+                    self.occupied_pins.entry(board_id.to_string()).or_default().push(miso.to_string());
+                    return Some((sck.to_string(), mosi.to_string(), miso.to_string(), idx));
+                }
+            }
+        }
+        None
+    }
+
 
     /// Find the best free pin on the board, starting at `preferred`.
     /// Supports numeric digital pins and analog pins (A0-A5).
@@ -176,35 +263,94 @@ impl Engine {
         let occupied = self.occupied_pins.get(board_id);
         let is_taken = |pid: &str| occupied.map(|os| os.contains(&pid.to_string())).unwrap_or(false);
 
-        if !is_taken(preferred) {
-            self.occupied_pins.entry(board_id.to_string()).or_default().push(preferred.to_string());
-            return Some(preferred.to_string());
-        }
-
         let board = self.components.get(board_id)?;
-        let preferred_num: i32 = preferred.parse().unwrap_or(13);
+        let is_pico = board.kind.contains("pico") || board.kind.contains("rp2040");
+        let is_esp32 = board.kind.contains("esp32");
 
-        // Try nearby numeric pins
-        let mut pins: Vec<i32> = board.pins.iter()
-            .filter_map(|p| p.id.parse::<i32>().ok())
-            .collect();
-        pins.sort_by_key(|p| (p - preferred_num).abs());
-        for p_id in &pins {
-            let s = p_id.to_string();
-            if !is_taken(&s) {
-                self.occupied_pins.entry(board_id.to_string()).or_default().push(s.clone());
-                return Some(s);
+        let mut preferred_cleaned = preferred.to_string();
+        
+        // ── Universal Pin Translation Layer ──
+        if is_pico {
+            match preferred.to_uppercase().as_str() {
+                "SDA" | "A4" => preferred_cleaned = "GP4".to_string(),
+                "SCL" | "A5" => preferred_cleaned = "GP5".to_string(),
+                "PWM" | "6"  => preferred_cleaned = "GP15".to_string(),
+                "MOSI" | "11" => preferred_cleaned = "GP19".to_string(),
+                "MISO" | "12" => preferred_cleaned = "GP16".to_string(),
+                "SCK" | "13"  => preferred_cleaned = "GP18".to_string(),
+                "RX" | "0"    => preferred_cleaned = "GP1".to_string(),
+                "TX" | "1"    => preferred_cleaned = "GP0".to_string(),
+                "A0" => preferred_cleaned = "GP26".to_string(),
+                "A1" => preferred_cleaned = "GP27".to_string(),
+                "A2" => preferred_cleaned = "GP28".to_string(),
+                _ if preferred.chars().all(|c| c.is_numeric()) => {
+                    preferred_cleaned = format!("GP{}", preferred);
+                }
+                _ => {}
+            }
+        } else if is_esp32 {
+            match preferred.to_uppercase().as_str() {
+                "SDA" | "A4" => preferred_cleaned = "GPIO21".to_string(),
+                "SCL" | "A5" => preferred_cleaned = "GPIO22".to_string(),
+                "PWM" | "6"  => preferred_cleaned = "GPIO18".to_string(),
+                "A0" => preferred_cleaned = "GPIO36".to_string(),
+                _ if preferred.chars().all(|c| c.is_numeric()) => {
+                    preferred_cleaned = format!("GPIO{}", preferred);
+                }
+                _ => {}
             }
         }
 
-        // Try analog pins
-        for ap in &["A0","A1","A2","A3","A4","A5"] {
+        if !is_taken(&preferred_cleaned) {
+            self.occupied_pins.entry(board_id.to_string()).or_default().push(preferred_cleaned.clone());
+            return Some(preferred_cleaned);
+        }
+
+        let mut pins: Vec<String> = board.pins.iter()
+            .map(|p| p.id.clone())
+            .filter(|id| {
+                id.chars().all(|c| c.is_numeric()) || 
+                (is_pico && id.starts_with("GP")) || 
+                (is_esp32 && id.starts_with("GPIO")) ||
+                id.starts_with('A') // Allow A0, A1, etc.
+            })
+            .collect();
+            
+        let preferred_num: i32 = preferred.chars().filter(|c| c.is_numeric()).collect::<String>().parse().unwrap_or(13);
+
+        pins.sort_by_key(|id| {
+            let n = id.chars().filter(|c| c.is_numeric()).collect::<String>().parse::<i32>().unwrap_or(0);
+            (n - preferred_num).abs()
+        });
+
+        for p_id in &pins {
+            if !is_taken(p_id) {
+                self.occupied_pins.entry(board_id.to_string()).or_default().push(p_id.clone());
+                return Some(p_id.clone());
+            }
+        }
+
+        // Try analog pins (Board Specific)
+        let analog_ids = if is_pico { vec!["GP26", "GP27", "GP28"] } 
+                         else { vec!["A0","A1","A2","A3","A4","A5"] };
+        for ap in &analog_ids {
             if board.pins.iter().any(|p| p.id == *ap) && !is_taken(ap) {
                 self.occupied_pins.entry(board_id.to_string()).or_default().push(ap.to_string());
                 return Some(ap.to_string());
             }
         }
         None
+    }
+
+    pub fn find_nearest_board(&self, x: f32, y: f32) -> Option<String> {
+        self.components.values()
+            .filter(|c| c.kind.contains("arduino") || c.kind.contains("esp32") || c.kind.contains("pico") || c.kind.contains("rp2040") || c.kind.contains("stm32"))
+            .min_by(|a, b| {
+                let da = (a.x - x).hypot(a.y - y);
+                let db = (b.x - x).hypot(b.y - y);
+                da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map(|c| c.id.clone())
     }
 
     pub fn find_breadboard(&self) -> Option<&Component> {
@@ -225,12 +371,17 @@ impl Engine {
     }
 
     /// Find a free position for a helper near (want_x, want_y).
-    pub fn free_helper_position(&self, want_x: f32, want_y: f32, w: f32, h: f32) -> (f32, f32) {
-        let mut cx = want_x; let mut cy = want_y;
+    pub fn free_helper_position(&self, want_x: f32, want_y: f32, w: f32, h: f32, align_y: Option<f32>) -> (f32, f32) {
+        let mut cx = want_x; 
+        let mut cy = align_y.unwrap_or(want_y);
         for attempt in 0..20 {
             if !self.has_collision(cx, cy, w, h, "__helper__") { return (cx, cy); }
             cx += HOLE_PITCH;
-            if attempt % 5 == 4 { cx = want_x; cy += HOLE_PITCH * 2.0; }
+            if attempt % 5 == 4 { 
+                cx = want_x; 
+                if align_y.is_none() { cy += HOLE_PITCH * 2.0; }
+                else { cy += HOLE_PITCH; } // Smaller jumps if aligned
+            }
         }
         (cx, cy)
     }
@@ -254,6 +405,13 @@ impl Engine {
         &mut self, comp: &NewComponentPlan, manifest_pins: &[ManifestPin],
         board_id: &str, plan: &mut AutonomousPlan,
     ) {
+        let board = match self.components.get(board_id) {
+            Some(b) => b,
+            None => return,
+        };
+        let is_pico = board.kind.contains("pico") || board.kind.contains("rp2040");
+        let is_esp32 = board.kind.contains("esp32");
+
         let mut i2c_done = false;
         for (idx, pin) in manifest_pins.iter().enumerate() {
             let pn  = pin.id.to_lowercase();
@@ -267,35 +425,45 @@ impl Engine {
                     from: format!("{}:{}", comp.id, pin.id),
                     to: format!("{}:GND", board_id),
                     color: "black".to_string(), path: None, is_socket: false, is_hidden: false,
+                    lane: (idx % 7) as i32,
                 });
             } else if pn == "vcc" || pn == "v+" || pn == "5v" || pn == "3v3" || pn == "vdd" {
+                let target_v = if is_pico { "VBUS" } else { "5V" };
                 plan.added_wires.push(WirePlan {
                     id: format!("w_fallback_vcc_{}_{}", comp.id, t),
                     from: format!("{}:{}", comp.id, pin.id),
-                    to: format!("{}:5V", board_id),
+                    to: format!("{}:{}", board_id, target_v),
                     color: "red".to_string(), path: None, is_socket: false, is_hidden: false,
+                    lane: (idx % 7) as i32,
                 });
             } else if pt == "analog" || sig.contains("analog") {
-                if let Some(ap) = self.resolve_best_pin(board_id, "A0") {
+                let pref = if is_pico { "GP26" } else { "A0" };
+                if let Some(ap) = self.resolve_best_pin(board_id, pref) {
                     plan.added_wires.push(WirePlan {
                         id: format!("w_fallback_analog_{}_{}", comp.id, t),
                         from: format!("{}:{}", comp.id, pin.id),
                         to: format!("{}:{}", board_id, ap),
                         color: "#38bdf8".to_string(), path: None, is_socket: false, is_hidden: false,
+                        lane: (idx % 7) as i32,
                     });
                 }
             } else if pt == "input" || pt == "bidirectional" || sig.contains("i2c") || sig.contains("scl") || sig.contains("sda") {
-                // I2C pins → fixed A4/A5 on Uno
-                let target_pin = if pn.contains("sda") { "A4" } else { "A5" };
-                plan.added_wires.push(WirePlan {
-                    id: format!("w_fallback_i2c_{}_{}", comp.id, t),
-                    from: format!("{}:{}", comp.id, pin.id),
-                    to: format!("{}:{}", board_id, target_pin),
-                    color: "purple".to_string(), path: None, is_socket: false, is_hidden: false,
-                });
-                if !i2c_done {
-                    plan.reasoning.push("Fallback: Detected I2C pins — connected to A4/A5.".to_string());
-                    i2c_done = true;
+                // I2C pins with Strict Hardware enforcement
+                if let Some((sda, scl, _, bus_idx)) = self.resolve_bus_pair(board_id, "i2c") {
+                    let target_pin = if pn.contains("sda") || sig.contains("sda") { sda } else { scl };
+                    plan.added_wires.push(WirePlan {
+                        id: format!("w_fallback_i2c_{}_{}", comp.id, t),
+                        from: format!("{}:{}", comp.id, pin.id),
+                        to: format!("{}:{}", board_id, target_pin),
+                        color: "purple".to_string(), path: None, is_socket: false, is_hidden: false,
+                        lane: (idx % 7) as i32,
+                    });
+                    if !i2c_done {
+                        plan.reasoning.push(format!("Strict Routing: Connected I2C to hardware {} (Bus {}).", target_pin, bus_idx));
+                        i2c_done = true;
+                    }
+                } else {
+                    plan.reasoning.push(format!("CRITICAL: No Hardware I2C buses available on {} for {}. I2C requires specific pins and cannot use Digital 4/5.", board_id, comp.id));
                 }
             } else if pt == "digital" || pt.is_empty() {
                 if let Some(p) = self.resolve_best_pin(board_id, "2") {
@@ -304,6 +472,7 @@ impl Engine {
                         from: format!("{}:{}", comp.id, pin.id),
                         to: format!("{}:{}", board_id, p),
                         color: "green".to_string(), path: None, is_socket: false, is_hidden: false,
+                        lane: (idx % 7) as i32,
                     });
                 }
             }
@@ -326,38 +495,64 @@ pub fn ingest_component(id: String, kind: String, x: f32, y: f32, w: f32, h: f32
     engine.components.insert(id.clone(), Component { id, kind, x, y, w, h, pins });
 }
 
+#[wasm_bindgen(js_name = findNearestBoard)]
+pub fn find_nearest_board(x: f32, y: f32) -> Option<String> {
+    ENGINE.lock().unwrap().find_nearest_board(x, y)
+}
+
 #[wasm_bindgen(js_name = generateAutonomousSetup)]
 pub fn generate_autonomous_setup(
-    new_comp_json: JsValue, manifest_json: JsValue,
-    board_id: String, existing_wires_json: JsValue,
+    new_comp_json: JsValue,
+    manifest_json: JsValue,
+    mut board_id: String,
+    wires_json: JsValue,
+    allow_breadboard: bool,
+    is_rewire: bool,
 ) -> JsValue {
     let mut engine = ENGINE.lock().unwrap();
-    let existing_wires: Vec<serde_json::Value> =
-        serde_wasm_bindgen::from_value(existing_wires_json).unwrap_or_default();
-    engine.build_state(existing_wires);
 
+    let existing_wires: Vec<serde_json::Value> = 
+        serde_wasm_bindgen::from_value(wires_json).unwrap_or_default();
+    
     let new_comp: NewComponentPlan = match serde_wasm_bindgen::from_value(new_comp_json) {
-        Ok(v)  => v,
-        Err(e) => return JsValue::from_str(&format!("Error parsing newComp: {}", e)),
+        Ok(v) => v,
+        Err(e) => return JsValue::from_str(&format!("Error parsing component: {}", e)),
     };
+
+    let rewire_id = if is_rewire { Some(&new_comp.id) } else { None };
+    let (removed_wires, removed_components) = engine.build_state(existing_wires, rewire_id);
+
     let manifest: ComponentManifest = match serde_wasm_bindgen::from_value(manifest_json) {
-        Ok(v)  => v,
+        Ok(v) => v,
         Err(e) => return JsValue::from_str(&format!("Error parsing manifest: {}", e)),
     };
+
+    // Auto-select nearest board if board_id is empty
+    if board_id.is_empty() {
+        if let Some(near_id) = engine.find_nearest_board(new_comp.x, new_comp.y) {
+            board_id = near_id;
+        } else {
+            board_id = "uno".to_string(); // Fallback
+        }
+    }
 
     let mut plan = AutonomousPlan {
         main_component:  new_comp.clone(),
         added_components: Vec::new(),
         added_wires:     Vec::new(),
+        removed_wires,
+        removed_components,
         code_snippet:    None,
-        reasoning:       vec!["WASM Engine v2: Breadboard-Aware Routing.".to_string()],
+        reasoning:       vec!["WASM Engine v2: Parallel Lane Routing.".to_string()],
     };
+
+    let mut lane_counter = 0;
 
     // ── 1. Breadboard provisioning ────────────────────────────────────────────
     let bb = engine.find_breadboard().cloned();
     let mut bb_to_add: Option<NewComponentPlan> = None;
 
-    if bb.is_none() {
+    if allow_breadboard && bb.is_none() {
         let count = engine.components.len();
         let (bb_type, w, h) = if count < 5  { ("wokwi-breadboard-mini", 320.0, 235.0) }
                               else if count < 15 { ("wokwi-breadboard-half", 495.0, 295.0) }
@@ -410,7 +605,7 @@ pub fn generate_autonomous_setup(
             let bb_y = current_bb_comp.as_ref().map(|b| b.y).unwrap_or(100.0);
             let raw_x = bb_x - 100.0;
             let raw_y = bb_y + 100.0;
-            let (ps_x, ps_y) = engine.free_helper_position(raw_x, raw_y, 60.0, 60.0);
+            let (ps_x, ps_y) = engine.free_helper_position(raw_x, raw_y, 60.0, 60.0, None);
             
             let voltage = autowiring.external_voltage.clone().unwrap_or_else(|| "5.0".to_string());
             
@@ -425,25 +620,89 @@ pub fn generate_autonomous_setup(
                 from: "powersupply:GND".to_string(),
                 to: format!("{}:GND", board_id),
                 color: "black".to_string(), path: None, is_socket: false, is_hidden: false,
+                lane: { let l = lane_counter; lane_counter += 1; l % 7 },
             });
             plan.reasoning.push("Injected external power supply component.".to_string());
         }
+        let mut comp_bus_cache: HashMap<String, (String, String, String, i32)> = HashMap::new();
 
         for (i, conn) in autowiring.connections.iter().enumerate() {
             let mut target = conn.to.clone();
 
-            if target.starts_with("arduino:") {
-                let preferred = target.replace("arduino:", "");
+            if target.contains("arduino:") || target.contains("board:") {
+                let original_pref = target.clone();
+                let preferred = target.replace("arduino:", "").replace("board:", "");
+                
+                let is_pico = engine.components.get(&board_id).map(|c| c.kind.contains("pico")).unwrap_or(false);
+
                 if preferred.to_lowercase() == "gnd" {
                     target = format!("{}:GND", board_id);
-                } else if preferred == "5V" || preferred == "3V3" || preferred == "VCC" {
-                    target = format!("{}:{}", board_id, preferred);
+                } else if preferred == "5V" || preferred == "VCC" {
+                    if is_pico {
+                        target = format!("{}:VBUS", board_id);
+                    } else {
+                        target = format!("{}:5V", board_id);
+                    }
+                } else if preferred == "3V3" {
+                    target = format!("{}:3V3", board_id);
                 } else {
-                    if let Some(p) = engine.resolve_best_pin(&board_id, &preferred) {
-                        resolved_pins.insert(preferred.clone(), p.clone());
+                    // ── I2C/Bus Awareness for Explicit Manifests ──
+                    let bus_type = if conn.from.to_uppercase().contains("SDA") || conn.from.to_uppercase().contains("SCL") || preferred.to_uppercase().contains("SDA") || preferred.to_uppercase().contains("SCL") {
+                        Some("i2c")
+                    } else if conn.from.to_uppercase().contains("MOSI") || conn.from.to_uppercase().contains("SCK") || conn.from.to_uppercase().contains("MISO") {
+                        Some("spi")
+                    } else if conn.from.to_uppercase().contains("TX") || conn.from.to_uppercase().contains("RX") {
+                        Some("uart")
+                    } else {
+                        None
+                    };
+
+                    if let Some(bt) = bus_type {
+                        let bus_info = if let Some(cached) = comp_bus_cache.get(bt) {
+                            Some(cached.clone())
+                        } else {
+                            let res = engine.resolve_bus_pair(&board_id, bt);
+                            if let Some(pair) = &res { comp_bus_cache.insert(bt.to_string(), pair.clone()); }
+                            res
+                        };
+
+                        if let Some((p1, p2, p3, bus_idx)) = bus_info {
+                            let upper_from = conn.from.to_uppercase();
+                            let upper_pref = preferred.to_uppercase();
+                            
+                            let resolved = if bt == "i2c" {
+                                if upper_from.contains("SDA") || upper_pref.contains("SDA") { p1 } else { p2 }
+                            } else if bt == "spi" {
+                                if upper_from.contains("SCK") || upper_pref.contains("SCK") || upper_from.contains("CLK") || upper_pref.contains("CLK") { p1 }
+                                else if upper_from.contains("MOSI") || upper_pref.contains("MOSI") || upper_from.contains("DIN") || upper_pref.contains("DIN") || upper_from.contains("DN") || upper_pref.contains("DN") { p2 }
+                                else if upper_from.contains("MISO") || upper_pref.contains("MISO") || upper_from.contains("DOUT") || upper_pref.contains("DOUT") { p3 }
+                                else { p1 } // Fallback
+                            } else if bt == "uart" {
+                                if upper_from.contains("TX") || upper_pref.contains("TX") { p1 } else { p2 }
+                            } else {
+                                p1
+                            };
+
+                            resolved_pins.insert(original_pref.clone(), resolved.clone());
+                            target = format!("{}:{}", board_id, resolved);
+                            if !plan.reasoning.iter().any(|r| r.contains("Bus")) {
+                                plan.reasoning.push(format!("Strict Routing: Assigned {} hardware (Bus {}) for {}.", bt.to_uppercase(), bus_idx, plan.main_component.id));
+                            }
+                        } else {
+                            plan.reasoning.push(format!("CRITICAL: No Hardware {} buses available on {} for component {}.", bt.to_uppercase(), board_id, plan.main_component.id));
+                            continue;
+                        }
+                    } else if let Some(p) = engine.resolve_best_pin(&board_id, &preferred) {
+                        resolved_pins.insert(original_pref.clone(), p.clone());
                         target = format!("{}:{}", board_id, p);
+                    } else {
+                        plan.reasoning.push(format!("CRITICAL: No available pins on {} for connection '{}'.", board_id, preferred));
+                        continue; // Skip this wire if no pin found
                     }
                 }
+            } else if !target.contains(':') && !target.is_empty() {
+                // Smart Prepend: If no colon, assume it's a board pin
+                target = format!("{}:{}", board_id, target);
             }
 
             // I2C pull-up injection
@@ -457,7 +716,7 @@ pub fn generate_autonomous_setup(
                     let pu_w = 70.0; let pu_h = 32.0;
                     let raw_x = bb_x + 30.0 + j as f32 * 90.0;
                     let raw_y = bb_y - 50.0;
-                    let (px, py) = engine.free_helper_position(raw_x, raw_y, pu_w, pu_h);
+                    let (px, py) = engine.free_helper_position(raw_x, raw_y, pu_w, pu_h, None);
                     plan.added_components.push(NewComponentPlan {
                         id: pu_id.clone(), kind: "wokwi-resistor".to_string(),
                         label: Some("4.7k".to_string()),
@@ -469,12 +728,20 @@ pub fn generate_autonomous_setup(
                         from: format!("{}:{}", plan.main_component.id, pin_name),
                         to:   format!("{}:p1", pu_id),
                         color: "#38bdf8".to_string(), path: None, is_socket: true, is_hidden: true,
+                        lane: { let l = lane_counter; lane_counter += 1; l % 7 },
                     });
+                    let pu_target = if allow_breadboard {
+                        format!("{}:top_vcc_{}", bb_id_str, rail_idx)
+                    } else {
+                        format!("{}:3V3", board_id)
+                    };
+
                     plan.added_wires.push(WirePlan {
                         id: format!("w_pu_{}_out_{}", pin_name, plan.main_component.id),
                         from: format!("{}:p2", pu_id),
-                        to:   format!("{}:top_vcc_{}", bb_id_str, rail_idx),
+                        to:   pu_target,
                         color: "red".to_string(), path: None, is_socket: false, is_hidden: false,
+                        lane: { let l = lane_counter; lane_counter += 1; l % 7 },
                     });
                 }
                 i2c_injected = true;
@@ -490,7 +757,8 @@ pub fn generate_autonomous_setup(
                 let via_id = format!("via_{}_{}_{}", conn.from, plan.main_component.id, i);
                 let raw_x  = plan.main_component.x + HOLE_PITCH * 5.0;
                 let raw_y  = plan.main_component.y;
-                let (vx, vy) = engine.free_helper_position(raw_x, raw_y, 70.0, 32.0);
+                // Try to align with the component's Y coordinate to keep wires straight
+                let (vx, vy) = engine.free_helper_position(raw_x, raw_y, 70.0, 32.0, Some(raw_y));
                 plan.added_components.push(NewComponentPlan {
                     id: via_id.clone(), kind: via_kind.clone(),
                     label: Some(format!("{}R", res_val)),
@@ -502,12 +770,14 @@ pub fn generate_autonomous_setup(
                     from: format!("{}:{}", plan.main_component.id, conn.from),
                     to:   format!("{}:p1", via_id),
                     color: "orange".to_string(), path: None, is_socket: true, is_hidden: true,
+                    lane: { let l = lane_counter; lane_counter += 1; l % 7 },
                 });
                 plan.added_wires.push(WirePlan {
                     id: format!("w_via_out_{}_{}", plan.main_component.id, i),
                     from: format!("{}:p2", via_id),
                     to:   target,
                     color: "green".to_string(), path: None, is_socket: false, is_hidden: false,
+                    lane: { let l = lane_counter; lane_counter += 1; l % 7 },
                 });
                 continue;
             }
@@ -517,6 +787,7 @@ pub fn generate_autonomous_setup(
                 from: format!("{}:{}", plan.main_component.id, conn.from),
                 to:   target,
                 color: "green".to_string(), path: None, is_socket: false, is_hidden: false,
+                lane: { let l = lane_counter; lane_counter += 1; l % 7 },
             });
         }
     } else {
@@ -525,6 +796,11 @@ pub fn generate_autonomous_setup(
         let comp_clone = new_comp.clone();
         let bid = board_id.clone();
         engine.universal_fallback_wiring(&comp_clone, &pins_clone, &bid, &mut plan);
+
+        // Fallback also needs to track if it failed
+        if plan.added_wires.is_empty() && !pins_clone.is_empty() {
+            plan.reasoning.push(format!("CRITICAL: Fallback wiring failed — no available pins on {} for component {}.", bid, comp_clone.id));
+        }
     }
 
     // ── 4. Code snippet ───────────────────────────────────────────────────────
