@@ -2144,7 +2144,6 @@ export function SimulatorPage({ gamificationMode = false }) {
   const serialIngressArbitrationRef = useRef(new Map());
   const serialPausedRef = useRef(false);
   const serialPausedQueueRef = useRef([]);
-  const canvasWorkerRef = useRef(null);
 
   const canvasRef = useRef(null)
   const innerCanvasRef = useRef(null)   // ref to the zoom-wrapper div — used for CSS-transform panning (Fix #4)
@@ -2164,6 +2163,7 @@ export function SimulatorPage({ gamificationMode = false }) {
   const componentsRef = useRef([]);
   const wiresRef = useRef([]);
   const pinDefsRef = useRef({});
+  const zoomTextTimerRef = useRef(null);
 
   const getLiveOopStateSnapshot = useCallback((compId) => liveOopStatesRef.current[compId] || EMPTY_LIVE_STATE, []);
   const subscribeLiveOopState = useCallback((compId, listener) => {
@@ -4266,20 +4266,26 @@ export function SimulatorPage({ gamificationMode = false }) {
     const exitLen = 9 + offset * 5;
     let dx = 0, dy = 0;
 
-    let dir = pin.dir;
-    if (!dir) {
-      // Always exit from the nearest edge. If the target is on the opposite side
-      // the resulting U-turn is intentional — it shows the wire's pin origin clearly.
-      const cw = comp.w || 40;
-      const ch = comp.h || 40;
-      const px = pin.x;
-      const py = pin.y;
+    // Always exit from the nearest physical edge, ignoring manifest-defined 'dir'. 
+    // We use a 15px "Snap Zone" to ensure pins near a border always exit from it.
+    const cw = comp.w || 40;
+    const ch = comp.h || 40;
+    const px = pin.x;
+    const py = pin.y;
 
-      const dTop = py;
-      const dBottom = ch - py;
-      const dLeft = px;
-      const dRight = cw - px;
+    const dTop = py;
+    const dBottom = ch - py;
+    const dLeft = px;
+    const dRight = cw - px;
 
+    // Priority 1: Snap to any edge within 15px
+    let dir = '';
+    if (dTop <= 15) dir = 'top';
+    else if (dBottom <= 15) dir = 'bottom';
+    else if (dLeft <= 15) dir = 'left';
+    else if (dRight <= 15) dir = 'right';
+    else {
+      // Priority 2: Mathematical nearest
       const minDist = Math.min(dTop, dBottom, dLeft, dRight);
       dir = minDist === dTop ? 'top' : (minDist === dBottom ? 'bottom' : (minDist === dRight ? 'right' : 'left'));
     }
@@ -4307,6 +4313,94 @@ export function SimulatorPage({ gamificationMode = false }) {
     }
     return getPinPosForComp(comp, pinId);
   }, [componentsMap, autofixPlan?.addedComponents, getPinPosForComp]);
+
+  // -- Intelligent Centering & Zoom to Fit --
+  const fitToView = useCallback((mode = 'reset') => {
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    if (components.length === 0) {
+      setCanvasZoom(1);
+      setCanvasOffset({ x: 0, y: 0 });
+      return;
+    }
+
+    const pinPosCache = new Map();
+    const getCachedPinPos = (compId, pinId) => {
+      const key = `${compId}:${pinId}`;
+      if (!pinPosCache.has(key)) pinPosCache.set(key, getPinPos(compId, pinId));
+      return pinPosCache.get(key);
+    };
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    components.forEach(c => {
+      const reg = COMPONENT_REGISTRY[c.type];
+      const b = typeof reg?.BOUNDS === 'function'
+        ? reg.BOUNDS(getComponentStateAttrs(c))
+        : (reg?.BOUNDS || { x: 0, y: 0, w: c.w || 80, h: c.h || 60 });
+      minX = Math.min(minX, c.x + b.x);
+      minY = Math.min(minY, c.y + b.y);
+      maxX = Math.max(maxX, c.x + b.x + b.w);
+      maxY = Math.max(maxY, c.y + b.y + b.h);
+      maxY = Math.max(maxY, c.y + b.y + b.h + 20); // Label padding
+      (PIN_DEFS[c.type] || []).forEach(pin => {
+        const pp = getCachedPinPos(c.id, pin.id);
+        if (pp) {
+          minX = Math.min(minX, pp.x - 4); minY = Math.min(minY, pp.y - 4);
+          maxX = Math.max(maxX, pp.x + 4); maxY = Math.max(maxY, pp.y + 4);
+        }
+      });
+    });
+    wires.forEach(w => {
+      (w.waypoints || []).forEach(wp => {
+        minX = Math.min(minX, wp.x); minY = Math.min(minY, wp.y);
+        maxX = Math.max(maxX, wp.x); maxY = Math.max(maxY, wp.y);
+      });
+      const [fComp, fPin] = (w.from || '').split(':');
+      const [tComp, tPin] = (w.to || '').split(':');
+      const fp = getCachedPinPos(fComp, fPin);
+      const tp = getCachedPinPos(tComp, tPin);
+      if (fp) { minX = Math.min(minX, fp.x); minY = Math.min(minY, fp.y); maxX = Math.max(maxX, fp.x); maxY = Math.max(maxY, fp.y); }
+      if (tp) { minX = Math.min(minX, tp.x); minY = Math.min(minY, tp.y); maxX = Math.max(maxX, tp.x); maxY = Math.max(maxY, tp.y); }
+    });
+
+    if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 800; maxY = 600; }
+
+    const PAD = 120;
+    const circuitW = maxX - minX + PAD;
+    const circuitH = maxY - minY + PAD;
+
+    let finalZoom = canvasZoom;
+    if (mode === 'reset') finalZoom = 1;
+    else if (mode === 'fit') {
+      const zoomX = rect.width / circuitW;
+      const zoomY = rect.height / circuitH;
+      finalZoom = Math.min(zoomX, zoomY, 1.25);
+      finalZoom = Math.max(0.25, parseFloat(finalZoom.toFixed(2)));
+    }
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    setCanvasZoom(finalZoom);
+    setCanvasOffset({
+      x: rect.width / 2 - centerX * finalZoom,
+      y: rect.height / 2 - centerY * finalZoom
+    });
+  }, [components, wires, canvasZoom, COMPONENT_REGISTRY, getComponentStateAttrs, PIN_DEFS, getPinPos]);
+
+  const handleZoomTextClick = (e) => {
+    e.stopPropagation();
+    if (zoomTextTimerRef.current) {
+      clearTimeout(zoomTextTimerRef.current);
+      zoomTextTimerRef.current = null;
+      fitToView('center'); // Double click: Center only
+    } else {
+      zoomTextTimerRef.current = setTimeout(() => {
+        zoomTextTimerRef.current = null;
+        fitToView('reset'); // Single click: Reset Zoom & Center
+      }, 250);
+    }
+  };
 
   // Keep reactive refs current
   getPinPosRef.current = getPinPos;
@@ -8158,119 +8252,6 @@ export function SimulatorPage({ gamificationMode = false }) {
     }
   };
 
-  const downloadPngWasm = async () => {
-    if (isExporting) return;
-    setIsExporting(true);
-    try {
-      if (!canvasWorkerRef.current) {
-        canvasWorkerRef.current = new Worker(new URL('../../worker/canvas-worker.ts', import.meta.url), { type: 'module' });
-      }
-
-      const SCALE = 2.5;
-      const PAD = 60;
-
-      // 1. Gather component SVG assets from DOM
-      const assets = {};
-      const canvasEl = canvasRef.current;
-      const types = new Set(components.map(c => c.kind || c.type));
-      console.log('[PNG Export WASM] Harvesting assets for types:', Array.from(types));
-
-      for (const type of types) {
-        const el = canvasEl.querySelector(type);
-        if (el && el.shadowRoot) {
-          const svg = el.shadowRoot.querySelector('svg');
-          if (svg) {
-            // usvg (Rust) is a strict XML parser. 
-            // It doesn't like &nbsp; and it definitely doesn't like <br> tags in SVG.
-            assets[type] = svg.outerHTML
-              .replace(/&nbsp;/g, '&#160;')
-              .replace(/<br\s*\/?>/gi, ' ');
-          } else {
-            console.warn(`[PNG Export WASM] No SVG found in shadowRoot for ${type}`);
-          }
-        } else {
-          console.warn(`[PNG Export WASM] Element or shadowRoot missing for ${type}`);
-        }
-      }
-      console.log(`[PNG Export WASM] Harvested ${Object.keys(assets).length} assets`);
-
-      // 2. Prepare payload
-      const project = {
-        board,
-        components: components.map(c => ({
-          id: c.id,
-          type: c.type || c.kind,
-          x: c.x,
-          y: c.y,
-          w: c.w,
-          h: c.h,
-          rotate: c.rotate,
-          attrs: c.attrs
-        })),
-        wires: wires.map(w => ({
-          from: w.from,
-          to: w.to,
-          color: w.color || 'green',
-          waypoints: w.waypoints
-        }))
-      };
-
-      const fullMetadata = buildProjectPayload({
-        board,
-        components,
-        wires,
-        code,
-        blocklyXml,
-        blocklyGeneratedCode,
-        useBlocklyCode,
-        projectFiles,
-        openCodeTabs,
-        activeCodeFileId,
-        exportedAt: new Date().toISOString(),
-      });
-
-      const options = {
-        scale: SCALE,
-        padding: PAD,
-        background: '#070b14'
-      };
-
-      const requestId = Date.now();
-
-      const result = await new Promise((resolve, reject) => {
-        const handler = (e) => {
-          if (e.data.id === requestId) {
-            canvasWorkerRef.current.removeEventListener('message', handler);
-            if (e.data.type === 'RENDER_RESULT') resolve(e.data.payload);
-            else reject(new Error(e.data.payload));
-          }
-        };
-        canvasWorkerRef.current.addEventListener('message', handler);
-        canvasWorkerRef.current.postMessage({
-          type: 'RENDER_PNG',
-          id: requestId,
-          payload: { project, assets, options, fullMetadata }
-        });
-      });
-
-      console.log('[PNG Export WASM] rendered in', result.ms, 'ms');
-
-      const dateStr = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-').replace(':', '-');
-      const filename = `circuit_${board}_${dateStr}_wasm.png`;
-      const url = URL.createObjectURL(result.blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-
-    } catch (err) {
-      console.error('[PNG Export WASM] Error:', err);
-      alert('WASM PNG export failed: ' + err.message);
-    } finally {
-      setIsExporting(false);
-    }
-  };
 
   // ── View Panel helpers — SVG Schematic Generator ─────────────────────────
   const generateSchematic = useCallback(() => {
@@ -8979,7 +8960,7 @@ export function SimulatorPage({ gamificationMode = false }) {
         )}
 
         {/* TOP BAR */}
-        <TopToolbox board={board} setBoard={setBoard} isRunning={isRunning} isPaused={isPaused} handleRun={handleRun} handlePause={handlePause} handleResume={handleResume} handleStop={handleStop} isCompiling={isCompiling} assessmentMode={assessmentMode} assessmentProjectName={assessmentProjectName} isSubmittingAssessment={isSubmittingAssessment} handleAssessmentSubmit={handleAssessmentSubmit} undo={undo} redo={redo} selected={selected} rotateComponent={rotateComponent} theme={theme} toggleTheme={toggleTheme} showViewPanel={showViewPanel} setShowViewPanel={setShowViewPanel} viewPanelSection={viewPanelSection} setViewPanelSection={setViewPanelSection} schematicDataUrl={schematicDataUrl} setSchematicDataUrl={setSchematicDataUrl} schematicLoading={schematicLoading} setSchematicLoading={setSchematicLoading} downloadSchematicPng={downloadSchematicPng} downloadSchematicPdf={downloadSchematicPdf} generateSchematic={generateSchematic} downloadCompCsv={downloadCompCsv} importFileRef={importFileRef} downloadPng={downloadPng} downloadPngWasm={downloadPngWasm} importPng={importPng} downloadSimulationJson={downloadSimulationJson} handleSave={handleSave} isExporting={isExporting} handleShareSimulation={handleShareSimulation} isSharingSimulation={isSharingSimulation} refreshProjectList={refreshProjectList} showProjectsDropdown={showProjectsDropdown} setShowProjectsDropdown={setShowProjectsDropdown} handleNewProject={handleNewProject} handleStartRename={handleStartRename} handleConfirmRename={handleConfirmRename} renamingProjectId={renamingProjectId} setRenamingProjectId={setRenamingProjectId} renameValue={renameValue} setRenameValue={setRenameValue} handleLoadProject={handleLoadProject} handleDeleteProject={handleDeleteProject} handleBackupWorkflow={handleBackupWorkflow} backupRestoreInputRef={backupRestoreInputRef} handleRestoreWorkflow={handleRestoreWorkflow} handleSyncToCloud={handleSyncToCloud} user={activeUser} navigate={navigate} isAuthenticated={isAnyAuthenticated} myProjects={myProjects} currentProjectId={currentProjectId} projectName={currentProjectName} formatProjectDate={formatProjectDate} saveHistory={saveHistory} setWires={setWires} setComponents={setComponents} setSelected={setSelected} history={history} components={components} wires={wires} webSerialSupported={webSerialSupported} hardwareBoards={boardComponents} hardwareBoardId={hardwareBoardId} setHardwareBoardId={handleHardwareBoardChange} hardwarePortPath={hardwarePortPath} setHardwarePortPath={setHardwarePortPath} resolvedHardwarePort={resolvedHardwarePort} hardwareAvailablePorts={hardwareAvailablePorts} showAllHardwarePorts={showAllHardwarePorts} setShowAllHardwarePorts={setShowAllHardwarePorts} refreshHardwarePorts={refreshHardwarePorts} isLoadingHardwarePorts={isLoadingHardwarePorts} hardwareBaudRate={hardwareBaudRate} setHardwareBaudRate={setHardwareBaudRate} hardwareResetMethod={hardwareResetMethod} setHardwareResetMethod={setHardwareResetMethod} connectHardwareSerial={connectHardwareSerial} disconnectHardwareSerial={disconnectHardwareSerial} uploadToHardware={handleUploadToHardware} hardwareConnected={hardwareConnected} hardwareConnecting={hardwareConnecting} isUploadingHardware={isUploadingHardware} hardwareStatus={hardwareStatus} editingDisabled={liveEditingDisabled} setShowProjectsSidebar={setShowProjectsSidebar} setProjectsSidebarTab={setProjectsSidebarTab} validationErrors={validationErrors} autofixPlan={autofixPlan} autofixStatus={autofixStatus} autofixLog={autofixLog} onApplyPlan={handleApplyPlan} onRefresh={triggerAutofixAnalysis} autoWiringEnabled={autoWiringEnabled} setAutoWiringEnabled={setAutoWiringEnabled} autoCodingEnabled={autoCodingEnabled} setAutoCodingEnabled={setAutoCodingEnabled} showAutofix={showAutofix} setShowAutofix={setShowAutofix} />
+        <TopToolbox board={board} setBoard={setBoard} isRunning={isRunning} isPaused={isPaused} handleRun={handleRun} handlePause={handlePause} handleResume={handleResume} handleStop={handleStop} isCompiling={isCompiling} assessmentMode={assessmentMode} assessmentProjectName={assessmentProjectName} isSubmittingAssessment={isSubmittingAssessment} handleAssessmentSubmit={handleAssessmentSubmit} undo={undo} redo={redo} selected={selected} rotateComponent={rotateComponent} theme={theme} toggleTheme={toggleTheme} showViewPanel={showViewPanel} setShowViewPanel={setShowViewPanel} viewPanelSection={viewPanelSection} setViewPanelSection={setViewPanelSection} schematicDataUrl={schematicDataUrl} setSchematicDataUrl={setSchematicDataUrl} schematicLoading={schematicLoading} setSchematicLoading={setSchematicLoading} downloadSchematicPng={downloadSchematicPng} downloadSchematicPdf={downloadSchematicPdf} generateSchematic={generateSchematic} downloadCompCsv={downloadCompCsv} importFileRef={importFileRef} downloadPng={downloadPng} importPng={importPng} downloadSimulationJson={downloadSimulationJson} handleSave={handleSave} isExporting={isExporting} handleShareSimulation={handleShareSimulation} isSharingSimulation={isSharingSimulation} refreshProjectList={refreshProjectList} showProjectsDropdown={showProjectsDropdown} setShowProjectsDropdown={setShowProjectsDropdown} handleNewProject={handleNewProject} handleStartRename={handleStartRename} handleConfirmRename={handleConfirmRename} renamingProjectId={renamingProjectId} setRenamingProjectId={setRenamingProjectId} renameValue={renameValue} setRenameValue={setRenameValue} handleLoadProject={handleLoadProject} handleDeleteProject={handleDeleteProject} handleBackupWorkflow={handleBackupWorkflow} backupRestoreInputRef={backupRestoreInputRef} handleRestoreWorkflow={handleRestoreWorkflow} handleSyncToCloud={handleSyncToCloud} user={activeUser} navigate={navigate} isAuthenticated={isAnyAuthenticated} myProjects={myProjects} currentProjectId={currentProjectId} projectName={currentProjectName} formatProjectDate={formatProjectDate} saveHistory={saveHistory} setWires={setWires} setComponents={setComponents} setSelected={setSelected} history={history} components={components} wires={wires} webSerialSupported={webSerialSupported} hardwareBoards={boardComponents} hardwareBoardId={hardwareBoardId} setHardwareBoardId={handleHardwareBoardChange} hardwarePortPath={hardwarePortPath} setHardwarePortPath={setHardwarePortPath} resolvedHardwarePort={resolvedHardwarePort} hardwareAvailablePorts={hardwareAvailablePorts} showAllHardwarePorts={showAllHardwarePorts} setShowAllHardwarePorts={setShowAllHardwarePorts} refreshHardwarePorts={refreshHardwarePorts} isLoadingHardwarePorts={isLoadingHardwarePorts} hardwareBaudRate={hardwareBaudRate} setHardwareBaudRate={setHardwareBaudRate} hardwareResetMethod={hardwareResetMethod} setHardwareResetMethod={setHardwareResetMethod} connectHardwareSerial={connectHardwareSerial} disconnectHardwareSerial={disconnectHardwareSerial} uploadToHardware={handleUploadToHardware} hardwareConnected={hardwareConnected} hardwareConnecting={hardwareConnecting} isUploadingHardware={isUploadingHardware} hardwareStatus={hardwareStatus} editingDisabled={liveEditingDisabled} setShowProjectsSidebar={setShowProjectsSidebar} setProjectsSidebarTab={setProjectsSidebarTab} validationErrors={validationErrors} autofixPlan={autofixPlan} autofixStatus={autofixStatus} autofixLog={autofixLog} onApplyPlan={handleApplyPlan} onRefresh={triggerAutofixAnalysis} autoWiringEnabled={autoWiringEnabled} setAutoWiringEnabled={setAutoWiringEnabled} autoCodingEnabled={autoCodingEnabled} setAutoCodingEnabled={setAutoCodingEnabled} showAutofix={showAutofix} setShowAutofix={setShowAutofix} />
         {studentAssignmentMode && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '8px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg2)', flexShrink: 0 }}>
             <div style={{ minWidth: 0 }}>
@@ -10688,9 +10669,9 @@ export function SimulatorPage({ gamificationMode = false }) {
                 </svg>
               </button>
               <button
-                onClick={() => setCanvasZoom(1)}
+                onClick={handleZoomTextClick}
                 style={{ background: 'none', border: 'none', color: 'var(--text2)', cursor: 'pointer', fontSize: 11, padding: '2px 6px', borderRadius: 6, minWidth: 40, fontFamily: 'JetBrains Mono, monospace' }}
-                title="Reset Zoom"
+                title="Center & Reset Zoom (Click) | Center Only (Double Click)"
               >{Math.round(canvasZoom * 100)}%</button>
               <button
                 className="zoom-btn"
@@ -10736,7 +10717,7 @@ export function SimulatorPage({ gamificationMode = false }) {
                       WebkitBackfaceVisibility: 'hidden',
                     }}
                   >
-                    <button className="canvas-menu-item" onClick={() => { setCanvasZoom(1); setCanvasOffset({ x: 0, y: 0 }); chrome.setShowCanvasMenu(false); }}>Fit to Canvas</button>
+                    <button className="canvas-menu-item" onClick={() => { fitToView('fit'); chrome.setShowCanvasMenu(false); }}>Fit to Canvas</button>
                     <button className={`canvas-menu-item${history.past.length === 0 || isRunning ? ' canvas-menu-item--disabled' : ''}`} onClick={() => { undo(); chrome.setShowCanvasMenu(false); }} disabled={history.past.length === 0 || isRunning}>Undo</button>
                     <button className={`canvas-menu-item${history.future.length === 0 || isRunning ? ' canvas-menu-item--disabled' : ''}`} onClick={() => { redo(); chrome.setShowCanvasMenu(false); }} disabled={history.future.length === 0 || isRunning}>Redo</button>
                     <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />

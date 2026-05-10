@@ -4,6 +4,8 @@
 
 The telemetry coverage in this repo changed materially. Several components that were previously silent now expose `onCustomTelemetry()` data, and the CLI component suite now passes for the full Pico component matrix.
 
+**2026-05-10:** `BaseComponent` now auto-populates lightweight `customTelemetry` from top-level `state` when a component does not implement `onCustomTelemetry()`. This provides immediate telemetry for many remaining components without per-file edits.
+
 ## Quick Answer: Why Only LCD2004 Pins Are Showing
 
 **Is this correct behavior?** ✅ **YES**
@@ -272,6 +274,24 @@ The current CLI validation run completed successfully against the live backend:
 - Coverage: Micropython and CircuitPython component wiring for the full Pico component matrix
 
 This confirms the updated component set still loads correctly through the MCP/CLI path after the telemetry additions.
+
+**Note (UNO tests):** UNO per-component runs may fail with `Compilation failed` if the backend lacks the Arduino toolchain (`arduino-cli`) and required AVR cores. To fix on Windows, install `arduino-cli`, add AVR cores, restart the backend, and re-run the UNO tests. Example commands:
+
+```powershell
+# Install (choose one):
+# Scoop
+scoop install arduino-cli
+# or Chocolatey
+choco install arduino-cli
+
+# Ensure arduino-cli is on PATH, then install AVR core:
+arduino-cli core update-index
+arduino-cli core install arduino:avr
+
+# Restart backend and re-run tests
+npm --prefix openhw-studio-backend run start
+npm --prefix openhw-studio-cli run test:mcp:uno-components-individual
+```
 
 ---
 
