@@ -28,6 +28,7 @@ import { getMyAssignmentSubmission, submitAssignment } from '../../services/clas
 import { uploadClassroomFiles } from '../../components/teacher/class-detail/uploadUtils.js'
 import StudentAssignmentModal from '../../components/teacher/class-detail/StudentAssignmentModal.jsx'
 import { getCachedHex, setCachedHex, enqueueComponent, getQueuedComponents, dequeueComponent } from '../../services/offlineCache.js'
+import { ComponentContextMenu, ComponentRenamePanel, ComponentValuePanel } from './ComponentContextMenu';
 import AutofixPreviewPanel from '../../components/AutofixPreviewPanel.jsx';
 import { saveProject, loadProject, listProjects, deleteProject, renameProject, generateProjectId, formatProjectDate } from '../../services/projectStore.js'
 import html2canvas from 'html2canvas'
@@ -1651,8 +1652,8 @@ export function SimulatorPage({ gamificationMode = false }) {
   const [, setCustomCatalogCounter] = useState(0); // Trigger palette re-render on injection
   const [previewBanner, setPreviewBanner] = useState(null); // { id, label } — set when opened from admin "Test in Simulator"
   const [isSubmittingAssessment, setIsSubmittingAssessment] = useState(false)
-  const [autoWiringEnabled, setAutoWiringEnabled] = useState(true);
-  const [autoCodingEnabled, setAutoCodingEnabled] = useState(true);
+  const [autoWiringEnabled, setAutoWiringEnabled] = useState(false);
+  const [autoCodingEnabled, setAutoCodingEnabled] = useState(false);
   const [isWiring, setIsWiring] = useState(false)
   const [wiringStartPin, setWiringStartPin] = useState(null)
   const [components, setComponents] = useState([])
@@ -1674,6 +1675,9 @@ export function SimulatorPage({ gamificationMode = false }) {
   const [solverMode, setSolverMode] = useState('logic')
   const [webGpuSupported, setWebGpuSupported] = useState(false)
   const [blocklyXml, setBlocklyXml] = useState('')
+  const [compContextMenu, setCompContextMenu] = useState(null); // { x, y, compId }
+  const [renameState, setRenameState] = useState({ id: null, x: 0, y: 0 });
+  const [valueState, setValueState] = useState({ id: null, x: 0, y: 0, key: 'value' });
   const [showEngineSelector, setShowEngineSelector] = useState(false)
   useEffect(() => {
     if (navigator.gpu) {
@@ -1712,7 +1716,7 @@ export function SimulatorPage({ gamificationMode = false }) {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
   const [showFavorites, setShowFavorites] = useState(true)
   const [paletteContextMenu, setPaletteContextMenu] = useState(null) // { x, y, item }
-  const [showComponentDesc, setShowComponentDesc] = useState(true) // description panel visible
+  const [showComponentDesc, setShowComponentDesc] = useState(false) // description panel visible
   const [showCreateComponentModal, setShowCreateComponentModal] = useState(false)
   const [showInspector, setShowInspector] = useState(false);
   const [hoveredElement, setHoveredElement] = useState(null); // { type: 'wire'|'pin'|'comp', id, data }
@@ -2182,6 +2186,56 @@ export function SimulatorPage({ gamificationMode = false }) {
       }
     };
   }, []);
+
+  const getComponentStateAttrs = (comp, liveStateOverride = null) => {
+    let attrs = { ...comp.attrs };
+
+    if (normalizeBoardKind(comp.type) === 'rp2040') {
+      attrs.env = mapRp2040EnvForLegacyContextMenu(resolveComponentAttrString(attrs, 'env', 'native'));
+    }
+
+    // Remote OOP state takes priority
+    const remoteState = liveStateOverride || liveOopStatesRef.current[comp.id];
+
+    if (comp.type === 'wokwi-led') {
+      delete attrs.value; // Let ui.tsx handle it
+    } else if (comp.type === 'wokwi-servo') {
+      if (remoteState && remoteState.angle !== undefined) {
+        attrs.angle = remoteState.angle.toString();
+      }
+    } else if (comp.type === 'wokwi-stepper-motor') {
+      if (remoteState && remoteState.angle !== undefined) {
+        attrs.angle = remoteState.angle.toString();
+      }
+    } else if (comp.type === 'wokwi-buzzer') {
+      if (remoteState && remoteState.isBuzzing) {
+        // Wokwi buzzer visual indicator (if supported) can be driven here
+        attrs.color = "red";
+      }
+    }
+
+    // Pass interactions to the Web Worker
+    attrs.onInteract = (event) => {
+      console.log(`[SimulatorPage] UI Component ${comp.id} interacted: ${event}. isRunning: ${isRunning}`);
+
+      // Handle physical board reset button presses
+      if (isProgrammableBoardType(comp.type) && event === 'RESET') {
+        if (isRunning) handleReset();
+        return;
+      }
+
+      if (workerRef.current && isRunning) {
+        workerRef.current.postMessage({
+          type: 'INTERACT',
+          compId: comp.id,
+          event: event
+        });
+      }
+    };
+
+    return attrs;
+  };
+
   const notifyLiveOopStateListeners = useCallback((compId) => {
     const listeners = liveOopStateListenersRef.current.get(compId);
     if (!listeners || listeners.size === 0) return;
@@ -4402,6 +4456,34 @@ export function SimulatorPage({ gamificationMode = false }) {
     }
   };
 
+  const applyZoomAtCenter = useCallback((newZoom) => {
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const mx = rect.width / 2;
+    const my = rect.height / 2;
+
+    const currentZoom = canvasZoomRef.current;
+    const currentOffset = canvasOffsetRef.current;
+
+    const cx = (mx - currentOffset.x) / currentZoom;
+    const cy = (my - currentOffset.y) / currentZoom;
+
+    const newOffsetX = mx - cx * newZoom;
+    const newOffsetY = my - cy * newZoom;
+
+    setCanvasZoom(newZoom);
+    setCanvasOffset({ x: newOffsetX, y: newOffsetY });
+
+    // Update refs immediately so subsequent clicks use fresh values
+    canvasZoomRef.current = newZoom;
+    canvasOffsetRef.current = { x: newOffsetX, y: newOffsetY };
+
+    // Update DOM directly for zero-latency response
+    if (innerCanvasRef.current) {
+      innerCanvasRef.current.style.transform = `translate(${newOffsetX}px, ${newOffsetY}px) scale(${newZoom})`;
+    }
+  }, []);
+
   // Keep reactive refs current
   getPinPosRef.current = getPinPos;
   componentsRef.current = components;
@@ -4488,6 +4570,14 @@ export function SimulatorPage({ gamificationMode = false }) {
           removedWires: [],
           transformations: []
         };
+
+        // If autowiring is disabled, we only want the main component at its intelligent position, 
+        // and NO wires or helper components (like breadboards).
+        if (!autoWiringEnabled) {
+          projectPlan.addedComponents = projectPlan.addedComponents.filter(c => c.id === newCompBase.id);
+          projectPlan.addedWires = [];
+        }
+
 
         // 2. Perform "Manual-Style" Snapping for the whole plan
         const { findNearestBreadboardHole, getRotatedPoint } = await import('./utils/autoSetup');
@@ -5239,13 +5329,85 @@ export function SimulatorPage({ gamificationMode = false }) {
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
   }, [wireStart, wires])
 
+  const updateComponentAttr = (id, key, value) => {
+    if (liveEditingDisabled) return;
+    saveHistory();
+    setComponents(prev => prev.map(c => {
+      if (c.id === id) {
+        let newW = c.w;
+        let newH = c.h;
+        const nextValue = (key === 'env' && normalizeBoardKind(c.type) === 'rp2040')
+          ? normalizeRp2040Env(value)
+          : value;
+        if (c.type === 'wokwi-neopixel-matrix') {
+          const rows = key === 'rows' ? (parseInt(nextValue) || 1) : (parseInt(c.attrs?.rows) || 1);
+          const cols = key === 'cols' ? (parseInt(nextValue) || 1) : (parseInt(c.attrs?.cols) || 1);
+          newW = Math.max(30, cols * 30);
+          newH = Math.max(30, rows * 30);
+        }
+        return { ...c, w: newW, h: newH, attrs: { ...c.attrs, [key]: nextValue } };
+      }
+      return c;
+    }));
+  };
+
+  const onCompContextMenu = useCallback((e, compId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCompContextMenu({ x: e.clientX, y: e.clientY, compId });
+    setRenameState({ id: null, x: 0, y: 0 }); // Close rename panel if open
+    setValueState({ id: null, x: 0, y: 0, key: 'value' });  // Close value panel if open
+  }, []);
+
+  const handleRenameComponentId = useCallback((oldId, newId) => {
+    if (!newId || oldId === newId) {
+      setRenameState({ id: null, x: 0, y: 0 });
+      return;
+    }
+
+    // Check for ID conflicts
+    if (components.some(c => c.id === newId)) {
+      console.warn(`[Rename] ID conflict: ${newId} already exists.`);
+      setRenameState({ id: null, x: 0, y: 0 });
+      return;
+    }
+
+    saveHistory();
+
+    // Update component ID
+    setComponents(prev => prev.map(c => c.id === oldId ? { ...c, id: newId } : c));
+
+    // Update all wires referencing this component
+    setWires(prev => prev.map(w => {
+      let from = w.from;
+      let to = w.to;
+      const [fromComp, ...fromPin] = from.split(':');
+      const [toComp, ...toPin] = to.split(':');
+
+      if (fromComp === oldId) {
+        from = `${newId}:${fromPin.join(':')}`;
+      }
+      if (toComp === oldId) {
+        to = `${newId}:${toPin.join(':')}`;
+      }
+
+      return { ...w, from, to };
+    }));
+
+    if (selected === oldId) setSelected(newId);
+    setRenameState({ id: null, x: 0, y: 0 });
+  }, [components, saveHistory, selected]);
+
   // ── Block default browser zoom/scroll with non-passive listeners ───────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const handleWheel = (e) => {
-      if (e.target instanceof HTMLElement && e.target.closest('[data-simulation-console="true"]')) return;
+      if (e.target instanceof HTMLElement && (
+        e.target.closest('[data-simulation-console="true"]') ||
+        e.target.closest('[data-no-canvas-scroll="true"]')
+      )) return;
       onWheel(e);
     };
 
@@ -5276,7 +5438,7 @@ export function SimulatorPage({ gamificationMode = false }) {
       saveHistory();
       const color1 = wireColor(wireStart.pinLabel);
       const color2 = wireColor(pinLabel);
-      
+
       // Logic: If the second pin has a more "specific" color (comms, power, etc.) 
       // and the first is generic green, use the specific color.
       const isGeneric = (c) => c === '#2ecc71' || c === '#10b981';
@@ -5290,7 +5452,7 @@ export function SimulatorPage({ gamificationMode = false }) {
         toLabel: pinLabel,
         color: finalColor,
         waypoints: wireStart.waypoints || [],
-        isBelow: false 
+        isBelow: false
       }
       setWires(prev => [...prev, newWire])
       setWireStart(null)
@@ -5306,27 +5468,6 @@ export function SimulatorPage({ gamificationMode = false }) {
     setWires(prev => prev.map(w => w.id === id ? { ...w, isBelow: !w.isBelow } : w));
   };
 
-  const updateComponentAttr = (id, key, value) => {
-    if (liveEditingDisabled) return;
-    saveHistory();
-    setComponents(prev => prev.map(c => {
-      if (c.id === id) {
-        let newW = c.w;
-        let newH = c.h;
-        const nextValue = (key === 'env' && normalizeBoardKind(c.type) === 'rp2040')
-          ? normalizeRp2040Env(value)
-          : value;
-        if (c.type === 'wokwi-neopixel-matrix') {
-          const rows = key === 'rows' ? (parseInt(nextValue) || 1) : (parseInt(c.attrs?.rows) || 1);
-          const cols = key === 'cols' ? (parseInt(nextValue) || 1) : (parseInt(c.attrs?.cols) || 1);
-          newW = Math.max(30, cols * 30);
-          newH = Math.max(30, rows * 30);
-        }
-        return { ...c, w: newW, h: newH, attrs: { ...c.attrs, [key]: nextValue } };
-      }
-      return c;
-    }));
-  };
 
   // Cancel wire on Escape / delete selected
   useEffect(() => {
@@ -8816,54 +8957,6 @@ export function SimulatorPage({ gamificationMode = false }) {
     else reader.readAsText(file);
   };
 
-  const getComponentStateAttrs = (comp, liveStateOverride = null) => {
-    let attrs = { ...comp.attrs };
-
-    if (normalizeBoardKind(comp.type) === 'rp2040') {
-      attrs.env = mapRp2040EnvForLegacyContextMenu(resolveComponentAttrString(attrs, 'env', 'native'));
-    }
-
-    // Remote OOP state takes priority
-    const remoteState = liveStateOverride || liveOopStatesRef.current[comp.id];
-
-    if (comp.type === 'wokwi-led') {
-      delete attrs.value; // Let ui.tsx handle it
-    } else if (comp.type === 'wokwi-servo') {
-      if (remoteState && remoteState.angle !== undefined) {
-        attrs.angle = remoteState.angle.toString();
-      }
-    } else if (comp.type === 'wokwi-stepper-motor') {
-      if (remoteState && remoteState.angle !== undefined) {
-        attrs.angle = remoteState.angle.toString();
-      }
-    } else if (comp.type === 'wokwi-buzzer') {
-      if (remoteState && remoteState.isBuzzing) {
-        // Wokwi buzzer visual indicator (if supported) can be driven here
-        attrs.color = "red";
-      }
-    }
-
-    // Pass interactions to the Web Worker
-    attrs.onInteract = (event) => {
-      console.log(`[SimulatorPage] UI Component ${comp.id} interacted: ${event}. isRunning: ${isRunning}`);
-
-      // Handle physical board reset button presses
-      if (isProgrammableBoardType(comp.type) && event === 'RESET') {
-        if (isRunning) handleReset();
-        return;
-      }
-
-      if (workerRef.current && isRunning) {
-        workerRef.current.postMessage({
-          type: 'INTERACT',
-          compId: comp.id,
-          event: event
-        });
-      }
-    };
-
-    return attrs;
-  };
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -9895,44 +9988,44 @@ export function SimulatorPage({ gamificationMode = false }) {
                   />
                 )}
               </svg>
-
-              {/* Component Context Menu — rendered at canvas level to avoid overflow:hidden clipping */}
-              {(() => {
-                const comp = components.find(c => c.id === selected);
-                if (!comp) return null;
-                const reg = COMPONENT_REGISTRY[comp.type];
-                if (!reg?.ContextMenu) return null;
-                const showDuringRun = !!reg.contextMenuDuringRun || !!reg.contextMenuOnlyDuringRun;
-                if (isRunning && !showDuringRun) return null;
-                if (!isRunning && reg.contextMenuOnlyDuringRun) return null;
-                return (
-                  <div key={`cmenu-${comp.id}`} data-contextmenu="true" style={{
-                    position: 'absolute',
-                    left: comp.x + comp.w / 2,
-                    top: comp.y - 14,
-                    transform: `translateX(-50%) translateY(-100%) scale(${1 / Math.max(canvasZoom, 0.01)})`,
-                    transformOrigin: 'bottom center',
-                    background: 'var(--bg2)', border: '1px solid var(--border)',
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '6px 10px', borderRadius: '10px',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.6)', cursor: 'default',
-                    pointerEvents: 'all', whiteSpace: 'nowrap', zIndex: 200
-                  }}
-                    onMouseDown={e => e.stopPropagation()}
-                    onClick={e => e.stopPropagation()}
-                    onDoubleClick={e => e.stopPropagation()}
-                  >
-                    {React.createElement(reg.ContextMenu, {
-                      attrs: getComponentStateAttrs(comp),
-                      onUpdate: (key, value) => updateComponentAttr(comp.id, key, value)
-                    })}
-                    <div style={{ position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid var(--border)' }} />
-                    <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--bg2)' }} />
-                  </div>
-                );
-              })()}
-
-              {/* HTML Overlay for Wire Context Menus (Bypasses SVG foreignObject event bugs) */}
+ 
+               {/* Component Context Menu — rendered at canvas level to avoid overflow:hidden clipping */}
+               {(() => {
+                 const comp = components.find(c => c.id === selected);
+                 if (!comp) return null;
+                 const reg = COMPONENT_REGISTRY[comp.type];
+                 if (!reg?.ContextMenu) return null;
+                 const showDuringRun = !!reg.contextMenuDuringRun || !!reg.contextMenuOnlyDuringRun;
+                 if (isRunning && !showDuringRun) return null;
+                 if (!isRunning && reg.contextMenuOnlyDuringRun) return null;
+                 return (
+                   <div key={`cmenu-${comp.id}`} data-contextmenu="true" style={{
+                     position: 'absolute',
+                     left: comp.x + comp.w / 2,
+                     top: comp.y - 14,
+                     transform: `translateX(-50%) translateY(-100%) scale(${1 / Math.max(canvasZoom, 0.01)})`,
+                     transformOrigin: 'bottom center',
+                     background: 'var(--bg2)', border: '1px solid var(--border)',
+                     display: 'flex', alignItems: 'center', gap: 8,
+                     padding: '6px 10px', borderRadius: '10px',
+                     boxShadow: '0 8px 24px rgba(0,0,0,0.6)', cursor: 'default',
+                     pointerEvents: 'all', whiteSpace: 'nowrap', zIndex: 200
+                   }}
+                     onMouseDown={e => e.stopPropagation()}
+                     onClick={e => e.stopPropagation()}
+                     onDoubleClick={e => e.stopPropagation()}
+                   >
+                     {React.createElement(reg.ContextMenu, {
+                       attrs: getComponentStateAttrs(comp),
+                       onUpdate: (key, value) => updateComponentAttr(comp.id, key, value)
+                     })}
+                     <div style={{ position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid var(--border)' }} />
+                     <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--bg2)' }} />
+                   </div>
+                 );
+               })()}
+ 
+               {/* HTML Overlay for Wire Context Menus (Bypasses SVG foreignObject event bugs) */}
               {(() => {
                 const w = wires.find(w => w.id === selected);
                 if (!w || isRunning) return null;
@@ -10032,6 +10125,7 @@ export function SimulatorPage({ gamificationMode = false }) {
                         filter: comp.isGhost ? 'grayscale(0.5) blur(0.5px)' : 'none',
                         pointerEvents: comp.isGhost ? 'none' : 'auto',
                       }}
+                      onContextMenu={e => onCompContextMenu(e, comp.id)}
                     >
                       <CanvasComponent
                         comp={comp}
@@ -10317,7 +10411,22 @@ export function SimulatorPage({ gamificationMode = false }) {
                 onClick={e => e.stopPropagation()}
                 onMouseDown={e => e.stopPropagation()}
                 onDoubleClick={e => e.stopPropagation()}
-                style={{ position: 'absolute', top: 12, right: 12, zIndex: 90, width: 220, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.35)', overflow: 'hidden' }}
+                style={{
+                  position: 'absolute',
+                  top: 12,
+                  right: 12,
+                  zIndex: 90,
+                  width: 220,
+                  background: 'var(--bg2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 12,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+                  overflow: 'hidden',
+                  maxHeight: 'calc(100vh - 130px)', // Limit height to stay above zoom controls
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+                data-no-canvas-scroll="true"
               >
                 {/* Header */}
                 <div style={{
@@ -10589,7 +10698,7 @@ export function SimulatorPage({ gamificationMode = false }) {
                               outline: 'none'
                             }}
                           >
-                            <option value="">-- Disconnected --</option>
+                            <option value="">Disconnected</option>
                             {filteredOptions.map(opt => (
                               <option key={opt.id} value={opt.id}>{opt.label}</option>
                             ))}
@@ -10659,7 +10768,7 @@ export function SimulatorPage({ gamificationMode = false }) {
               </button>
               <button
                 className="zoom-btn"
-                onClick={() => setCanvasZoom(z => Math.max(0.25, parseFloat((z - 0.25).toFixed(2))))}
+                onClick={() => applyZoomAtCenter(Math.max(0.25, parseFloat((canvasZoomRef.current - 0.25).toFixed(2))))}
                 style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', lineHeight: 1, padding: '4px 7px', borderRadius: 6, display: 'flex', alignItems: 'center' }}
                 title="Zoom Out"
               >
@@ -10675,7 +10784,7 @@ export function SimulatorPage({ gamificationMode = false }) {
               >{Math.round(canvasZoom * 100)}%</button>
               <button
                 className="zoom-btn"
-                onClick={() => setCanvasZoom(z => Math.min(2, parseFloat((z + 0.25).toFixed(2))))}
+                onClick={() => applyZoomAtCenter(Math.min(2, parseFloat((canvasZoomRef.current + 0.25).toFixed(2))))}
                 style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', lineHeight: 1, padding: '4px 7px', borderRadius: 6, display: 'flex', alignItems: 'center' }}
                 title="Zoom In"
               >
@@ -11812,6 +11921,90 @@ export function SimulatorPage({ gamificationMode = false }) {
               </div>
             </div>
           )}
+
+          {/* MODAL / OVERLAY LAYER (Global) */}
+          <ComponentContextMenu
+            x={compContextMenu?.x}
+            y={compContextMenu?.y}
+            comp={components.find(c => c.id === compContextMenu?.compId)}
+            info={(() => {
+              const comp = components.find(c => c.id === compContextMenu?.compId);
+              if (!comp) return null;
+              for (const g of CATALOG) {
+                const item = g.items.find(i => i.type === comp.type);
+                if (item) return { ...item, group: g.group };
+              }
+              return { label: comp.label || comp.id, group: 'Universal', description: 'Interactive Simulator Component' };
+            })()}
+            visible={!!compContextMenu}
+            onClose={() => setCompContextMenu(null)}
+            onRename={() => {
+              const id = compContextMenu.compId;
+              const comp = components.find(c => c.id === id);
+              if (comp && canvasRef.current) {
+                const rect = canvasRef.current.getBoundingClientRect();
+                const vx = (comp.x + (comp.w || 0) / 2) * canvasZoom + canvasOffset.x + rect.left;
+                const vy = comp.y * canvasZoom + canvasOffset.y + rect.top;
+                setRenameState({ id, x: vx, y: vy });
+              }
+            }}
+            onPinMap={() => {
+              const id = compContextMenu.compId;
+              setSelected(id);
+              setShowComponentDesc(true);
+              // Small delay to ensure the [selected] effect (which collapses mapping) runs first
+              setTimeout(() => setIsPinMappingExpanded(true), 50);
+            }}
+            onRotate={() => rotateComponent(compContextMenu.compId)}
+            onDelete={() => {
+              saveHistory();
+              const id = compContextMenu.compId;
+              setComponents(prev => prev.filter(c => c.id !== id));
+              setWires(prev => prev.filter(w => !w.from.startsWith(id + ':') && !w.to.startsWith(id + ':')));
+              if (selected === id) setSelected(null);
+            }}
+            onDoc={() => {
+              const comp = components.find(c => c.id === compContextMenu.compId);
+              const reg = COMPONENT_REGISTRY[comp?.type];
+              const helpUrl = reg?.manifest?.helpUrl || reg?.helpUrl;
+              if (helpUrl) window.open(helpUrl, '_blank');
+            }}
+            updateComponentAttr={updateComponentAttr}
+            onValueEdit={(id, key = 'value') => {
+              const comp = components.find(c => c.id === id);
+              if (comp && canvasRef.current) {
+                const rect = canvasRef.current.getBoundingClientRect();
+                const vx = (comp.x + (comp.w || 0) / 2) * canvasZoom + canvasOffset.x + rect.left;
+                const vy = comp.y * canvasZoom + canvasOffset.y + rect.top;
+                setValueState({ id, x: vx, y: vy, key });
+              }
+            }}
+            theme={theme}
+          />
+
+          <ComponentRenamePanel
+            comp={components.find(c => c.id === renameState.id)}
+            x={renameState.x}
+            y={renameState.y}
+            visible={!!renameState.id && renameState.x !== 0}
+            onConfirm={(newId) => handleRenameComponentId(renameState.id, newId)}
+            onCancel={() => setRenameState({ id: null, x: 0, y: 0 })}
+            theme={theme}
+          />
+
+          <ComponentValuePanel
+            comp={components.find(c => c.id === valueState.id)}
+            attrKey={valueState.key}
+            x={valueState.x}
+            y={valueState.y}
+            visible={!!valueState.id && valueState.x !== 0}
+            onConfirm={(val) => {
+              updateComponentAttr(valueState.id, valueState.key, val);
+              setValueState({ id: null, x: 0, y: 0, key: 'value' });
+            }}
+            onCancel={() => setValueState({ id: null, x: 0, y: 0, key: 'value' })}
+            theme={theme}
+          />
         </div>
       </div>
     );
