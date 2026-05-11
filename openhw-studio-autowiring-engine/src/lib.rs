@@ -27,13 +27,24 @@ pub struct Connection {
     pub from:  String,
     pub to:    String,
     pub via:   Option<String>,
+    pub color: Option<String>,
     pub attrs: Option<HashMap<String, serde_json::Value>>,
     pub i2c:   Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct HelperDefinition {
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub id: String,
+    pub label: Option<String>,
+    pub attrs: Option<serde_json::Value>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Autowiring {
     pub connections: Vec<Connection>,
+    pub helpers: Option<Vec<HelperDefinition>>,
     #[serde(rename = "externalPower", default)]
     pub external_power: Option<bool>,
     #[serde(rename = "externalVoltage", default)]
@@ -78,10 +89,15 @@ pub struct WirePlan {
     pub from:      String,
     pub to:        String,
     pub color:     String,
+    #[serde(alias = "waypoints")]
     pub path:      Option<Vec<Point>>,
     pub is_socket: bool,
     pub is_hidden: bool,
     pub lane:      i32,
+}
+
+fn is_none_or_empty(s: &Option<String>) -> bool {
+    s.as_ref().map(|x| x.is_empty()).unwrap_or(true)
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -89,12 +105,16 @@ pub struct NewComponentPlan {
     pub id:    String,
     #[serde(rename = "type")]
     pub kind:  String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     pub x:     f32,
     pub y:     f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub w:     Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub h:     Option<f32>,
-    pub attrs: Option<HashMap<String, serde_json::Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attrs: Option<serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -133,13 +153,14 @@ impl Engine {
         self.occupied_rows.clear();
     }
 
-    pub fn build_state(&mut self, existing_wires: Vec<serde_json::Value>, rewire_id: Option<&String>) -> (Vec<String>, Vec<String>) {
+    pub fn build_state(&mut self, existing_wires: Vec<serde_json::Value>, rewire_id: Option<&String>) -> (Vec<String>, Vec<String>, usize) {
         self.occupancy_grid.clear();
         self.occupied_pins.clear();
         self.occupied_rows.clear();
 
         let mut removed_wires = Vec::new();
         let mut removed_components = Vec::new();
+        let mut processed_wire_count = 0;
 
         // 1. Identify helper components to remove if re-wiring
         if let Some(rid) = rewire_id {
@@ -182,17 +203,18 @@ impl Engine {
                 }
             }
 
+            processed_wire_count += 1;
             for ps in &[from_str, to_str] {
-                if !ps.is_empty() {
-                    let parts: Vec<&str> = ps.split(|c| c == ':' || c == '.').collect();
-                    if parts.len() >= 2 {
-                        self.occupied_pins
-                            .entry(parts[0].to_string())
-                            .or_default()
-                            .push(parts[1].to_string());
-                    }
-                    if parts.len() >= 2 {
-                        if let Some(num_str) = parts[1].chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse::<i32>().ok() {
+                if !ps.is_empty() && ps.contains(':') {
+                    let parts: Vec<&str> = ps.splitn(2, ':').collect();
+                    if parts.len() == 2 {
+                        let comp_id = parts[0].to_string();
+                        let pin_id = parts[1].to_string();
+                        
+                        let clean_pin = pin_id.split('.').next().unwrap_or(&pin_id).to_string();
+                        self.occupied_pins.entry(comp_id).or_default().push(clean_pin.clone());
+
+                        if let Some(num_str) = clean_pin.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse::<i32>().ok() {
                             if !self.occupied_rows.contains(&num_str) {
                                 self.occupied_rows.push(num_str);
                             }
@@ -201,7 +223,7 @@ impl Engine {
                 }
             }
         }
-        (removed_wires, removed_components)
+        (removed_wires, removed_components, processed_wire_count)
     }
 
     pub fn pin_exists(&self, board_id: &str, pin_id: &str) -> bool {
@@ -211,12 +233,51 @@ impl Engine {
         false
     }
 
-    pub fn is_pin_taken(&self, board_id: &str, pin_id: &str) -> bool {
-        if !self.pin_exists(board_id, pin_id) { return true; }
-        self.occupied_pins.get(board_id).map(|os| os.contains(&pin_id.to_string())).unwrap_or(false)
+    pub fn is_pin_taken(&self, comp_id: &str, pin_id: &str, plan: &mut AutonomousPlan) -> bool {
+        // 0. Buses are never "taken"
+        let upin = pin_id.to_uppercase();
+        if upin == "GND" || upin == "VCC" || upin == "5V" || upin == "3V3" || upin == "12V" || upin == "VIN" || upin == "VBUS" {
+            return false;
+        }
+
+        // 1. Check existing wires (already on the board)
+        let mut is_taken = false;
+        if let Some(taken) = self.occupied_pins.get(comp_id) {
+            // Handle potential multi-pin list in existing state (unlikely but safe)
+            if pin_id.contains('|') {
+                is_taken = pin_id.split('|').all(|p| taken.contains(&p.to_string()));
+            } else if taken.contains(&pin_id.to_string()) { 
+                is_taken = true;
+            }
+        }
+        
+        // 2. Check newly added wires in the current plan
+        if !is_taken {
+            let full_prefix = format!("{}:", comp_id);
+            let pins_to_check: Vec<&str> = if pin_id.contains('|') { pin_id.split('|').collect() } else { vec![pin_id] };
+            
+            if plan.added_wires.iter().any(|w| {
+                pins_to_check.iter().any(|&p| {
+                    let suffix = format!(":{}", p);
+                    w.from == format!("{}{}", full_prefix, p) || 
+                    w.to == format!("{}{}", full_prefix, p) ||
+                    w.from.ends_with(&suffix) && w.from.starts_with(&full_prefix) ||
+                    w.to.ends_with(&suffix) && w.to.starts_with(&full_prefix)
+                })
+            }) {
+                is_taken = true;
+            }
+        }
+        
+        // Debug Log
+        if pin_id.starts_with("OUT") || pin_id.starts_with("IN") || pin_id.starts_with("EN") {
+            plan.reasoning.push(format!("DEBUG: is_pin_taken({}, {}) -> {}", comp_id, pin_id, if is_taken { "BUSY" } else { "FREE" }));
+        }
+        
+        is_taken
     }
 
-    pub fn resolve_bus_pair(&mut self, board_id: &str, bus_type: &str) -> Option<(String, String, String, i32)> {
+    pub fn resolve_bus_pair(&mut self, board_id: &str, bus_type: &str, plan: &mut AutonomousPlan) -> Option<(String, String, String, i32)> {
         let is_pico = self.components.get(board_id)?.kind.contains("pico");
         
         if bus_type == "i2c" {
@@ -229,26 +290,22 @@ impl Engine {
                 vec![("A4", "A5", "", 0)]
             };
             for (p1, p2, p3, idx) in pairs {
-                if !self.is_pin_taken(board_id, p1) && !self.is_pin_taken(board_id, p2) {
-                    self.occupied_pins.entry(board_id.to_string()).or_default().push(p1.to_string());
-                    self.occupied_pins.entry(board_id.to_string()).or_default().push(p2.to_string());
+                if !self.is_pin_taken(board_id, p1, plan) && !self.is_pin_taken(board_id, p2, plan) {
                     return Some((p1.to_string(), p2.to_string(), p3.to_string(), idx));
                 }
             }
         } else if bus_type == "spi" {
             let groups = if is_pico {
                 vec![
-                    ("GP18", "GP19", "GP16", 0), // SCK, MOSI, MISO (Bus 0)
-                    ("GP10", "GP11", "GP8", 1),  // SCK, MOSI, MISO (Bus 1)
+                    ("GP18", "GP19", "GP16", 0), ("GP2", "GP3", "GP0", 0), ("GP6", "GP7", "GP4", 0), ("GP10", "GP11", "GP8", 0),
+                    ("GP22", "GP23", "GP20", 0), ("GP26", "GP27", "GP24", 0),
+                    ("GP14", "GP15", "GP12", 1), ("GP10", "GP11", "GP8", 1), ("GP2", "GP3", "GP0", 1), ("GP6", "GP7", "GP4", 1),
                 ]
             } else {
                 vec![("13", "11", "12", 0)] // Uno SPI: 13=SCK, 11=MOSI, 12=MISO
             };
             for (sck, mosi, miso, idx) in groups {
-                if !self.is_pin_taken(board_id, sck) && !self.is_pin_taken(board_id, mosi) && !self.is_pin_taken(board_id, miso) {
-                    self.occupied_pins.entry(board_id.to_string()).or_default().push(sck.to_string());
-                    self.occupied_pins.entry(board_id.to_string()).or_default().push(mosi.to_string());
-                    self.occupied_pins.entry(board_id.to_string()).or_default().push(miso.to_string());
+                if !self.is_pin_taken(board_id, sck, plan) && !self.is_pin_taken(board_id, mosi, plan) && !self.is_pin_taken(board_id, miso, plan) {
                     return Some((sck.to_string(), mosi.to_string(), miso.to_string(), idx));
                 }
             }
@@ -449,7 +506,7 @@ impl Engine {
                 }
             } else if pt == "input" || pt == "bidirectional" || sig.contains("i2c") || sig.contains("scl") || sig.contains("sda") {
                 // I2C pins with Strict Hardware enforcement
-                if let Some((sda, scl, _, bus_idx)) = self.resolve_bus_pair(board_id, "i2c") {
+                if let Some((sda, scl, _, bus_idx)) = self.resolve_bus_pair(board_id, "i2c", plan) {
                     let target_pin = if pn.contains("sda") || sig.contains("sda") { sda } else { scl };
                     plan.added_wires.push(WirePlan {
                         id: format!("w_fallback_i2c_{}_{}", comp.id, t),
@@ -511,8 +568,11 @@ pub fn generate_autonomous_setup(
 ) -> JsValue {
     let mut engine = ENGINE.lock().unwrap();
 
-    let existing_wires: Vec<serde_json::Value> = 
-        serde_wasm_bindgen::from_value(wires_json).unwrap_or_default();
+    // ── 0. Manual Wire Ingestion (Robust via Alias) ──
+    let existing_wires: Vec<serde_json::Value> = match serde_wasm_bindgen::from_value(wires_json) {
+        Ok(v) => v,
+        Err(_) => Vec::new(),
+    };
     
     let new_comp: NewComponentPlan = match serde_wasm_bindgen::from_value(new_comp_json) {
         Ok(v) => v,
@@ -520,7 +580,7 @@ pub fn generate_autonomous_setup(
     };
 
     let rewire_id = if is_rewire { Some(&new_comp.id) } else { None };
-    let (removed_wires, removed_components) = engine.build_state(existing_wires, rewire_id);
+    let (removed_wires, removed_components, wire_count) = engine.build_state(existing_wires, rewire_id);
 
     let manifest: ComponentManifest = match serde_wasm_bindgen::from_value(manifest_json) {
         Ok(v) => v,
@@ -543,8 +603,16 @@ pub fn generate_autonomous_setup(
         removed_wires,
         removed_components,
         code_snippet:    None,
-        reasoning:       vec!["WASM Engine v2: Parallel Lane Routing.".to_string()],
+        reasoning:       vec![
+            format!("SCAN: Found {} wires in project.", wire_count)
+        ],
     };
+    let main_id = plan.main_component.id.clone();
+
+    // Memory Dump
+    for (cid, pins) in &engine.occupied_pins {
+        plan.reasoning.push(format!("SCAN: Component '{}' has busy pins: {:?}", cid, pins));
+    }
 
     let mut lane_counter = 0;
 
@@ -559,7 +627,8 @@ pub fn generate_autonomous_setup(
                               else               { ("wokwi-breadboard",      920.0, 295.0) };
         let bb_id = format!("bb_{}", count);
         let bcomp = NewComponentPlan {
-            id: bb_id.clone(), kind: bb_type.to_string(), label: Some("Breadboard".to_string()),
+            id: bb_id.clone(), kind: bb_type.to_string(), 
+            label: None, // Let frontend handle default labeling
             x: plan.main_component.x - 60.0, y: plan.main_component.y - 60.0,
             w: Some(w), h: Some(h), attrs: None,
         };
@@ -569,10 +638,14 @@ pub fn generate_autonomous_setup(
     }
 
     // ── 2. Anchor-pin snapping ────────────────────────────────────────────────
-    let current_bb_comp = bb.clone().or_else(|| bb_to_add.as_ref().map(|b| Component {
-        id: b.id.clone(), kind: b.kind.clone(),
-        x: b.x, y: b.y, w: b.w.unwrap_or(400.0), h: b.h.unwrap_or(300.0), pins: Vec::new(),
-    }));
+    let current_bb_comp = if allow_breadboard {
+        bb.clone().or_else(|| bb_to_add.as_ref().map(|b| Component {
+            id: b.id.clone(), kind: b.kind.clone(),
+            x: b.x, y: b.y, w: b.w.unwrap_or(400.0), h: b.h.unwrap_or(300.0), pins: Vec::new(),
+        }))
+    } else {
+        None
+    };
 
     if let Some(ref bb_comp) = current_bb_comp {
         let anchor_pin = manifest.pins.as_ref()
@@ -611,12 +684,12 @@ pub fn generate_autonomous_setup(
             
             plan.added_components.push(NewComponentPlan {
                 id: "powersupply".to_string(), kind: "wokwi-power-supply".to_string(),
-                label: Some(format!("{}V DC", voltage)),
+                label: Some("Power Supply".to_string()),
                 x: ps_x, y: ps_y, w: Some(60.0), h: Some(60.0),
-                attrs: Some(HashMap::from([("voltage".to_string(), serde_json::Value::String(voltage))])),
+                attrs: Some(serde_json::json!({ "voltage": voltage })),
             });
             plan.added_wires.push(WirePlan {
-                id: format!("w_ps_gnd_{}", plan.main_component.id),
+                id: format!("w_ps_gnd_{}", main_id),
                 from: "powersupply:GND".to_string(),
                 to: format!("{}:GND", board_id),
                 color: "black".to_string(), path: None, is_socket: false, is_hidden: false,
@@ -624,14 +697,144 @@ pub fn generate_autonomous_setup(
             });
             plan.reasoning.push("Injected external power supply component.".to_string());
         }
+
+        // Specialized Power Supply for Motors (Inductive load)
+        if manifest.kind == "wokwi-motor" {
+            // Check if we already have a PSU
+            let has_psu = engine.components.values().any(|c| c.kind.contains("power-supply")) ||
+                         plan.added_components.iter().any(|c| c.kind.contains("power-supply"));
+            
+            if !has_psu {
+                let mut voltage = "12.0".to_string();
+                if let Some(helpers) = &autowiring.helpers {
+                    if let Some(psu_helper) = helpers.iter().find(|h| h.kind.contains("power-supply")) {
+                        if let Some(v) = psu_helper.attrs.as_ref().and_then(|a| a.get("voltage")) {
+                             voltage = v.as_str().unwrap_or("12.0").to_string();
+                        }
+                    }
+                }
+
+                let ps_w = 60.0; let ps_h = 60.0;
+                let raw_x = new_comp.x + 200.0;
+                let raw_y = new_comp.y;
+                let (ps_x, ps_y) = engine.free_helper_position(raw_x, raw_y, ps_w, ps_h, Some(raw_y));
+                
+                plan.added_components.push(NewComponentPlan {
+                    id: format!("power-supply_{}", main_id),
+                    kind: "wokwi-power-supply".to_string(),
+                    label: Some("Power Supply".to_string()),
+                    x: ps_x, y: ps_y, w: Some(60.0), h: Some(60.0),
+                    attrs: Some(serde_json::json!({ "voltage": voltage })),
+                });
+            }
+        }
+
+        // ── 5. Helper Component Injection ──
+        let mut helper_id_map: HashMap<String, String> = HashMap::new();
+        if let Some(helpers) = &autowiring.helpers {
+            for h in helpers {
+                // If it's a shared resource like power supply, try to find existing one first
+                let mut target_id = "".to_string();
+                // Shared Helper Logic: Look for existing PSU or Motor Driver
+                if h.kind.contains("power-supply") {
+                    if let Some(existing_psu) = engine.components.values().find(|c| c.kind.contains("power-supply")) {
+                        target_id = existing_psu.id.clone();
+                        plan.reasoning.push(format!("Reusing existing power supply: {}", target_id));
+                    }
+                } else if h.kind.contains("motor-driver") {
+                    // Find a driver that has either OUT1 or OUT3 free
+                    if let Some(existing_driver) = engine.components.values().find(|c| {
+                        if !c.kind.contains("motor-driver") { return false; }
+                        let taken = engine.occupied_pins.get(&c.id).cloned().unwrap_or_default();
+                        let out1_free = !taken.contains(&"OUT1".to_string()) && !taken.contains(&"OUT2".to_string());
+                        let out3_free = !taken.contains(&"OUT3".to_string()) && !taken.contains(&"OUT4".to_string());
+                        out1_free || out3_free
+                    }) {
+                        target_id = existing_driver.id.clone();
+                        plan.reasoning.push(format!("Sharing existing motor driver: {}", target_id));
+                    }
+                }
+
+                if target_id == "" {
+                    // Create new helper
+                    let _used_ids: Vec<String> = engine.components.keys().cloned().chain(plan.added_components.iter().map(|c| c.id.clone())).collect();
+                    let new_id = format!("{}_{}", h.kind.replace("wokwi-", ""), new_comp.id);
+                    
+                    // Basic layout: place helpers to the right of the main component
+                    let offset = plan.added_components.len() as f32 + 1.0;
+                    let added = NewComponentPlan {
+                        id: new_id.clone(),
+                        kind: h.kind.clone(),
+                        label: Some(h.kind.replace("wokwi-", "").replace("-", " ").to_uppercase().replace("MOTOR DRIVER", "Motor Driver").replace("POWER SUPPLY", "Power Supply")),
+                        x: new_comp.x + new_comp.w.unwrap_or(60.0) + (offset * 100.0),
+                        y: new_comp.y,
+                        w: if h.kind.contains("driver") { Some(80.0) } else if h.kind.contains("supply") { Some(60.0) } else { None },
+                        h: if h.kind.contains("driver") { Some(80.0) } else if h.kind.contains("supply") { Some(60.0) } else { None },
+                        attrs: h.attrs.clone(),
+                    };
+                    target_id = new_id;
+                    plan.added_components.push(added);
+                    plan.reasoning.push(format!("Injected helper: {} ({})", target_id, h.kind));
+                } else {
+                    // Shared Ownership: DO NOT add to added_components if it already exists
+                    // This prevents overriding existing project state with empty attributes
+                }
+                helper_id_map.insert(h.id.clone(), target_id);
+            }
+        }
+
         let mut comp_bus_cache: HashMap<String, (String, String, String, i32)> = HashMap::new();
 
         for (i, conn) in autowiring.connections.iter().enumerate() {
             let mut target = conn.to.clone();
+            let mut resolved_target_pin = "".to_string();
 
-            if target.contains("arduino:") || target.contains("board:") {
+            if target.contains("arduino:") || target.contains("board:") || target.contains("helper:") {
                 let original_pref = target.clone();
-                let preferred = target.replace("arduino:", "").replace("board:", "");
+                let mut preferred = target.replace("arduino:", "").replace("board:", "");
+                
+                // Universal Fallback: pick the first available pin in the | list
+                if preferred.contains('|') {
+                    let (prefix, options_str) = if preferred.contains(':') {
+                        let last_colon = preferred.rfind(':').unwrap();
+                        (preferred[..=last_colon].to_string(), preferred[last_colon+1..].to_string())
+                    } else {
+                        ("".to_string(), preferred.clone())
+                    };
+
+                    let mut found = false;
+                    for opt in options_str.split('|') {
+                        let candidate_full = format!("{}{}", prefix, opt);
+                        let is_taken = if candidate_full.contains("helper:") {
+                             let parts: Vec<&str> = candidate_full.split(':').collect();
+                             let alias = if parts.len() == 3 { parts[1] } else { parts[0] };
+                             let pin_id = if parts.len() == 3 { parts[2] } else { parts[1] };
+                             if let Some(real_id) = helper_id_map.get(alias) {
+                                 engine.is_pin_taken(real_id, pin_id, &mut plan)
+                             } else { false }
+                        } else {
+                             let pin_id = opt.replace("arduino:", "").replace("board:", "");
+                             engine.is_pin_taken(&board_id, &pin_id, &mut plan)
+                        };
+                        
+                        if !is_taken {
+                            target = if original_pref.contains(':') {
+                                let first_colon = original_pref.find(':').unwrap();
+                                format!("{}{}", &original_pref[..=first_colon], candidate_full)
+                            } else {
+                                candidate_full.clone()
+                            };
+                            preferred = candidate_full;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if !found {
+                        // If all busy, pick the first one and warn (handled below)
+                        preferred = format!("{}{}", prefix, options_str.split('|').next().unwrap_or(""));
+                    }
+                }
+                resolved_target_pin = preferred.clone();
                 
                 let is_pico = engine.components.get(&board_id).map(|c| c.kind.contains("pico")).unwrap_or(false);
 
@@ -645,6 +848,37 @@ pub fn generate_autonomous_setup(
                     }
                 } else if preferred == "3V3" {
                     target = format!("{}:3V3", board_id);
+                } else if preferred.contains(':') {
+                    // Resolve helper:alias:pin1|pin2 -> physical_id:best_pin
+                    let parts: Vec<&str> = preferred.split(':').collect();
+                    plan.reasoning.push(format!("DEBUG: Splitting helper '{}' into {} parts.", preferred, parts.len()));
+                    
+                    if parts.len() >= 2 {
+                        let alias = if parts.len() == 3 { parts[1] } else { parts[0] };
+                        let pin_options = if parts.len() == 3 { parts[2] } else { parts[1] };
+                        
+                        plan.reasoning.push(format!("DEBUG: Alias='{}', Options='{}'", alias, pin_options));
+                        
+                        if let Some(real_id) = helper_id_map.get(alias) {
+                            let mut best_pin = "".to_string();
+                            let options: Vec<&str> = pin_options.split('|').collect();
+                            plan.reasoning.push(format!("DEBUG: Found {} possible pins.", options.len()));
+                            
+                            for opt in &options {
+                                if !engine.is_pin_taken(real_id, opt, &mut plan) {
+                                    best_pin = opt.to_string();
+                                    plan.reasoning.push(format!("DEBUG: Selected free pin: {}", best_pin));
+                                    break;
+                                }
+                            }
+                            if best_pin.is_empty() && !options.is_empty() {
+                                best_pin = options[0].to_string();
+                                plan.reasoning.push(format!("WARNING: All target pin options for {} are taken. Defaulting to {} (COLLISION LIKELY)", real_id, best_pin));
+                            }
+                            target = format!("{}:{}", real_id, best_pin);
+                            resolved_pins.insert(original_pref.clone(), format!("{}:{}", real_id, best_pin));
+                        }
+                    }
                 } else {
                     // ── I2C/Bus Awareness for Explicit Manifests ──
                     let bus_type = if conn.from.to_uppercase().contains("SDA") || conn.from.to_uppercase().contains("SCL") || preferred.to_uppercase().contains("SDA") || preferred.to_uppercase().contains("SCL") {
@@ -661,7 +895,7 @@ pub fn generate_autonomous_setup(
                         let bus_info = if let Some(cached) = comp_bus_cache.get(bt) {
                             Some(cached.clone())
                         } else {
-                            let res = engine.resolve_bus_pair(&board_id, bt);
+                            let res = engine.resolve_bus_pair(&board_id, bt, &mut plan);
                             if let Some(pair) = &res { comp_bus_cache.insert(bt.to_string(), pair.clone()); }
                             res
                         };
@@ -686,10 +920,10 @@ pub fn generate_autonomous_setup(
                             resolved_pins.insert(original_pref.clone(), resolved.clone());
                             target = format!("{}:{}", board_id, resolved);
                             if !plan.reasoning.iter().any(|r| r.contains("Bus")) {
-                                plan.reasoning.push(format!("Strict Routing: Assigned {} hardware (Bus {}) for {}.", bt.to_uppercase(), bus_idx, plan.main_component.id));
+                                plan.reasoning.push(format!("Strict Routing: Assigned {} hardware (Bus {}) for {}.", bt.to_uppercase(), bus_idx, main_id));
                             }
                         } else {
-                            plan.reasoning.push(format!("CRITICAL: No Hardware {} buses available on {} for component {}.", bt.to_uppercase(), board_id, plan.main_component.id));
+                            plan.reasoning.push(format!("CRITICAL: No Hardware {} buses available on {} for component {}.", bt.to_uppercase(), board_id, main_id));
                             continue;
                         }
                     } else if let Some(p) = engine.resolve_best_pin(&board_id, &preferred) {
@@ -707,25 +941,25 @@ pub fn generate_autonomous_setup(
 
             // I2C pull-up injection
             if conn.i2c.unwrap_or(false) && !i2c_injected {
-                let bb_x = current_bb_comp.as_ref().map(|b| b.x).unwrap_or(100.0);
-                let bb_y = current_bb_comp.as_ref().map(|b| b.y).unwrap_or(100.0);
-                let bb_id_str = current_bb_comp.as_ref().map(|b| b.id.as_str()).unwrap_or("bb_0");
+                let bb_x = current_bb_comp.as_ref().map(|b| b.x).unwrap_or(new_comp.x + 100.0);
+                let bb_y = current_bb_comp.as_ref().map(|b| b.y).unwrap_or(new_comp.y - 100.0);
+                let bb_id_str = current_bb_comp.as_ref().map(|b| b.id.as_str()).unwrap_or("board");
 
                 for (j, (pin_name, rail_idx)) in [("SDA", 8), ("SCL", 10)].iter().enumerate() {
-                    let pu_id = format!("pu_{}_{}", pin_name.to_lowercase(), plan.main_component.id);
+                    let pu_id = format!("pu_{}_{}", pin_name.to_lowercase(), main_id);
                     let pu_w = 70.0; let pu_h = 32.0;
                     let raw_x = bb_x + 30.0 + j as f32 * 90.0;
                     let raw_y = bb_y - 50.0;
                     let (px, py) = engine.free_helper_position(raw_x, raw_y, pu_w, pu_h, None);
                     plan.added_components.push(NewComponentPlan {
                         id: pu_id.clone(), kind: "wokwi-resistor".to_string(),
-                        label: Some("4.7k".to_string()),
-                        x: px, y: py, w: Some(pu_w), h: Some(pu_h),
-                        attrs: Some(HashMap::from([("value".to_string(), serde_json::Value::String("4700".to_string()))])),
+                        label: Some("Resistor".to_string()),
+                        x: px, y: py, w: Some(70.0), h: Some(32.0),
+                        attrs: Some(serde_json::json!({ "value": "4700" }))
                     });
                     plan.added_wires.push(WirePlan {
-                        id: format!("w_pu_{}_in_{}", pin_name, plan.main_component.id),
-                        from: format!("{}:{}", plan.main_component.id, pin_name),
+                        id: format!("w_pu_{}_in_{}", pin_name, main_id),
+                        from: format!("{}:{}", main_id, pin_name),
                         to:   format!("{}:p1", pu_id),
                         color: "#38bdf8".to_string(), path: None, is_socket: true, is_hidden: true,
                         lane: { let l = lane_counter; lane_counter += 1; l % 7 },
@@ -737,7 +971,7 @@ pub fn generate_autonomous_setup(
                     };
 
                     plan.added_wires.push(WirePlan {
-                        id: format!("w_pu_{}_out_{}", pin_name, plan.main_component.id),
+                        id: format!("w_pu_{}_out_{}", pin_name, main_id),
                         from: format!("{}:p2", pu_id),
                         to:   pu_target,
                         color: "red".to_string(), path: None, is_socket: false, is_hidden: false,
@@ -754,26 +988,26 @@ pub fn generate_autonomous_setup(
                     .and_then(|a| a.get("value"))
                     .and_then(|v| v.as_str())
                     .unwrap_or("220");
-                let via_id = format!("via_{}_{}_{}", conn.from, plan.main_component.id, i);
+                let via_id = format!("via_{}_{}_{}", conn.from, main_id, i);
                 let raw_x  = plan.main_component.x + HOLE_PITCH * 5.0;
                 let raw_y  = plan.main_component.y;
                 // Try to align with the component's Y coordinate to keep wires straight
                 let (vx, vy) = engine.free_helper_position(raw_x, raw_y, 70.0, 32.0, Some(raw_y));
                 plan.added_components.push(NewComponentPlan {
                     id: via_id.clone(), kind: via_kind.clone(),
-                    label: Some(format!("{}R", res_val)),
+                    label: Some("Resistor".to_string()),
                     x: vx, y: vy, w: Some(70.0), h: Some(32.0),
-                    attrs: Some(HashMap::from([("value".to_string(), serde_json::Value::String(res_val.to_string()))])),
+                    attrs: Some(serde_json::json!({ "value": res_val })),
                 });
                 plan.added_wires.push(WirePlan {
-                    id: format!("w_via_in_{}_{}", plan.main_component.id, i),
-                    from: format!("{}:{}", plan.main_component.id, conn.from),
+                    id: format!("w_via_in_{}_{}", main_id, i),
+                    from: format!("{}:{}", main_id, conn.from),
                     to:   format!("{}:p1", via_id),
                     color: "orange".to_string(), path: None, is_socket: true, is_hidden: true,
                     lane: { let l = lane_counter; lane_counter += 1; l % 7 },
                 });
                 plan.added_wires.push(WirePlan {
-                    id: format!("w_via_out_{}_{}", plan.main_component.id, i),
+                    id: format!("w_via_out_{}_{}", main_id, i),
                     from: format!("{}:p2", via_id),
                     to:   target,
                     color: "green".to_string(), path: None, is_socket: false, is_hidden: false,
@@ -782,11 +1016,50 @@ pub fn generate_autonomous_setup(
                 continue;
             }
 
+            let main_id = plan.main_component.id.clone();
+            let mut from_pin = format!("{}:{}", main_id, conn.from);
+            if conn.from.starts_with("helper:") {
+                let parts: Vec<&str> = conn.from.split(':').collect();
+                if parts.len() >= 3 {
+                    let alias = parts[1];
+                    let pin_options = parts[2];
+                    if let Some(real_id) = helper_id_map.get(alias) {
+                        let mut best_pin = "".to_string();
+                        let options: Vec<&str> = pin_options.split('|').collect();
+                        for opt in &options {
+                            if !engine.is_pin_taken(real_id, opt, &mut plan) {
+                                best_pin = opt.to_string();
+                                break;
+                            }
+                        }
+                        // If still empty, fall back to the first option but log a warning (or handle error)
+                        if best_pin.is_empty() && !options.is_empty() {
+                            best_pin = options[0].to_string();
+                            plan.reasoning.push(format!("WARNING: All pin options for {} are taken. Defaulting to {} (COLLISION LIKELY)", real_id, best_pin));
+                        }
+                        from_pin = format!("{}:{}", real_id, best_pin);
+                    }
+                }
+            }
+
             plan.added_wires.push(WirePlan {
-                id: format!("w_auto_{}_{}", plan.main_component.id, i),
-                from: format!("{}:{}", plan.main_component.id, conn.from),
-                to:   target,
-                color: "green".to_string(), path: None, is_socket: false, is_hidden: false,
+                id: format!("w_auto_{}_{}", main_id, i),
+                from: from_pin.clone(),
+                to: if target.contains("arduino:") || target.contains("board:") {
+                        format!("{}:{}", board_id, resolved_target_pin)
+                    } else if target.contains("helper:") {
+                        // For helpers, target is already resolved to physical_id:pin in the loop above
+                        target.clone()
+                    } else {
+                        target.clone()
+                    },
+                color: if let Some(c) = &conn.color { c.clone() }
+                       else if from_pin.contains("VCC") || from_pin.contains("5V") || from_pin.contains("VMOT") || target.contains("5V") { "red".to_string() } 
+                       else if from_pin.contains("GND") || target.contains("GND") { "black".to_string() } 
+                       else { "green".to_string() },
+                path: None, 
+                is_socket: if conn.color.is_some() { false } else { from_pin.contains("uno") || target.contains("uno") || from_pin.contains("board") || target.contains("board") },
+                is_hidden: false,
                 lane: { let l = lane_counter; lane_counter += 1; l % 7 },
             });
         }
@@ -814,5 +1087,7 @@ pub fn generate_autonomous_setup(
         }
     }
 
-    serde_wasm_bindgen::to_value(&plan).unwrap()
+    use serde::Serialize;
+    let serializer = serde_wasm_bindgen::Serializer::new().serialize_maps_as_objects(true);
+    plan.serialize(&serializer).unwrap()
 }

@@ -1,0 +1,137 @@
+{
+  "schemaVersion": "openhw-project-v2",
+  "board": "wokwi-arduino-uno",
+  "components": [
+    {
+      "id": "uno1",
+      "type": "wokwi-arduino-uno",
+      "label": "Arduino Uno",
+      "x": 168.5,
+      "y": 363.11111068725586,
+      "w": 311,
+      "h": 228,
+      "rotation": 0,
+      "attrs": {}
+    },
+    {
+      "id": "wokwi_stepper_motor_1",
+      "type": "wokwi-stepper-motor",
+      "label": "Stepper Motor (Bipolar)",
+      "x": 661,
+      "y": 630.111,
+      "w": 50,
+      "h": 50,
+      "rotation": 0,
+      "attrs": {
+        "step_angle": "1.8"
+      }
+    },
+    {
+      "id": "a4988_wokwi_stepper_motor_1",
+      "type": "wokwi-a4988",
+      "label": "A4988 Driver",
+      "x": 728,
+      "y": 355.1111145019531,
+      "w": 40,
+      "h": 20,
+      "rotation": 0,
+      "attrs": {}
+    },
+    {
+      "id": "power-supply_wokwi_stepper_motor_1",
+      "type": "wokwi-power-supply",
+      "label": "12V Supply",
+      "x": 828,
+      "y": 355.1111145019531,
+      "w": 40,
+      "h": 20,
+      "rotation": 0,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    {
+      "id": "w_auto_wokwi_stepper_motor_1_0",
+      "from": "wokwi_stepper_motor_1:A+",
+      "to": "helper:driver:1A",
+      "color": "green",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "",
+      "toLabel": ""
+    },
+    {
+      "id": "w_auto_wokwi_stepper_motor_1_1",
+      "from": "wokwi_stepper_motor_1:A-",
+      "to": "helper:driver:2A",
+      "color": "green",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "",
+      "toLabel": ""
+    },
+    {
+      "id": "w_auto_wokwi_stepper_motor_1_2",
+      "from": "wokwi_stepper_motor_1:B+",
+      "to": "helper:driver:1B",
+      "color": "green",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "",
+      "toLabel": ""
+    },
+    {
+      "id": "w_auto_wokwi_stepper_motor_1_3",
+      "from": "wokwi_stepper_motor_1:B-",
+      "to": "helper:driver:2B",
+      "color": "green",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "",
+      "toLabel": ""
+    }
+  ],
+  "blocklyXml": "",
+  "blocklyGeneratedCode": "",
+  "useBlocklyCode": false,
+  "projectFiles": [
+    {
+      "id": "project/library.txt",
+      "path": "project/library.txt",
+      "name": "library.txt",
+      "kind": "root",
+      "content": "Adafruit MCP23017 Arduino Library\n107-Arduino-Servo-RP2040\nAdafruit NeoPixel\nAdafruit TSC2007\nAdafruit GFX Library\nAdafruit BusIO\nAdafruit TouchScreen\nLiquidCrystal I2C\nAdafruit ILI9341\nSparkFun MAX3010x Pulse and Proximity Sensor Library\nAdafruit LiquidCrystal\nAdafruit SH110X\nAdafruit SSD1306\n107-Arduino-24LCxx\nServo\nAdafruit STMPE610",
+      "dirty": false
+    },
+    {
+      "id": "project/uno1/uno1.ino",
+      "path": "project/uno1/uno1.ino",
+      "name": "uno1.ino",
+      "kind": "code",
+      "boardId": "uno1",
+      "boardKind": "arduino_uno",
+      "content": "// uno1 main sketch\nvoid setup() {\n  pinMode(13, OUTPUT);\n  // Serial.begin(9600);\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(500);\n  digitalWrite(13, LOW);\n  delay(500);\n}\n",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/library.txt",
+    "project/uno1/uno1.ino"
+  ],
+  "activeCodeFileId": "project/uno1/uno1.ino",
+  "code": "// uno1 main sketch\nvoid setup() {\n  pinMode(13, OUTPUT);\n  // Serial.begin(9600);\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(500);\n  digitalWrite(13, LOW);\n  delay(500);\n}\n",
+  "name": "Untitled",
+  "exportedAt": "2026-05-11T11:05:23.611Z"
+}
