@@ -160,7 +160,7 @@ function TopToolboxInternal(props) {
   const TITLE_WIDTH = '180px'; // Adjust this to change the project title area width
   // -----------------
 
-  const { board, setBoard, isRunning, isPaused, handleRun, handlePause, handleResume, handleStop, isCompiling, assessmentMode, assessmentProjectName, isSubmittingAssessment, handleAssessmentSubmit, undo, redo, selected, rotateComponent, theme, toggleTheme, showViewPanel, setShowViewPanel, viewPanelSection, setViewPanelSection, schematicDataUrl, setSchematicDataUrl, schematicLoading, setSchematicLoading, downloadSchematicPng, downloadSchematicPdf, generateSchematic, downloadCompCsv, importFileRef, downloadPng, importPng, downloadSimulationJson, handleSave, isExporting, handleShareSimulation, isSharingSimulation, refreshProjectList, showProjectsDropdown, setShowProjectsDropdown, handleNewProject, handleStartRename, handleConfirmRename, renamingProjectId, setRenamingProjectId, renameValue, setRenameValue, handleLoadProject, handleDeleteProject, handleBackupWorkflow, backupRestoreInputRef, handleRestoreWorkflow, handleSyncToCloud, user, isAuthenticated, myProjects, currentProjectId, projectName: projectNameProp, formatProjectDate, saveHistory, setWires, setComponents, setSelected, history, components, wires, webSerialSupported, hardwareBoards, hardwareBoardId, setHardwareBoardId, hardwarePortPath, setHardwarePortPath, resolvedHardwarePort, hardwareAvailablePorts, showAllHardwarePorts, setShowAllHardwarePorts, refreshHardwarePorts, isLoadingHardwarePorts, hardwareBaudRate, setHardwareBaudRate, hardwareResetMethod, setHardwareResetMethod, connectHardwareSerial, disconnectHardwareSerial, uploadToHardware, hardwareConnected, hardwareConnecting, isUploadingHardware, hardwareStatus, setShowProjectsSidebar, setProjectsSidebarTab, editingDisabled = false, validationErrors = [], autofixPlan, autofixStatus, autofixLog, onApplyPlan, onRefresh, autoWiringEnabled, setAutoWiringEnabled, autoCodingEnabled, setAutoCodingEnabled } = props;
+  const { board, setBoard, isRunning, isPaused, handleRun, handlePause, handleResume, handleStop, isCompiling, assessmentMode, assessmentProjectName, isSubmittingAssessment, handleAssessmentSubmit, undo, redo, selected, rotateComponent, theme, toggleTheme, showViewPanel, setShowViewPanel, viewPanelSection, setViewPanelSection, schematicDataUrl, setSchematicDataUrl, schematicLoading, setSchematicLoading, downloadSchematicPng, downloadSchematicPdf, generateSchematic, downloadCompCsv, importFileRef, downloadPng, importPng, downloadSimulationJson, handleSave, isExporting, handleShareSimulation, isSharingSimulation, refreshProjectList, showProjectsDropdown, setShowProjectsDropdown, handleNewProject, handleStartRename, handleConfirmRename, renamingProjectId, setRenamingProjectId, renameValue, setRenameValue, handleLoadProject, handleDeleteProject, handleBackupWorkflow, backupRestoreInputRef, handleRestoreWorkflow, handleSyncToCloud, user, isAuthenticated, myProjects, currentProjectId, projectName: projectNameProp, formatProjectDate, saveHistory, setWires, setComponents, setSelected, history, components, wires, webSerialSupported, hardwareBoards, hardwareBoardId, setHardwareBoardId, hardwarePortPath, setHardwarePortPath, resolvedHardwarePort, hardwareAvailablePorts, showAllHardwarePorts, setShowAllHardwarePorts, refreshHardwarePorts, isLoadingHardwarePorts, hardwareBaudRate, setHardwareBaudRate, hardwareResetMethod, setHardwareResetMethod, connectHardwareSerial, disconnectHardwareSerial, uploadToHardware, hardwareConnected, hardwareConnecting, isUploadingHardware, hardwareStatus, setShowProjectsSidebar, setProjectsSidebarTab, editingDisabled = false, validationErrors = [], autofixPlan, autofixStatus, autofixLog, onApplyPlan, onRefresh, autoWiringEnabled, setAutoWiringEnabled, autoCodingEnabled, setAutoCodingEnabled, showShortcuts, setShowShortcuts } = props;
   const navigate = useNavigate();
 
 
@@ -210,8 +210,8 @@ function TopToolboxInternal(props) {
   ];
 
   const toolMenuItems = [
-    { label: 'Schematic View', onClick: () => { setShowSchematic(true); generateSchematic(); } },
-    { label: 'Component List', onClick: () => setShowComponentList(true) },
+    { label: 'Schematic View', shortcut: 'Alt+S', onClick: () => { setShowSchematic(true); generateSchematic(); } },
+    { label: 'Component List', shortcut: 'Alt+L', onClick: () => setShowComponentList(true) },
     { label: 'Alignment Lab', onClick: () => navigate('/alignment-lab') },
     { type: 'separator' },
     { 
@@ -238,7 +238,7 @@ function TopToolboxInternal(props) {
 
   const helpMenuItems = [
     { label: 'Documentation', onClick: () => window.open('https://docs.openhw.org', '_blank') },
-    { label: 'Keyboard Shortcuts', onClick: () => { } },
+    { label: 'Keyboard Shortcuts', shortcut: 'H', onClick: () => setShowShortcuts(true) },
     { 
       label: 'Assist', 
       submenu: assistMenuItems
@@ -734,6 +734,51 @@ function TopToolboxInternal(props) {
             </button>
           </div>
         )}
+      </FloatingPanel>
+      <FloatingPanel title="Keyboard Shortcuts" show={showShortcuts} onClose={() => setShowShortcuts(false)} width={450}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {[
+            { group: 'General', shortcuts: [
+              { key: 'F5 / Ctrl + Enter', desc: 'Run Simulation' },
+              { key: 'Esc', desc: 'Stop / Clear Selection' },
+              { key: 'Ctrl + S', desc: 'Save Project' },
+              { key: 'Ctrl + O', desc: 'Open Projects' },
+              { key: 'H', desc: 'Keyboard Shortcuts' },
+            ]},
+            { group: 'Edit', shortcuts: [
+              { key: 'Ctrl + Z', desc: 'Undo' },
+              { key: 'Ctrl + Y', desc: 'Redo' },
+              { key: 'Del / Backspace', desc: 'Delete Selected' },
+              { key: 'R', desc: 'Rotate Component' },
+            ]},
+            { group: 'View', shortcuts: [
+              { key: '+ / -', desc: 'Zoom In / Out' },
+              { key: '0', desc: 'Reset Zoom' },
+              { key: 'V', desc: 'Toggle Right Panel' },
+            ]},
+          ].map((g, i) => (
+            <div key={i} style={{ marginBottom: '8px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', opacity: 0.8 }}>{g.group}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {g.shortcuts.map((s, j) => (
+                  <div key={j} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>{s.desc}</span>
+                    <kbd style={{ 
+                      background: 'rgba(255,255,255,0.1)', 
+                      padding: '2px 6px', 
+                      borderRadius: '4px', 
+                      fontSize: '11px', 
+                      fontFamily: 'JetBrains Mono, monospace',
+                      color: '#fff',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      boxShadow: '0 2px 0 rgba(0,0,0,0.2)'
+                    }}>{s.key}</kbd>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </FloatingPanel>
     </header>
   );

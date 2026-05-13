@@ -227,17 +227,16 @@ FRONTEND_URL=http://localhost:5173
 
 ---
 
-## Documentation
+## Documentation Portal
+Check out our **[Premium Documentation Website](https://danish9661.github.io/Arduino-simulator/)** for a searchable, high-performance guide to the entire system.
 
 | Document | Description |
 |---|---|
-| This file | Architecture overview, setup, and feature summary |
-| [OFFLINE_AND_STORAGE.md](./OFFLINE_AND_STORAGE.md) | Full technical reference for offline features and IndexedDB storage |
-| [validation_migration_guide.md](./validation_migration_guide.md) | Migration guide for structured validation issues, WebUI annotations, and CLI/MCP output |
-| [OpenHW-studio-frontend/README.md](./OpenHW-studio-frontend/README.md) | Frontend structure, pages, and features |
-| [openhw-studio-backend/README.md](./openhw-studio-backend/README.md) | Backend API endpoints and compilation pipeline |
-| [openhw-studio-emulator/README.md](./openhw-studio-emulator/README.md) | Emulator CPU simulation and WebSocket protocol |
-| [openhw-studio-cli/README.md](./openhw-studio-cli/README.md) | Terminal command reference for project/sim/serial/lib workflows |
+| [Documentation Portal](./openhw-studio-docs) | **Searchable web-based documentation (VitePress)** |
+| [Architecture Overview](./openhw-studio-docs/architecture/overview.md) | High-level system design and core logic |
+| [Grading Engine](./openhw-studio-docs/grading/overview.md) | Scoring, calculation guides, and engine status |
+| [Telemetry API](./openhw-studio-docs/telemetry/api.md) | Data tracking and signal analysis reference |
+| [Deployment Guide](./openhw-studio-docs/guides/deployment.md) | Setup and deployment manual |
 
 ---
 
