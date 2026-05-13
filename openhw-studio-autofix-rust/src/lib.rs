@@ -139,7 +139,11 @@ impl Engine {
                 for &(dx, dy) in &[(0, 1), (0, -1), (1, 0), (-1, 0)] {
                     let next = GridPos { x: p.x + dx, y: p.y + dy };
                     let mut is_blocked = false;
-                    if next != start && next != end {
+                    
+                    // Prevent infinite grid expansion capacity overflow
+                    if next.x < -1000 || next.x > 3000 || next.y < -1000 || next.y > 3000 {
+                        is_blocked = true;
+                    } else if next != start && next != end {
                         for &(x1, y1, x2, y2) in &obstacles {
                             if next.x >= x1 && next.x <= x2 && next.y >= y1 && next.y <= y2 {
                                 is_blocked = true;
@@ -147,6 +151,7 @@ impl Engine {
                             }
                         }
                     }
+                    
                     if !is_blocked {
                         neighbors.push((next, 1));
                     }
@@ -498,6 +503,138 @@ impl Engine {
                         }
                     }
                   }
+             }
+
+             if rule == "validateDuplicateI2CAddress" || msg.contains("duplicate i2c address") {
+                 self.plans.push(FixPlan {
+                     description: "Update I2C Address or Add Multiplexer".to_string(),
+                     target_rule_id: rule.to_string(),
+                     added_components: Vec::new(),
+                     added_wires: Vec::new(),
+                     removed_wires: Vec::new(),
+                     transformations: Vec::new(),
+                     reasoning: vec!["Duplicate I2C address detected. Adjusting component properties or injecting multiplexer (TCA9548A).".to_string()],
+                 });
+             }
+
+             if rule == "validatePowerDissipation" || msg.contains("power dissipation") {
+                 self.plans.push(FixPlan {
+                     description: "Add Heatsink or Power Regulation".to_string(),
+                     target_rule_id: rule.to_string(),
+                     added_components: Vec::new(),
+                     added_wires: Vec::new(),
+                     removed_wires: Vec::new(),
+                     transformations: Vec::new(),
+                     reasoning: vec!["Component exceeds safe power dissipation limits.".to_string()],
+                 });
+             }
+
+             if rule == "validateI2CDeviceWithoutMcu" || msg.contains("i2c device without mcu") {
+                 self.plans.push(FixPlan {
+                     description: "Remove orphaned I2C device or add MCU".to_string(),
+                     target_rule_id: rule.to_string(),
+                     added_components: Vec::new(),
+                     added_wires: Vec::new(),
+                     removed_wires: Vec::new(),
+                     transformations: Vec::new(),
+                     reasoning: vec!["Standalone I2C device found without an MCU to control it.".to_string()],
+                 });
+             }
+
+             if rule == "validateSerialPinConflict" || msg.contains("serial pin conflict") {
+                 self.plans.push(FixPlan {
+                     description: "Re-route UART pins to resolve conflict".to_string(),
+                     target_rule_id: rule.to_string(),
+                     added_components: Vec::new(),
+                     added_wires: Vec::new(),
+                     removed_wires: Vec::new(),
+                     transformations: Vec::new(),
+                     reasoning: vec!["Multiple devices mapped to the same hardware serial pins.".to_string()],
+                 });
+             }
+
+             if rule == "validateTotalPowerBudget" || msg.contains("total power budget") {
+                 self.plans.push(FixPlan {
+                     description: "Add external power supply".to_string(),
+                     target_rule_id: rule.to_string(),
+                     added_components: Vec::new(),
+                     added_wires: Vec::new(),
+                     removed_wires: Vec::new(),
+                     transformations: Vec::new(),
+                     reasoning: vec!["Total current draw exceeds the board's regulator capacity.".to_string()],
+                 });
+             }
+
+             if rule == "validateThermalLimits" || msg.contains("thermal limits") {
+                 self.plans.push(FixPlan {
+                     description: "Add active cooling or throttle power".to_string(),
+                     target_rule_id: rule.to_string(),
+                     added_components: Vec::new(),
+                     added_wires: Vec::new(),
+                     removed_wires: Vec::new(),
+                     transformations: Vec::new(),
+                     reasoning: vec!["Simulated thermal limits exceeded.".to_string()],
+                 });
+             }
+
+             if rule == "validateBatteryLife" || msg.contains("battery life") {
+                 self.plans.push(FixPlan {
+                     description: "Optimize power states or increase battery capacity".to_string(),
+                     target_rule_id: rule.to_string(),
+                     added_components: Vec::new(),
+                     added_wires: Vec::new(),
+                     removed_wires: Vec::new(),
+                     transformations: Vec::new(),
+                     reasoning: vec!["Expected battery life is below minimum threshold for operation.".to_string()],
+                 });
+             }
+
+             if rule == "validateVoltageDrops" || msg.contains("voltage drops") {
+                 self.plans.push(FixPlan {
+                     description: "Thicken traces, decrease wire length, or add decoupling capacitors".to_string(),
+                     target_rule_id: rule.to_string(),
+                     added_components: Vec::new(),
+                     added_wires: Vec::new(),
+                     removed_wires: Vec::new(),
+                     transformations: Vec::new(),
+                     reasoning: vec!["Significant voltage drop detected across supply lines.".to_string()],
+                 });
+             }
+
+             if rule == "validateDeadlocks" || msg.contains("deadlocks") {
+                 self.plans.push(FixPlan {
+                     description: "Adjust timing or interrupts to clear logic deadlocks".to_string(),
+                     target_rule_id: rule.to_string(),
+                     added_components: Vec::new(),
+                     added_wires: Vec::new(),
+                     removed_wires: Vec::new(),
+                     transformations: Vec::new(),
+                     reasoning: vec!["Hardware state machine or interrupt deadlock detected.".to_string()],
+                 });
+             }
+
+             if rule == "validateSignalIntegrity" || msg.contains("signal integrity") {
+                 self.plans.push(FixPlan {
+                     description: "Add termination resistors or routing shields".to_string(),
+                     target_rule_id: rule.to_string(),
+                     added_components: Vec::new(),
+                     added_wires: Vec::new(),
+                     removed_wires: Vec::new(),
+                     transformations: Vec::new(),
+                     reasoning: vec!["High frequency signal integrity issues identified (e.g. reflections/crosstalk).".to_string()],
+                 });
+             }
+
+             if rule == "validateCrossComponentInteractions" || msg.contains("cross component") {
+                 self.plans.push(FixPlan {
+                     description: "Isolate interfering components".to_string(),
+                     target_rule_id: rule.to_string(),
+                     added_components: Vec::new(),
+                     added_wires: Vec::new(),
+                     removed_wires: Vec::new(),
+                     transformations: Vec::new(),
+                     reasoning: vec!["Adverse interactions detected between components (e.g. shared bus contention).".to_string()],
+                 });
              }
 
              // --- Pattern 5: Duplicate Wire Removal ---

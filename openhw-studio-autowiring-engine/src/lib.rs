@@ -29,6 +29,7 @@ pub struct Connection {
     pub via:   Option<String>,
     pub color: Option<String>,
     pub attrs: Option<HashMap<String, serde_json::Value>>,
+    pub mode:  Option<String>,
     pub i2c:   Option<bool>,
 }
 
@@ -134,6 +135,7 @@ pub struct Engine {
     pub occupancy_grid: HashMap<Point, i32>,
     pub occupied_pins:  HashMap<String, Vec<String>>,
     pub occupied_rows:  Vec<i32>,
+    pub component_to_board: HashMap<String, String>,
 }
 
 impl Engine {
@@ -143,6 +145,7 @@ impl Engine {
             occupancy_grid: HashMap::new(),
             occupied_pins:  HashMap::new(),
             occupied_rows:  Vec::new(),
+            component_to_board: HashMap::new(),
         }
     }
 
@@ -151,12 +154,14 @@ impl Engine {
         self.occupancy_grid.clear();
         self.occupied_pins.clear();
         self.occupied_rows.clear();
+        self.component_to_board.clear();
     }
 
     pub fn build_state(&mut self, existing_wires: Vec<serde_json::Value>, rewire_id: Option<&String>) -> (Vec<String>, Vec<String>, usize) {
         self.occupancy_grid.clear();
         self.occupied_pins.clear();
         self.occupied_rows.clear();
+        self.component_to_board.clear();
 
         let mut removed_wires = Vec::new();
         let mut removed_components = Vec::new();
@@ -211,8 +216,21 @@ impl Engine {
                         let comp_id = parts[0].to_string();
                         let pin_id = parts[1].to_string();
                         
+                        
                         let clean_pin = pin_id.split('.').next().unwrap_or(&pin_id).to_string();
-                        self.occupied_pins.entry(comp_id).or_default().push(clean_pin.clone());
+                        self.occupied_pins.entry(comp_id.clone()).or_default().push(clean_pin.clone());
+
+                        // Track board affinity
+                        let other_id = if *ps == from_str { to_str.split(':').next().unwrap_or("") } else { from_str.split(':').next().unwrap_or("") };
+                        if !other_id.is_empty() {
+                            let is_other_board = self.components.get(other_id).map(|c| {
+                                c.kind.contains("arduino") || c.kind.contains("esp32") || c.kind.contains("pico") || c.kind.contains("stm32")
+                            }).unwrap_or(false);
+                            
+                            if is_other_board {
+                                self.component_to_board.insert(comp_id.clone(), other_id.to_string());
+                            }
+                        }
 
                         if let Some(num_str) = clean_pin.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse::<i32>().ok() {
                             if !self.occupied_rows.contains(&num_str) {
@@ -467,7 +485,6 @@ impl Engine {
             None => return,
         };
         let is_pico = board.kind.contains("pico") || board.kind.contains("rp2040");
-        let is_esp32 = board.kind.contains("esp32");
 
         let mut i2c_done = false;
         for (idx, pin) in manifest_pins.iter().enumerate() {
@@ -742,16 +759,21 @@ pub fn generate_autonomous_setup(
                         plan.reasoning.push(format!("Reusing existing power supply: {}", target_id));
                     }
                 } else if h.kind.contains("motor-driver") {
-                    // Find a driver that has either OUT1 or OUT3 free
                     if let Some(existing_driver) = engine.components.values().find(|c| {
                         if !c.kind.contains("motor-driver") { return false; }
+                        
+                        // Board Isolation: Ensure driver isn't already connected to a DIFFERENT board
+                        if let Some(affinity) = engine.component_to_board.get(&c.id) {
+                            if affinity != &board_id { return false; }
+                        }
+
                         let taken = engine.occupied_pins.get(&c.id).cloned().unwrap_or_default();
                         let out1_free = !taken.contains(&"OUT1".to_string()) && !taken.contains(&"OUT2".to_string());
                         let out3_free = !taken.contains(&"OUT3".to_string()) && !taken.contains(&"OUT4".to_string());
                         out1_free || out3_free
                     }) {
                         target_id = existing_driver.id.clone();
-                        plan.reasoning.push(format!("Sharing existing motor driver: {}", target_id));
+                        plan.reasoning.push(format!("Sharing existing motor driver: {} (matched board affinity)", target_id));
                     }
                 }
 
@@ -776,8 +798,21 @@ pub fn generate_autonomous_setup(
                     plan.added_components.push(added);
                     plan.reasoning.push(format!("Injected helper: {} ({})", target_id, h.kind));
                 } else {
-                    // Shared Ownership: DO NOT add to added_components if it already exists
-                    // This prevents overriding existing project state with empty attributes
+                    // Shared Ownership: Even if reusing, add to added_components so frontend 
+                    // can update ownerIds for correct cleanup behavior.
+                    if let Some(existing_c) = engine.components.get(&target_id) {
+                        plan.added_components.push(NewComponentPlan {
+                            id: existing_c.id.clone(),
+                            kind: existing_c.kind.clone(),
+                            label: None,
+                            x: existing_c.x,
+                            y: existing_c.y,
+                            w: Some(existing_c.w),
+                            h: Some(existing_c.h),
+                            attrs: None, // Keep existing attrs
+                        });
+                        plan.reasoning.push(format!("Synchronized shared ownership for helper: {}", target_id));
+                    }
                 }
                 helper_id_map.insert(h.id.clone(), target_id);
             }
@@ -993,26 +1028,68 @@ pub fn generate_autonomous_setup(
                 let raw_y  = plan.main_component.y;
                 // Try to align with the component's Y coordinate to keep wires straight
                 let (vx, vy) = engine.free_helper_position(raw_x, raw_y, 70.0, 32.0, Some(raw_y));
+                
                 plan.added_components.push(NewComponentPlan {
                     id: via_id.clone(), kind: via_kind.clone(),
-                    label: Some("Resistor".to_string()),
+                    label: Some(if via_kind.contains("resistor") { "Resistor".to_string() } else { "Helper".to_string() }),
                     x: vx, y: vy, w: Some(70.0), h: Some(32.0),
                     attrs: Some(serde_json::json!({ "value": res_val })),
                 });
-                plan.added_wires.push(WirePlan {
-                    id: format!("w_via_in_{}_{}", main_id, i),
-                    from: format!("{}:{}", main_id, conn.from),
-                    to:   format!("{}:p1", via_id),
-                    color: "orange".to_string(), path: None, is_socket: true, is_hidden: true,
-                    lane: { let l = lane_counter; lane_counter += 1; l % 7 },
-                });
-                plan.added_wires.push(WirePlan {
-                    id: format!("w_via_out_{}_{}", main_id, i),
-                    from: format!("{}:p2", via_id),
-                    to:   target,
-                    color: "green".to_string(), path: None, is_socket: false, is_hidden: false,
-                    lane: { let l = lane_counter; lane_counter += 1; l % 7 },
-                });
+
+                if conn.mode.as_deref() == Some("divider") {
+                    // Voltage Divider Mode:
+                    // 1. Direct connection from Component to Signal Pin (Target)
+                    plan.added_wires.push(WirePlan {
+                        id: format!("w_div_direct_{}_{}", main_id, i),
+                        from: format!("{}:{}", main_id, conn.from),
+                        to:   target.clone(),
+                        color: "orange".to_string(), path: None, is_socket: true, is_hidden: false,
+                        lane: { let l = lane_counter; lane_counter += 1; l % 7 },
+                    });
+                    // 2. Tap connection from Component to Helper P1
+                    plan.added_wires.push(WirePlan {
+                        id: format!("w_div_tap_{}_{}", main_id, i),
+                        from: format!("{}:{}", main_id, conn.from),
+                        to:   format!("{}:p1", via_id),
+                        color: "orange".to_string(), path: None, is_socket: true, is_hidden: true,
+                        lane: { let l = lane_counter; lane_counter += 1; l % 7 },
+                    });
+                    // 3. Ground connection from Helper P2 to GND
+                    let div_target = conn.attrs.as_ref()
+                        .and_then(|a| a.get("dividerTarget"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("arduino:GND");
+                    
+                    let resolved_div_target = if div_target.contains("arduino:") || div_target.contains("board:") {
+                        format!("{}:GND", board_id)
+                    } else {
+                        div_target.to_string()
+                    };
+
+                    plan.added_wires.push(WirePlan {
+                        id: format!("w_div_gnd_{}_{}", main_id, i),
+                        from: format!("{}:p2", via_id),
+                        to:   resolved_div_target,
+                        color: "black".to_string(), path: None, is_socket: false, is_hidden: false,
+                        lane: { let l = lane_counter; lane_counter += 1; l % 7 },
+                    });
+                } else {
+                    // Standard Series Mode: Component -> Via -> Target
+                    plan.added_wires.push(WirePlan {
+                        id: format!("w_via_in_{}_{}", main_id, i),
+                        from: format!("{}:{}", main_id, conn.from),
+                        to:   format!("{}:p1", via_id),
+                        color: "orange".to_string(), path: None, is_socket: true, is_hidden: true,
+                        lane: { let l = lane_counter; lane_counter += 1; l % 7 },
+                    });
+                    plan.added_wires.push(WirePlan {
+                        id: format!("w_via_out_{}_{}", main_id, i),
+                        from: format!("{}:p2", via_id),
+                        to:   target,
+                        color: "green".to_string(), path: None, is_socket: false, is_hidden: false,
+                        lane: { let l = lane_counter; lane_counter += 1; l % 7 },
+                    });
+                }
                 continue;
             }
 

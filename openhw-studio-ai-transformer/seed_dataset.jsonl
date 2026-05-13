@@ -1,0 +1,232 @@
+{"text": "Add a resistor to pin 2 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1"}, {"type": "wire", "from": "res_1:1", "to": "uno1:2"}]}}
+{"text": "Connect a red led to pin 13 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "red"}, {"type": "wire", "from": "led_1:A", "to": "uno1:13"}]}}
+{"text": "Put 3 blue leds on the board and connect them to pins 2, 3 and 4 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "blue"}, {"type": "add", "component": "wokwi-led", "id": "led_2", "color": "blue"}, {"type": "add", "component": "wokwi-led", "id": "led_3", "color": "blue"}, {"type": "wire", "from": "led_1:A", "to": "uno1:2"}, {"type": "wire", "from": "led_2:A", "to": "uno1:3"}, {"type": "wire", "from": "led_3:A", "to": "uno1:4"}]}}
+{"text": "I need a pushbutton on pin 7 of pico1", "plan": {"actions": [{"type": "add", "component": "wokwi-pushbutton", "id": "btn_1"}, {"type": "wire", "from": "btn_1:1.L", "to": "pico1:7"}]}}
+{"text": "Add a potentiometer to A0 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-potentiometer", "id": "pot_1"}, {"type": "wire", "from": "pot_1:SIG", "to": "uno1:A0"}]}}
+{"text": "Place an ultrasonic sensor and connect it to pico1 pins 10 and 11", "plan": {"actions": [{"type": "add", "component": "wokwi-hc-sr04", "id": "ultra_1"}, {"type": "wire", "from": "ultra_1:TRIG", "to": "pico1:10"}, {"type": "wire", "from": "ultra_1:ECHO", "to": "pico1:11"}]}}
+{"text": "Connect gnd of led1 to gnd of uno1", "plan": {"actions": [{"type": "wire", "from": "led1:C", "to": "uno1:GND"}]}}
+{"text": "Wire the vcc of dht1 to 5v on uno1", "plan": {"actions": [{"type": "wire", "from": "dht1:VCC", "to": "uno1:5V"}]}}
+{"text": "Add 2 resistors and 2 leds", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1"}, {"type": "add", "component": "wokwi-resistor", "id": "res_2"}, {"type": "add", "component": "wokwi-led", "id": "led_1"}, {"type": "add", "component": "wokwi-led", "id": "led_2"}]}}
+{"text": "Move led1 to x 200 y 300", "plan": {"actions": [{"type": "move", "id": "led1", "x": 200, "y": 300}]}}
+{"text": "Hey, can you put a green led on pin 5 of uno1?", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "green"}, {"type": "wire", "from": "led_1:A", "to": "uno1:5"}]}}
+{"text": "Connect the button1 to GP0 on pico1", "plan": {"actions": [{"type": "wire", "from": "button1:2.R", "to": "pico1:GP0"}]}}
+{"text": "Remove the resistor res1", "plan": {"actions": [{"type": "remove", "id": "res1"}]}}
+{"text": "Change color of led1 to yellow", "plan": {"actions": [{"type": "update", "id": "led1", "color": "yellow"}]}}
+{"text": "Add a servo motor and connect it to pin 9 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-servo", "id": "servo_1"}, {"type": "wire", "from": "servo_1:PWM", "to": "uno1:9"}]}}
+{"text": "Add a blue led to pin 3 of uno2", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "blue"}, {"type": "wire", "from": "led_1:A", "to": "uno2:3"}]}}
+{"text": "Connect pot1 to A1 on esp32_1", "plan": {"actions": [{"type": "wire", "from": "pot1:SIG", "to": "esp32_1:A1"}]}}
+{"text": "Put a buzzer on pin 11 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-buzzer", "id": "buz_1"}, {"type": "wire", "from": "buz_1:1", "to": "uno1:11"}]}}
+{"text": "I want a 10k resistor on uno1 pin 8", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "10k"}, {"type": "wire", "from": "res_1:1", "to": "uno1:8"}]}}
+{"text": "Add an lcd display and connect it to i2c of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-lcd1602", "id": "lcd_1"}, {"type": "wire", "from": "lcd_1:SDA", "to": "uno1:SDA"}, {"type": "wire", "from": "lcd_1:SCL", "to": "uno1:SCL"}]}}
+{"text": "Connect led1 cathode to gnd of pico1", "plan": {"actions": [{"type": "wire", "from": "led1:C", "to": "pico1:GND"}]}}
+{"text": "Wire the switch to GP15 on pico1", "plan": {"actions": [{"type": "wire", "from": "switch1:1.L", "to": "pico1:GP15"}]}}
+{"text": "Add 5 red leds", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "red"}, {"type": "add", "component": "wokwi-led", "id": "led_2", "color": "red"}, {"type": "add", "component": "wokwi-led", "id": "led_3", "color": "red"}, {"type": "add", "component": "wokwi-led", "id": "led_4", "color": "red"}, {"type": "add", "component": "wokwi-led", "id": "led_5", "color": "red"}]}}
+{"text": "Put a 220 ohm resistor on pin 4 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "220"}, {"type": "wire", "from": "res_1:1", "to": "uno1:4"}]}}
+{"text": "Connect the servo to pin 10 on uno1", "plan": {"actions": [{"type": "wire", "from": "servo1:PWM", "to": "uno1:10"}]}}
+{"text": "I need a dht11 sensor on uno2 pin 2", "plan": {"actions": [{"type": "add", "component": "wokwi-dht11", "id": "dht_1"}, {"type": "wire", "from": "dht_1:VCC", "to": "uno2:5V"}, {"type": "wire", "from": "dht_1:GND", "to": "uno2:GND"}, {"type": "wire", "from": "dht_1:DATA", "to": "uno2:2"}]}}
+{"text": "Add a green led to pin 6 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "green"}, {"type": "wire", "from": "led_1:A", "to": "uno1:6"}]}}
+{"text": "Wire a button to pin 4 of pico1", "plan": {"actions": [{"type": "add", "component": "wokwi-pushbutton", "id": "btn_1"}, {"type": "wire", "from": "btn_1:1.L", "to": "pico1:4"}]}}
+{"text": "Connect the ultrasonic trigger to pin 12 of uno1", "plan": {"actions": [{"type": "wire", "from": "ultra1:TRIG", "to": "uno1:12"}]}}
+{"text": "Change resistor value to 330", "plan": {"actions": [{"type": "update", "id": "res1", "value": "330"}]}}
+{"text": "Move button1 to 500, 100", "plan": {"actions": [{"type": "move", "id": "button1", "x": 500, "y": 100}]}}
+{"text": "Add a yellow led to pin 2 of esp32_1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "yellow"}, {"type": "wire", "from": "led_1:A", "to": "esp32_1:2"}]}}
+{"text": "Connect pot1 wiper to A5 of uno1", "plan": {"actions": [{"type": "wire", "from": "pot1:SIG", "to": "uno1:A5"}]}}
+{"text": "I need a 4.7k resistor on pin 1 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "4.7k"}, {"type": "wire", "from": "res_1:1", "to": "uno1:1"}]}}
+{"text": "Add a blue led to GP2 on pico1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "blue"}, {"type": "wire", "from": "led_1:A", "to": "pico1:GP2"}]}}
+{"text": "Connect gnd of buzzer1 to gnd on uno2", "plan": {"actions": [{"type": "wire", "from": "buzzer1:GND", "to": "uno2:GND"}]}}
+{"text": "Put a red led on pin 8 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "red"}, {"type": "wire", "from": "led_1:A", "to": "uno1:8"}]}}
+{"text": "Wire the echo pin to pin 11 of uno1", "plan": {"actions": [{"type": "wire", "from": "ultra1:ECHO", "to": "uno1:11"}]}}
+{"text": "Add a button and connect it to pin 3 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-pushbutton", "id": "btn_1"}, {"type": "wire", "from": "btn_1:1.L", "to": "uno1:3"}]}}
+{"text": "Remove the led led2", "plan": {"actions": [{"type": "remove", "id": "led2"}]}}
+{"text": "Change color of led2 to white", "plan": {"actions": [{"type": "update", "id": "led2", "color": "white"}]}}
+{"text": "Add a resistor and a button to uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1"}, {"type": "add", "component": "wokwi-pushbutton", "id": "btn_1"}]}}
+{"text": "Connect the servo signal to pin 5 of pico1", "plan": {"actions": [{"type": "wire", "from": "servo1:PWM", "to": "pico1:GP5"}]}}
+{"text": "Add a green led to GP14 on pico1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "green"}, {"type": "wire", "from": "led_1:A", "to": "pico1:GP14"}]}}
+{"text": "Wire the pot to A2 of uno1", "plan": {"actions": [{"type": "wire", "from": "pot1:SIG", "to": "uno1:A2"}]}}
+{"text": "I want a 220 ohm resistor on uno2 pin 13", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "220"}, {"type": "wire", "from": "res_1:1", "to": "uno2:13"}]}}
+{"text": "Add an lcd1602 on uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-lcd1602", "id": "lcd_1"}]}}
+{"text": "Connect led1 to pin 7 of uno1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "uno1:7"}]}}
+{"text": "Add a blue led and connect it to pin 4 of uno2", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "blue"}, {"type": "wire", "from": "led_1:A", "to": "uno2:4"}]}}
+{"text": "Put a resistor on uno1 pin 6", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1"}, {"type": "wire", "from": "res_1:1", "to": "uno1:6"}]}}
+{"text": "Connect the button to pin 2 on uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-pushbutton", "id": "btn_1"}, {"type": "wire", "from": "btn_1:1.L", "to": "uno1:2"}]}}
+{"text": "I need a buzzer on GP16 of pico1", "plan": {"actions": [{"type": "add", "component": "wokwi-buzzer", "id": "buz_1"}, {"type": "wire", "from": "buz_1:1", "to": "pico1:GP16"}]}}
+{"text": "Add a red led on pin 9 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "red"}, {"type": "wire", "from": "led_1:A", "to": "uno1:9"}]}}
+{"text": "Wire the resistor to pin 1 of uno1", "plan": {"actions": [{"type": "wire", "from": "res1:1", "to": "uno1:1"}]}}
+{"text": "Add a potentiometer and connect it to A3 on uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-potentiometer", "id": "pot_1"}, {"type": "wire", "from": "pot_1:SIG", "to": "uno1:A3"}]}}
+{"text": "Remove the buzzer buz1", "plan": {"actions": [{"type": "remove", "id": "buz1"}]}}
+{"text": "Add a yellow led to uno1 pin 4", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "yellow"}, {"type": "wire", "from": "led_1:A", "to": "uno1:4"}]}}
+{"text": "Connect led1 to pin 12 of uno1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "uno1:12"}]}}
+{"text": "Add a 10k resistor to uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "10k"}]}}
+{"text": "Put a green led on GP3 of pico1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "green"}, {"type": "wire", "from": "led_1:A", "to": "pico1:GP3"}]}}
+{"text": "Connect the dht11 to pin 7 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-dht11", "id": "dht_1"}, {"type": "wire", "from": "dht_1:DATA", "to": "uno1:7"}]}}
+{"text": "Add a blue led on pin 11 of uno2", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "blue"}, {"type": "wire", "from": "led_1:A", "to": "uno2:11"}]}}
+{"text": "Wire the servo to GP10 on pico1", "plan": {"actions": [{"type": "wire", "from": "servo1:PWM", "to": "pico1:GP10"}]}}
+{"text": "Add a red led and connect it to pin 2 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "red"}, {"type": "wire", "from": "led_1:A", "to": "uno1:2"}]}}
+{"text": "Connect the button1 to pin 8 of uno1", "plan": {"actions": [{"type": "wire", "from": "button1:1.L", "to": "uno1:8"}]}}
+{"text": "Add a 330 ohm resistor to uno1 pin 5", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "330"}, {"type": "wire", "from": "res_1:1", "to": "uno1:5"}]}}
+{"text": "Put a white led on pin 1 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "white"}, {"type": "wire", "from": "led_1:A", "to": "uno1:1"}]}}
+{"text": "Connect the pot to A4 on uno1", "plan": {"actions": [{"type": "wire", "from": "pot1:SIG", "to": "uno1:A4"}]}}
+{"text": "I need an ultrasonic on pico1 pins 2 and 3", "plan": {"actions": [{"type": "add", "component": "wokwi-hc-sr04", "id": "ultra_1"}, {"type": "wire", "from": "ultra_1:TRIG", "to": "pico1:GP2"}, {"type": "wire", "from": "ultra_1:ECHO", "to": "pico1:GP3"}]}}
+{"text": "Add a green led to uno2 pin 9", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "green"}, {"type": "wire", "from": "led_1:A", "to": "uno2:9"}]}}
+{"text": "Wire the buzzer to pin 10 of uno1", "plan": {"actions": [{"type": "wire", "from": "buzzer1:1", "to": "uno1:10"}]}}
+{"text": "Add a button on pin 6 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-pushbutton", "id": "btn_1"}, {"type": "wire", "from": "btn_1:1.L", "to": "uno1:6"}]}}
+{"text": "Remove led1", "plan": {"actions": [{"type": "remove", "id": "led1"}]}}
+{"text": "Add a 220 ohm resistor on uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "220"}]}}
+{"text": "Connect led1 to GP4 of pico1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "pico1:GP4"}]}}
+{"text": "Add a blue led to uno1 pin 3", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "blue"}, {"type": "wire", "from": "led_1:A", "to": "uno1:3"}]}}
+{"text": "Wire the potentiometer to A1 of uno1", "plan": {"actions": [{"type": "wire", "from": "pot1:SIG", "to": "uno1:A1"}]}}
+{"text": "Put a yellow led on pin 12 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "yellow"}, {"type": "wire", "from": "led_1:A", "to": "uno1:12"}]}}
+{"text": "Connect the button to GP6 of pico1", "plan": {"actions": [{"type": "wire", "from": "button1:1.L", "to": "pico1:GP6"}]}}
+{"text": "Add a 1k resistor on uno1 pin 7", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "1k"}, {"type": "wire", "from": "res_1:1", "to": "uno1:7"}]}}
+{"text": "I want a red led on uno2 pin 8", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "red"}, {"type": "wire", "from": "led_1:A", "to": "uno2:8"}]}}
+{"text": "Add a servo to uno1 pin 11", "plan": {"actions": [{"type": "add", "component": "wokwi-servo", "id": "servo_1"}, {"type": "wire", "from": "servo_1:PWM", "to": "uno1:11"}]}}
+{"text": "Connect the led1 to pin 2 of uno1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "uno1:2"}]}}
+{"text": "Add a buzzer and connect it to pin 4 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-buzzer", "id": "buz_1"}, {"type": "wire", "from": "buz_1:1", "to": "uno1:4"}]}}
+{"text": "Put a 10k resistor on pin 13 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "10k"}, {"type": "wire", "from": "res_1:1", "to": "uno1:13"}]}}
+{"text": "Connect the dht11 to GP1 of pico1", "plan": {"actions": [{"type": "add", "component": "wokwi-dht11", "id": "dht_1"}, {"type": "wire", "from": "dht_1:DATA", "to": "pico1:GP1"}]}}
+{"text": "Add a white led to uno2 pin 3", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "white"}, {"type": "wire", "from": "led_1:A", "to": "uno2:3"}]}}
+{"text": "Wire the button to pin 5 of uno1", "plan": {"actions": [{"type": "wire", "from": "btn1:1.L", "to": "uno1:5"}]}}
+{"text": "Add a 220 ohm resistor on pin 10 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "220"}, {"type": "wire", "from": "res_1:1", "to": "uno1:10"}]}}
+{"text": "Connect led1 to pin 1 of uno1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "uno1:1"}]}}
+{"text": "Add a green led and connect it to GP12 of pico1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "green"}, {"type": "wire", "from": "led_1:A", "to": "pico1:GP12"}]}}
+{"text": "Put a potentiometer on uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-potentiometer", "id": "pot_1"}]}}
+{"text": "Connect the servo to pin 3 of uno1", "plan": {"actions": [{"type": "wire", "from": "servo1:PWM", "to": "uno1:3"}]}}
+{"text": "Add a red led on uno1 pin 6", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "red"}, {"type": "wire", "from": "led_1:A", "to": "uno1:6"}]}}
+{"text": "Wire the resistor to GP0 on pico1", "plan": {"actions": [{"type": "wire", "from": "res1:1", "to": "pico1:GP0"}]}}
+{"text": "Add a 330 ohm resistor to uno2 pin 7", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "330"}, {"type": "wire", "from": "res_1:1", "to": "uno2:7"}]}}
+{"text": "I need an led on pin 13 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1"}, {"type": "wire", "from": "led_1:A", "to": "uno1:13"}]}}
+{"text": "Connect the ultrasonic trigger to GP10 of pico1", "plan": {"actions": [{"type": "wire", "from": "ultra1:TRIG", "to": "pico1:GP10"}]}}
+{"text": "Add a blue led to uno1 pin 2", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "blue"}, {"type": "wire", "from": "led_1:A", "to": "uno1:2"}]}}
+{"text": "Wire the button1 to pin 4 of uno1", "plan": {"actions": [{"type": "wire", "from": "button1:1.L", "to": "uno1:4"}]}}
+{"text": "Put a 1k resistor on uno1 pin 9", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "1k"}, {"type": "wire", "from": "res_1:1", "to": "uno1:9"}]}}
+{"text": "Connect led1 to pin 10 of uno1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "uno1:10"}]}}
+{"text": "Add a yellow led and connect it to pin 12 of uno2", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "yellow"}, {"type": "wire", "from": "led_1:A", "to": "uno2:12"}]}}
+{"text": "Wire the potentiometer to A2 of uno1", "plan": {"actions": [{"type": "wire", "from": "pot1:SIG", "to": "uno1:A2"}]}}
+{"text": "Add a button to uno1 pin 11", "plan": {"actions": [{"type": "add", "component": "wokwi-pushbutton", "id": "btn_1"}, {"type": "wire", "from": "btn_1:1.L", "to": "uno1:11"}]}}
+{"text": "Remove resistor res2", "plan": {"actions": [{"type": "remove", "id": "res2"}]}}
+{"text": "Add a white led to pin 1 of uno2", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "white"}, {"type": "wire", "from": "led_1:A", "to": "uno2:1"}]}}
+{"text": "Connect led1 to pin 5 of uno1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "uno1:5"}]}}
+{"text": "Add a 4.7k resistor to uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "4.7k"}]}}
+{"text": "Put a buzzer on GP14 of pico1", "plan": {"actions": [{"type": "add", "component": "wokwi-buzzer", "id": "buz_1"}, {"type": "wire", "from": "buz_1:1", "to": "pico1:GP14"}]}}
+{"text": "Connect the dht11 to pin 4 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-dht11", "id": "dht_1"}, {"type": "wire", "from": "dht_1:DATA", "to": "uno1:4"}]}}
+{"text": "Add a red led on uno1 pin 3", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "red"}, {"type": "wire", "from": "led_1:A", "to": "uno1:3"}]}}
+{"text": "Wire the servo to pin 6 of uno1", "plan": {"actions": [{"type": "wire", "from": "servo1:PWM", "to": "uno1:6"}]}}
+{"text": "Add a 220 ohm resistor and connect it to pin 8 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "220"}, {"type": "wire", "from": "res_1:1", "to": "uno1:8"}]}}
+{"text": "Connect the button1 to pin 2 of uno2", "plan": {"actions": [{"type": "wire", "from": "button1:1.L", "to": "uno2:2"}]}}
+{"text": "Add a green led to uno1 pin 1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "green"}, {"type": "wire", "from": "led_1:A", "to": "uno1:1"}]}}
+{"text": "Put a blue led on GP6 of pico1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "blue"}, {"type": "wire", "from": "led_1:A", "to": "pico1:GP6"}]}}
+{"text": "Connect the potentiometer to A5 of uno1", "plan": {"actions": [{"type": "wire", "from": "pot1:SIG", "to": "uno1:A5"}]}}
+{"text": "Add a 10k resistor to uno2 pin 12", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "10k"}, {"type": "wire", "from": "res_1:1", "to": "uno2:12"}]}}
+{"text": "I need an ultrasonic on uno1 pins 12 and 13", "plan": {"actions": [{"type": "add", "component": "wokwi-hc-sr04", "id": "ultra_1"}, {"type": "wire", "from": "ultra_1:TRIG", "to": "uno1:12"}, {"type": "wire", "from": "ultra_1:ECHO", "to": "uno1:13"}]}}
+{"text": "Add a yellow led to uno1 pin 5", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "yellow"}, {"type": "wire", "from": "led_1:A", "to": "uno1:5"}]}}
+{"text": "Wire the buzzer to GP10 of pico1", "plan": {"actions": [{"type": "wire", "from": "buzzer1:1", "to": "pico1:GP10"}]}}
+{"text": "Add a 330 ohm resistor to uno1 pin 4", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "330"}, {"type": "wire", "from": "res_1:1", "to": "uno1:4"}]}}
+{"text": "Connect led1 to pin 7 of uno1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "uno1:7"}]}}
+{"text": "Add a red led and connect it to pin 9 of uno2", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "red"}, {"type": "wire", "from": "led_1:A", "to": "uno2:9"}]}}
+{"text": "Wire the button to pin 11 of uno1", "plan": {"actions": [{"type": "wire", "from": "btn1:1.L", "to": "uno1:11"}]}}
+{"text": "Add a 1k resistor on uno1 pin 2", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "1k"}, {"type": "wire", "from": "res_1:1", "to": "uno1:2"}]}}
+{"text": "Connect led1 to GP4 of pico1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "pico1:GP4"}]}}
+{"text": "Add a blue led to uno2 pin 10", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "blue"}, {"type": "wire", "from": "led_1:A", "to": "uno2:10"}]}}
+{"text": "Put a green led on pin 1 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "green"}, {"type": "wire", "from": "led_1:A", "to": "uno1:1"}]}}
+{"text": "Connect the servo to GP2 of pico1", "plan": {"actions": [{"type": "wire", "from": "servo1:PWM", "to": "pico1:GP2"}]}}
+{"text": "Add a white led to uno1 pin 3", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "white"}, {"type": "wire", "from": "led_1:A", "to": "uno1:3"}]}}
+{"text": "Wire the potentiometer to A3 of uno1", "plan": {"actions": [{"type": "wire", "from": "pot1:SIG", "to": "uno1:A3"}]}}
+{"text": "Add a 220 ohm resistor on uno2 pin 8", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "220"}, {"type": "wire", "from": "res_1:1", "to": "uno2:8"}]}}
+{"text": "Connect led1 to pin 12 of uno1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "uno1:12"}]}}
+{"text": "Add a blue led and connect it to GP0 of pico1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "blue"}, {"type": "wire", "from": "led_1:A", "to": "pico1:GP0"}]}}
+{"text": "Put a 10k resistor on uno1 pin 4", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "10k"}, {"type": "wire", "from": "res_1:1", "to": "uno1:4"}]}}
+{"text": "Connect the button to pin 6 on uno1", "plan": {"actions": [{"type": "wire", "from": "btn1:1.L", "to": "uno1:6"}]}}
+{"text": "I need a buzzer on uno1 pin 11", "plan": {"actions": [{"type": "add", "component": "wokwi-buzzer", "id": "buz_1"}, {"type": "wire", "from": "buz_1:1", "to": "uno1:11"}]}}
+{"text": "Add a red led on GP14 of pico1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "red"}, {"type": "wire", "from": "led_1:A", "to": "pico1:GP14"}]}}
+{"text": "Wire the resistor to pin 5 of uno1", "plan": {"actions": [{"type": "wire", "from": "res1:1", "to": "uno1:5"}]}}
+{"text": "Add a potentiometer and connect it to A1 on uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-potentiometer", "id": "pot_1"}, {"type": "wire", "from": "pot_1:SIG", "to": "uno1:A1"}]}}
+{"text": "Remove led2", "plan": {"actions": [{"type": "remove", "id": "led2"}]}}
+{"text": "Add a yellow led to uno2 pin 2", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "yellow"}, {"type": "wire", "from": "led_1:A", "to": "uno2:2"}]}}
+{"text": "Connect led1 to pin 8 of uno1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "uno1:8"}]}}
+{"text": "Add a 220 ohm resistor to uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "220"}]}}
+{"text": "Put a green led on pin 4 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "green"}, {"type": "wire", "from": "led_1:A", "to": "uno1:4"}]}}
+{"text": "Connect the dht11 to GP16 of pico1", "plan": {"actions": [{"type": "add", "component": "wokwi-dht11", "id": "dht_1"}, {"type": "wire", "from": "dht_1:DATA", "to": "pico1:GP16"}]}}
+{"text": "Add a blue led on uno1 pin 7", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "blue"}, {"type": "wire", "from": "led_1:A", "to": "uno1:7"}]}}
+{"text": "Wire the servo to pin 10 of uno1", "plan": {"actions": [{"type": "wire", "from": "servo1:PWM", "to": "uno1:10"}]}}
+{"text": "Add a red led and connect it to pin 1 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "red"}, {"type": "wire", "from": "led_1:A", "to": "uno1:1"}]}}
+{"text": "Connect the button1 to pin 13 of uno1", "plan": {"actions": [{"type": "wire", "from": "button1:1.L", "to": "uno1:13"}]}}
+{"text": "Add a 330 ohm resistor to uno1 pin 2", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "330"}, {"type": "wire", "from": "res_1:1", "to": "uno1:2"}]}}
+{"text": "Put a white led on pin 12 of uno2", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "white"}, {"type": "wire", "from": "led_1:A", "to": "uno2:12"}]}}
+{"text": "Connect the pot to A0 on uno1", "plan": {"actions": [{"type": "wire", "from": "pot1:SIG", "to": "uno1:A0"}]}}
+{"text": "I need an ultrasonic on pico1 pins 4 and 5", "plan": {"actions": [{"type": "add", "component": "wokwi-hc-sr04", "id": "ultra_1"}, {"type": "wire", "from": "ultra_1:TRIG", "to": "pico1:GP4"}, {"type": "wire", "from": "ultra_1:ECHO", "to": "pico1:GP5"}]}}
+{"text": "Add a green led to uno1 pin 8", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "green"}, {"type": "wire", "from": "led_1:A", "to": "uno1:8"}]}}
+{"text": "Wire the buzzer to pin 2 of uno1", "plan": {"actions": [{"type": "wire", "from": "buzzer1:1", "to": "uno1:2"}]}}
+{"text": "Add a button on pin 3 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-pushbutton", "id": "btn_1"}, {"type": "wire", "from": "btn_1:1.L", "to": "uno1:3"}]}}
+{"text": "Remove led1", "plan": {"actions": [{"type": "remove", "id": "led1"}]}}
+{"text": "Add a 10k resistor on uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "10k"}]}}
+{"text": "Connect led1 to GP2 of pico1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "pico1:GP2"}]}}
+{"text": "Add a blue led to uno2 pin 4", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "blue"}, {"type": "wire", "from": "led_1:A", "to": "uno2:4"}]}}
+{"text": "Wire the potentiometer to A4 on uno1", "plan": {"actions": [{"type": "wire", "from": "pot1:SIG", "to": "uno1:A4"}]}}
+{"text": "Put a yellow led on pin 11 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "yellow"}, {"type": "wire", "from": "led_1:A", "to": "uno1:11"}]}}
+{"text": "Connect the button to pin 5 of uno1", "plan": {"actions": [{"type": "wire", "from": "btn1:1.L", "to": "uno1:5"}]}}
+{"text": "Add a 1k resistor on uno1 pin 1", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "1k"}, {"type": "wire", "from": "res_1:1", "to": "uno1:1"}]}}
+{"text": "I want a red led on uno1 pin 10", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "red"}, {"type": "wire", "from": "led_1:A", "to": "uno1:10"}]}}
+{"text": "Add a servo to uno2 pin 9", "plan": {"actions": [{"type": "add", "component": "wokwi-servo", "id": "servo_1"}, {"type": "wire", "from": "servo_1:PWM", "to": "uno2:9"}]}}
+{"text": "Connect the led1 to pin 3 of uno1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "uno1:3"}]}}
+{"text": "Add a buzzer and connect it to pin 7 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-buzzer", "id": "buz_1"}, {"type": "wire", "from": "buz_1:1", "to": "uno1:7"}]}}
+{"text": "Put a 220 ohm resistor on pin 12 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "220"}, {"type": "wire", "from": "res_1:1", "to": "uno1:12"}]}}
+{"text": "Connect the dht11 to pin 2 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-dht11", "id": "dht_1"}, {"type": "wire", "from": "dht_1:DATA", "to": "uno1:2"}]}}
+{"text": "Add a white led to uno1 pin 4", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "white"}, {"type": "wire", "from": "led_1:A", "to": "uno1:4"}]}}
+{"text": "Wire the button to GP10 on pico1", "plan": {"actions": [{"type": "wire", "from": "btn1:1.L", "to": "pico1:GP10"}]}}
+{"text": "Add a 10k resistor on pin 1 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "10k"}, {"type": "wire", "from": "res_1:1", "to": "uno1:1"}]}}
+{"text": "Connect led1 to pin 8 of uno1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "uno1:8"}]}}
+{"text": "Add a green led and connect it to pin 13 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "green"}, {"type": "wire", "from": "led_1:A", "to": "uno1:13"}]}}
+{"text": "Put a potentiometer on pico1", "plan": {"actions": [{"type": "add", "component": "wokwi-potentiometer", "id": "pot_1"}]}}
+{"text": "Connect the servo to GP4 of pico1", "plan": {"actions": [{"type": "wire", "from": "servo1:PWM", "to": "pico1:GP4"}]}}
+{"text": "Add a red led on uno2 pin 5", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "red"}, {"type": "wire", "from": "led_1:A", "to": "uno2:5"}]}}
+{"text": "Wire the resistor to pin 11 of uno1", "plan": {"actions": [{"type": "wire", "from": "res1:1", "to": "uno1:11"}]}}
+{"text": "Add a 330 ohm resistor to uno1 pin 3", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "330"}, {"type": "wire", "from": "res_1:1", "to": "uno1:3"}]}}
+{"text": "I need an led on GP1 of pico1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1"}, {"type": "wire", "from": "led_1:A", "to": "pico1:GP1"}]}}
+{"text": "Connect the ultrasonic trigger to pin 4 of uno1", "plan": {"actions": [{"type": "wire", "from": "ultra1:TRIG", "to": "uno1:4"}]}}
+{"text": "Add a blue led to uno1 pin 12", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "blue"}, {"type": "wire", "from": "led_1:A", "to": "uno1:12"}]}}
+{"text": "Wire the button1 to pin 2 of uno1", "plan": {"actions": [{"type": "wire", "from": "button1:1.L", "to": "uno1:2"}]}}
+{"text": "Put a 1k resistor on uno2 pin 13", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "1k"}, {"type": "wire", "from": "res_1:1", "to": "uno2:13"}]}}
+{"text": "Connect led1 to pin 5 of uno1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "uno1:5"}]}}
+{"text": "Add a yellow led and connect it to GP3 of pico1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "yellow"}, {"type": "wire", "from": "led_1:A", "to": "pico1:GP3"}]}}
+{"text": "Wire the potentiometer to A5 of uno1", "plan": {"actions": [{"type": "wire", "from": "pot1:SIG", "to": "uno1:A5"}]}}
+{"text": "Add a button to uno1 pin 1", "plan": {"actions": [{"type": "add", "component": "wokwi-pushbutton", "id": "btn_1"}, {"type": "wire", "from": "btn_1:1.L", "to": "uno1:1"}]}}
+{"text": "Remove buzzer buz2", "plan": {"actions": [{"type": "remove", "id": "buz2"}]}}
+{"text": "Add a white led to uno1 pin 8", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "white"}, {"type": "wire", "from": "led_1:A", "to": "uno1:8"}]}}
+{"text": "Connect led1 to GP0 of pico1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "pico1:GP0"}]}}
+{"text": "Add a 4.7k resistor to uno2", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "4.7k"}]}}
+{"text": "Put a buzzer on pin 3 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-buzzer", "id": "buz_1"}, {"type": "wire", "from": "buz_1:1", "to": "uno1:3"}]}}
+{"text": "Connect the dht11 to pin 9 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-dht11", "id": "dht_1"}, {"type": "wire", "from": "dht_1:DATA", "to": "uno1:9"}]}}
+{"text": "Add a red led on uno1 pin 11", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "red"}, {"type": "wire", "from": "led_1:A", "to": "uno1:11"}]}}
+{"text": "Wire the servo to GP15 on pico1", "plan": {"actions": [{"type": "wire", "from": "servo1:PWM", "to": "pico1:GP15"}]}}
+{"text": "Add a 220 ohm resistor and connect it to pin 4 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "220"}, {"type": "wire", "from": "res_1:1", "to": "uno1:4"}]}}
+{"text": "Connect the button1 to GP4 of pico1", "plan": {"actions": [{"type": "wire", "from": "button1:1.L", "to": "pico1:GP4"}]}}
+{"text": "Add a green led to uno2 pin 1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "green"}, {"type": "wire", "from": "led_1:A", "to": "uno2:1"}]}}
+{"text": "Put a blue led on pin 7 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "blue"}, {"type": "wire", "from": "led_1:A", "to": "uno1:7"}]}}
+{"text": "Connect the potentiometer to A2 of uno1", "plan": {"actions": [{"type": "wire", "from": "pot1:SIG", "to": "uno1:A2"}]}}
+{"text": "Add a 10k resistor to uno1 pin 3", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "10k"}, {"type": "wire", "from": "res_1:1", "to": "uno1:3"}]}}
+{"text": "I need an ultrasonic on uno1 pins 2 and 3", "plan": {"actions": [{"type": "add", "component": "wokwi-hc-sr04", "id": "ultra_1"}, {"type": "wire", "from": "ultra_1:TRIG", "to": "uno1:2"}, {"type": "wire", "from": "ultra_1:ECHO", "to": "uno1:3"}]}}
+{"text": "Add a yellow led to uno1 pin 13", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "yellow"}, {"type": "wire", "from": "led_1:A", "to": "uno1:13"}]}}
+{"text": "Wire the buzzer to pin 8 of uno1", "plan": {"actions": [{"type": "wire", "from": "buzzer1:1", "to": "uno1:8"}]}}
+{"text": "Add a 330 ohm resistor to uno2 pin 10", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "330"}, {"type": "wire", "from": "res_1:1", "to": "uno2:10"}]}}
+{"text": "Connect led1 to GP6 of pico1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "pico1:GP6"}]}}
+{"text": "Add a red led and connect it to pin 5 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "red"}, {"type": "wire", "from": "led_1:A", "to": "uno1:5"}]}}
+{"text": "Wire the button to GP2 on pico1", "plan": {"actions": [{"type": "wire", "from": "btn1:1.L", "to": "pico1:GP2"}]}}
+{"text": "Add a 1k resistor on uno1 pin 12", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "1k"}, {"type": "wire", "from": "res_1:1", "to": "uno1:12"}]}}
+{"text": "Connect led1 to pin 4 of uno1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "uno1:4"}]}}
+{"text": "Add a blue led to uno2 pin 6", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "blue"}, {"type": "wire", "from": "led_1:A", "to": "uno2:6"}]}}
+{"text": "Put a green led on pin 10 of uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "green"}, {"type": "wire", "from": "led_1:A", "to": "uno1:10"}]}}
+{"text": "Connect the servo to pin 11 of uno1", "plan": {"actions": [{"type": "wire", "from": "servo1:PWM", "to": "uno1:11"}]}}
+{"text": "Add a white led to uno1 pin 2", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "white"}, {"type": "wire", "from": "led_1:A", "to": "uno1:2"}]}}
+{"text": "Wire the potentiometer to A0 of uno1", "plan": {"actions": [{"type": "wire", "from": "pot1:SIG", "to": "uno1:A0"}]}}
+{"text": "Add a 220 ohm resistor on uno1 pin 7", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "220"}, {"type": "wire", "from": "res_1:1", "to": "uno1:7"}]}}
+{"text": "Connect led1 to pin 9 of uno1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "uno1:9"}]}}
+{"text": "Add a blue led and connect it to pin 1 of uno2", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "blue"}, {"type": "wire", "from": "led_1:A", "to": "uno2:1"}]}}
+{"text": "Put a 10k resistor on uno1 pin 13", "plan": {"actions": [{"type": "add", "component": "wokwi-resistor", "id": "res_1", "value": "10k"}, {"type": "wire", "from": "res_1:1", "to": "uno1:13"}]}}
+{"text": "Connect the button to pin 3 on uno1", "plan": {"actions": [{"type": "wire", "from": "btn1:1.L", "to": "uno1:3"}]}}
+{"text": "I need a buzzer on GP12 of pico1", "plan": {"actions": [{"type": "add", "component": "wokwi-buzzer", "id": "buz_1"}, {"type": "wire", "from": "buz_1:1", "to": "pico1:GP12"}]}}
+{"text": "Add a red led on uno1 pin 4", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "red"}, {"type": "wire", "from": "led_1:A", "to": "uno1:4"}]}}
+{"text": "Wire the resistor to GP6 on pico1", "plan": {"actions": [{"type": "wire", "from": "res1:1", "to": "pico1:GP6"}]}}
+{"text": "Add a potentiometer and connect it to A5 on uno1", "plan": {"actions": [{"type": "add", "component": "wokwi-potentiometer", "id": "pot_1"}, {"type": "wire", "from": "pot_1:SIG", "to": "uno1:A5"}]}}
+{"text": "Remove led3", "plan": {"actions": [{"type": "remove", "id": "led3"}]}}
+{"text": "Add a yellow led to uno1 pin 11", "plan": {"actions": [{"type": "add", "component": "wokwi-led", "id": "led_1", "color": "yellow"}, {"type": "wire", "from": "led_1:A", "to": "uno1:11"}]}}
+{"text": "Connect led1 to pin 2 of uno1", "plan": {"actions": [{"type": "wire", "from": "led1:A", "to": "uno1:2"}]}}

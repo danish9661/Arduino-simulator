@@ -17,7 +17,11 @@ export default defineConfig(({ mode }) => {
   const useAlias = !!resolvedEmulatorPath && fs.existsSync(resolvedEmulatorPath)
 
   return {
-    plugins: [react()],
+    plugins: [
+      react({
+        exclude: [/src[\\\/]worker[\\\/].*/, /openhw-studio-emulator[\\\/].*/],
+      })
+    ],
     worker: {
       format: 'es',
     },
@@ -54,6 +58,15 @@ export default defineConfig(({ mode }) => {
           },
         ],
       },
+    },
+    ssr: {
+      noExternal: ['rp2040js', 'avr8js', '@openhw/emulator', 'littlefs'],
+    },
+    test: {
+      environment: 'jsdom',
+      deps: {
+        inline: ['rp2040js', 'avr8js', '@openhw/emulator', 'littlefs'],
+      }
     },
     server: {
       fs: {

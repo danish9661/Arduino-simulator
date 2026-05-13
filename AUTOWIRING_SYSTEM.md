@@ -30,14 +30,15 @@ These components feature automatic wiring, helper injection, and ready-to-run Ar
 | **Ultrasonic (HC-SR04)** | None (Direct) | Distance calculation (cm) |
 | **LED** | 220Ω Resistor | Basic blink/PWM logic |
 | **Buzzer** | None (Direct) | Tone generation logic |
+| **RGB LED** | 3x 220Ω Resistors | Multi-color cycle (Red/Green/Blue) |
+| **Photoresistor (LDR)** | 10kΩ Voltage Divider | Analog light intensity (Lux) |
+| **Temp Sensor (NTC)** | 10kΩ Voltage Divider | Beta-model temperature (Celsius) |
 
 ### 🚧 Partially Implemented (Universal Fallback)
 These components use the universal wiring engine but may require manual code tweaks or manifest refinement.
 
 | Component | Current Status | Notes |
 | :--- | :--- | :--- |
-| **RGB LED** | Wiring Only | Manual color logic required |
-| **LDR (Photoresistor)** | Wiring Only | Needs voltage divider helper |
 | **PIR Sensor** | Wiring Only | Digital read implemented |
 | **SD Card Module** | Wiring Only | SPI connections established |
 | **MPU6050 Accel/Gyro** | Wiring Only | I2C connections established |
