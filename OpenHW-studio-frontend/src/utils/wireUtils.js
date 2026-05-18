@@ -21,7 +21,7 @@ export function renderRoundedPath(pts) {
 }
 
 // ─── INTERNAL: ENSURE STRICT ORTHOGONALITY ────────────────────────────────
-function makeOrthogonal(pts) {
+export function makeOrthogonal(pts) {
   if (pts.length < 2) return pts;
   const result = [pts[0]];
   for (let i = 1; i < pts.length; i++) {

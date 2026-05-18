@@ -1,5 +1,32 @@
 # Change Log & Audit Trail
 
+## Conversation: c81c5a98-5a3c-44c7-9340-2aa559e90e5c (2026-05-19)
+
+### Modified Files:
+1. **[openhw-studio-autowiring-engine/src/lib.rs](file:///c:/Users/Danish/Documents/simulator/openhw-studio-autowiring-engine/src/lib.rs)**:
+   *   **Universal Autowiring Tracing**: Implemented universal autowiring connection tracing in `generate_code_for_component` and `generate_autonomous_setup`. Allows composite, helper-based components (like `openhw-motor` with `openhw-motor-driver`) to dynamically resolve and update their board pin assignments exactly like direct components (like `openhw-led`). Added explicit `conn.via` component tracing and commented out the legacy hardcoded 2-pin bridging rule in `get_connected_net` to prevent conflicts and ensure 100% manifest-driven routing. Added dynamic `${COMP_ID}` and `${COMP_SUFFIX}` replacement to support multiple instances of identical components without C++ variable name collisions.
+2. **[openhw-motor/manifest.json](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/openhw-motor/manifest.json)**:
+   *   **Universal Placeholder Migration**: Replaced invalid C++ macro placeholders (`[[helper:driver:ENA|ENB]]`, etc.) with universal `${helper:driver:ENA|ENB}` placeholders. Stripped redundant `void setup()` and `void loop()` wrappers.
+3. **[openhw-stepper-motor/manifest.json](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/openhw-stepper-motor/manifest.json)**:
+   *   **Universal Placeholder & Multi-Instance Migration**: Replaced hardcoded pin numbers (`8, 9, 10`) with universal placeholders (`${helper:driver:STEP}`, `${helper:driver:DIR}`, `${helper:driver:ENABLE}`). Replaced hardcoded `stepper` variable name with `stepper_${COMP_SUFFIX}` to prevent variable name collisions when multiple stepper motors are connected. Moved `#include <AccelStepper.h>` and object declaration to `globals`. Connected `RESET` and `SLEEP` to `5V` and pulled `ENABLE` LOW.
+4. **[openhw-rgb-led/manifest.json](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/openhw-rgb-led/manifest.json)**:
+   *   **Macro & Structure Fix**: Moved `#define PIN_R 9`, `#define PIN_G 10`, `#define PIN_B 11` to `globals`. Removed invalid `arduino:9|6|3` syntax. Stripped redundant `void setup()` and `void loop()` wrappers.
+5. **[openhw-servo/manifest.json](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/openhw-servo/manifest.json)**:
+   *   **Library Dependency Fix**: Added `"libraries": ["Servo"]` array to ensure proper library resolution during automated code generation.
+6. **Mass Manifest Migration (20 Component Manifests)**:
+   *   **Universal Placeholders & Collision Prevention**: Audited all remaining ~60 component manifests and updated the 20 components containing autocoding blocks (`openhw-ldr-module`, `openhw-hc-sr04`, `openhw-a4988`, `openhw-motor-driver`, `openhw-pushbutton`, `openhw-buzzer`, `openhw-potentiometer`, `openhw-photoresistor`, `openhw-ntc-temperature-sensor`, `openhw-ssd1306-oled`, `openhw-sd-card`, `openhw-nokia-5110`, `openhw-membrane-keypad`, `openhw-max7219`, `openhw-lcd2004-i2c`, `openhw-lcd1602-i2c`, `openhw-ili9341`, `max30102`). Replaced all hardcoded pin numbers with dynamic placeholders (e.g. `${TRIG}`, `${ECHO}`, `${CS}`, `${STEP}`, `${DIR}`, `${ENABLE}`) and appended `${COMP_SUFFIX}` to all C++ variable names, arrays, and object declarations to prevent global scope collisions when multiple instances are present.
+18. **[execute.ts](file:///c:/Users/Danish/Documents/simulator/OpenHW-studio-frontend/src/worker/execute.ts)**:
+    *   **Composite Helper Voltage Propagation**: Discovered and fixed a major architectural gap in `AVRRunner` where `repropagateAllVoltages` only propagated voltages starting from Arduino board pins (`uno1`). Because composite helper components (like `openhw-power-supply` and `openhw-a4988`) connect to each other and to destination components via wires independent of the board (e.g. `power-supply:5V -> a4988:VMOT`, `a4988:1A -> stepper-motor:A+`), their generated output voltages were never propagated across the wires, resulting in 0V at the destination pins. Updated `updateOopPin` to accept `customCompId` and updated `repropagateAllVoltages` to repropagate active driver outputs from non-board helper components (`a4988`, `motor-driver`, `logic-gate`, `power-supply`) across connected wires. Updated `COMPONENT_PINS` for power supply to include `5V` alongside `VCC` and `GND`.
+19. **Explanation of `stepper.json` Code Generation**:
+    *   **Legacy Project File Analysis**: Examined `workflow/stepper.json` and identified an `exportedAt` timestamp of `2026-05-18T20:55:05.416Z`, confirming it was saved *before* the mass manifest migration was performed on `openhw-stepper-motor` (which took place during Request 9). At the time `stepper.json` was saved, `openhw-stepper-motor/manifest.json` still contained the legacy hardcoded autocoding block without `${COMP_SUFFIX}` or dynamic `${helper:driver:STEP}` placeholders.
+
+### Reasoning:
+*   Enables truly universal dynamic pin replacement for complex composite components across the entire emulator.
+*   Prevents `#include` directives, `#define` macros, and global object declarations from being incorrectly generated inside function blocks during automatic code generation.
+*   Corrects A4988 driver simulation logic where floating active-LOW `ENABLE`, `SLEEP`, and `RESET` pins kept the driver in an inactive (`active: false`) freewheeling state.
+*   Ensures all 24 autocoding-enabled manifests adhere to the standardized `globals`, `setup`, `loop`, and `libraries` schema.
+*   Fixes the root cause of 0V on destination pins for composite helper components by ensuring their active driver outputs are correctly propagated across wires during simulation runs.
+
 ## Conversation: 42a9bf94-3a04-4769-9b93-4c92a0721d37 (2026-05-18)
 
 ### Modified Files:

@@ -1,5 +1,6 @@
-import React, { useSyncExternalStore, useCallback } from 'react';
+import React, { useSyncExternalStore, useCallback, useMemo } from 'react';
 import { CanvasWire, CanvasComponent } from './CanvasPrimitives';
+import { calculateWireBundleOffsets } from '../../../utils/wireRouting.js';
 
 const ReactiveComponentUI = React.memo(({ comp, COMPONENT_REGISTRY, getComponentStateAttrs, isRunning, getLiveOopStateSnapshot, subscribeLiveOopState }) => {
   const liveState = useSyncExternalStore(
@@ -92,6 +93,17 @@ function CanvasSceneLayerBase({
   onPinClick,
   setWireStart,
 }) {
+  const wireOffsetMap = useMemo(() => calculateWireBundleOffsets(wires, (wire) => {
+    const fromParts = wire.from.split(':');
+    const toParts = wire.to.split(':');
+    const p1 = getPinPos(fromParts[0], fromParts.slice(1).join(':'));
+    const p2 = getPinPos(toParts[0], toParts.slice(1).join(':'));
+    if (!p1 || !p2) return null;
+    const e1 = getPinExitPoint(fromParts[0], fromParts.slice(1).join(':'), 0, p2) || p1;
+    const e2 = getPinExitPoint(toParts[0], toParts.slice(1).join(':'), 0, p1) || p2;
+    return { p1, p2, e1, e2, waypoints: wire.waypoints || [] };
+  }), [wires, getPinPos, getPinExitPoint]);
+
   return (
     <div ref={innerCanvasRef} style={{
       position: 'absolute', top: 0, left: 0,
@@ -112,8 +124,7 @@ function CanvasSceneLayerBase({
             if (!p1) p1 = { x: 0, y: 0, isFallback: true };
             if (!p2) p2 = { x: 0, y: 0, isFallback: true };
           }
-          const globalIndex = wires.findIndex(ww => ww.id === w.id);
-          const offset = (globalIndex !== -1 ? globalIndex : index) % 7;
+          const offset = wireOffsetMap.get(w.id) || 0;
           const e1 = getPinExitPoint(fromParts[0], fromParts.slice(1).join(':'), offset, p2) || p1;
           const e2 = getPinExitPoint(toParts[0], toParts.slice(1).join(':'), offset, p1) || p2;
 
@@ -204,8 +215,7 @@ function CanvasSceneLayerBase({
             if (!p1) p1 = { x: 0, y: 0, isFallback: true };
             if (!p2) p2 = { x: 0, y: 0, isFallback: true };
           }
-          const globalIndexTop = wires.findIndex(ww => ww.id === w.id);
-          const offset = (globalIndexTop !== -1 ? globalIndexTop : index) % 7;
+          const offset = wireOffsetMap.get(w.id) || 0;
           const e1 = getPinExitPoint(fromParts[0], fromParts.slice(1).join(':'), offset, p2) || p1;
           const e2 = getPinExitPoint(toParts[0], toParts.slice(1).join(':'), offset, p1) || p2;
 

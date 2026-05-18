@@ -1,0 +1,5821 @@
+{
+  "timestamp": "2026-05-18T21:24:19.580Z",
+  "telemetryMode": "detail",
+  "totalTelemetryEntries": 49,
+  "totalProtocolLogs": 0,
+  "protocolLogs": [],
+  "telemetryEntries": [
+    {
+      "id": "1779139356008-0h1vbc",
+      "timestamp": "02:52:36.008",
+      "summary": "Sample interval set to 1000ms",
+      "details": {
+        "interval": 1000
+      }
+    },
+    {
+      "id": "1779139359650-zk2mq4",
+      "timestamp": "02:52:39.650",
+      "summary": "Freq: 561.755Hz | Avg: 0.01ms | leds: N/A | deepSiliconRegisters: N/A | deepSiliconSRAM: N/A | deepSiliconTimers: N/A | deepSiliconPower: N/A | deepSiliconInterrupts: N/A | pins: {Object: 25 keys} | pinToggles: {\"10\":1} | analogVoltages: {Object: 33 keys} | i2cTraffic: [] | spiTraffic: [] | serialBytes: 0.00 | pwmTraffic: 0.00 | oneWireTraffic: 0.00 | pioTraffic: 0.00 | i2sTraffic: 0.00",
+      "details": {
+        "id": "uno1",
+        "type": "openhw-arduino-uno",
+        "state": {
+          "txActive": true,
+          "rxActive": true,
+          "pin13Active": true,
+          "pins": {
+            "0": true,
+            "1": true,
+            "2": true,
+            "3": true,
+            "4": true,
+            "5": true,
+            "6": true,
+            "7": true,
+            "8": false,
+            "9": false,
+            "10": false,
+            "11": true,
+            "12": true,
+            "13": true,
+            "5V": true,
+            "vin": true,
+            "VIN": true,
+            "3V3": true,
+            "A0": true,
+            "A1": true,
+            "A2": true,
+            "A3": true,
+            "A4": true,
+            "A5": true,
+            "GND": false
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "analogVoltages": {
+            "0": 5,
+            "1": 5,
+            "2": 5,
+            "3": 5,
+            "4": 5,
+            "5": 5,
+            "6": 5,
+            "7": 5,
+            "8": 0,
+            "9": 0,
+            "10": 0,
+            "11": 5,
+            "12": 5,
+            "13": 5,
+            "A0": 5,
+            "A1": 5,
+            "A2": 5,
+            "A3": 5,
+            "A4": 5,
+            "A5": 5,
+            "vin": 5,
+            "VIN": 5,
+            "gnd_1": 0,
+            "gnd_2": 0,
+            "gnd_3": 0,
+            "GND": 0,
+            "5V": 5,
+            "3v3": 0,
+            "3V3": 3.3,
+            "rst": 0,
+            "RST": 0,
+            "ioref": 0,
+            "IOREF": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 561.755,
+          "timing": {
+            "totalMs": 0.09999999403953552,
+            "maxMs": 0.09999999403953552,
+            "avgMs": 0.00624999962747097,
+            "count": 16,
+            "lastUpdateAtMs": 1779139359625
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "stateSize": 52,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359587,
+            "lastStateChangeCycles": null,
+            "stateMutationCount": 4,
+            "idleMs": 39
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 495,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 3.3,
+              "average": 4.575,
+              "samples": 4
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 3.3
+          },
+          "custom": {
+            "txActive": true,
+            "rxActive": true,
+            "pin13Active": true
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:39.627Z",
+        "_metrics": {
+          "sampleCount": 1,
+          "updateFreqHz": 1000,
+          "stateSizeBytes": 52,
+          "stateMutationCount": 0,
+          "idleMs": 0,
+          "pinToggleCount": 0,
+          "pinCount": 33
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=txActive, rxActive, pin13Active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:39.627Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139359650-9511lw",
+      "timestamp": "02:52:39.650",
+      "summary": "Freq: 601.502Hz | Avg: 0.00ms | angle: N/A | pins: {} | pinToggles: {} | pwmTraffic: 0.00",
+      "details": {
+        "id": "stepper_motor_1",
+        "type": "openhw-stepper-motor",
+        "state": {
+          "step_angle": "1.8",
+          "targetBoard": "uno1",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "A+": 0,
+            "A-": 0,
+            "B+": 0,
+            "B-": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 601.502,
+          "timing": {
+            "totalMs": 0,
+            "maxMs": 0,
+            "avgMs": 0,
+            "count": 16,
+            "lastUpdateAtMs": 1779139359625
+          },
+          "pinToggles": {},
+          "stateSize": 41,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 2
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "step_angle": "1.8",
+            "targetBoard": "uno1"
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:39.627Z",
+        "_metrics": {
+          "sampleCount": 1,
+          "updateFreqHz": 1000,
+          "stateSizeBytes": 41,
+          "stateMutationCount": 0,
+          "idleMs": 0,
+          "pinToggleCount": 0,
+          "pinCount": 4
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=step_angle, targetBoard",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:39.627Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139359650-srudf0",
+      "timestamp": "02:52:39.650",
+      "summary": "Freq: 561.755Hz | Avg: 0.01ms | active: true | stepCount: N/A | pins: {Object: 9 keys} | pinToggles: {\"1A\":2,\"2A\":2,\"ENABLE\":1}",
+      "details": {
+        "id": "a4988_stepper_motor_1",
+        "type": "openhw-a4988",
+        "state": {
+          "active": true,
+          "pins": {
+            "VDD": true,
+            "RESET": true,
+            "SLEEP": true,
+            "1A": true,
+            "2A": true,
+            "ENABLE": false,
+            "STEP": false,
+            "DIR": false,
+            "GND_LOGIC": false
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "analogVoltages": {
+            "ENABLE": 0,
+            "MS1": 0,
+            "MS2": 0,
+            "MS3": 0,
+            "RESET": 5,
+            "SLEEP": 5,
+            "STEP": 0,
+            "DIR": 0,
+            "VMOT": 0,
+            "GND_MOT": 0,
+            "2B": 0,
+            "2A": 5,
+            "1A": 5,
+            "1B": 0,
+            "VDD": 5,
+            "GND_LOGIC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 561.755,
+          "timing": {
+            "totalMs": 0.09999999403953552,
+            "maxMs": 0.09999999403953552,
+            "avgMs": 0.00624999962747097,
+            "count": 16,
+            "lastUpdateAtMs": 1779139359625
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "stateSize": 15,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359593,
+            "lastStateChangeCycles": 3486,
+            "stateMutationCount": 1,
+            "idleMs": 34
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 171,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 5,
+              "average": 5,
+              "samples": 1
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 5
+          },
+          "custom": {
+            "active": true
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:39.627Z",
+        "_metrics": {
+          "sampleCount": 1,
+          "updateFreqHz": 1000,
+          "stateSizeBytes": 15,
+          "stateMutationCount": 0,
+          "idleMs": 0,
+          "pinToggleCount": 0,
+          "pinCount": 16
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:39.627Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139359650-7flcth",
+      "timestamp": "02:52:39.650",
+      "summary": "Freq: 601.502Hz | Avg: 0.01ms | voltage: 12.0 | current: N/A | pins: {} | pinToggles: {}",
+      "details": {
+        "id": "power-supply_stepper_motor_1",
+        "type": "openhw-power-supply",
+        "state": {
+          "voltage": "12.0",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "GND": 0,
+            "VCC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 601.502,
+          "timing": {
+            "totalMs": 0.09999999403953552,
+            "maxMs": 0.09999999403953552,
+            "avgMs": 0.00624999962747097,
+            "count": 16,
+            "lastUpdateAtMs": 1779139359625
+          },
+          "pinToggles": {},
+          "stateSize": 18,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 2
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "voltage": "12.0"
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:39.627Z",
+        "_metrics": {
+          "sampleCount": 1,
+          "updateFreqHz": 1000,
+          "stateSizeBytes": 18,
+          "stateMutationCount": 0,
+          "idleMs": 0,
+          "pinToggleCount": 0,
+          "pinCount": 2
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=voltage",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:39.627Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139360668-s4bnf1",
+      "timestamp": "02:52:40.668",
+      "summary": "Freq: 552.205Hz | Avg: 0.00ms | leds: N/A | deepSiliconRegisters: N/A | deepSiliconSRAM: N/A | deepSiliconTimers: N/A | deepSiliconPower: N/A | deepSiliconInterrupts: N/A | pins: {Object: 25 keys} | pinToggles: {\"10\":1} | analogVoltages: {Object: 33 keys} | i2cTraffic: [] | spiTraffic: [] | serialBytes: 0.00 | pwmTraffic: 0.00 | oneWireTraffic: 0.00 | pioTraffic: 0.00 | i2sTraffic: 0.00",
+      "details": {
+        "id": "uno1",
+        "type": "openhw-arduino-uno",
+        "state": {
+          "txActive": true,
+          "rxActive": true,
+          "pin13Active": true,
+          "pins": {
+            "0": true,
+            "1": true,
+            "2": true,
+            "3": true,
+            "4": true,
+            "5": true,
+            "6": true,
+            "7": true,
+            "8": false,
+            "9": false,
+            "10": false,
+            "11": true,
+            "12": true,
+            "13": true,
+            "5V": true,
+            "vin": true,
+            "VIN": true,
+            "3V3": true,
+            "A0": true,
+            "A1": true,
+            "A2": true,
+            "A3": true,
+            "A4": true,
+            "A5": true,
+            "GND": false
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "analogVoltages": {
+            "0": 5,
+            "1": 5,
+            "2": 5,
+            "3": 5,
+            "4": 5,
+            "5": 5,
+            "6": 5,
+            "7": 5,
+            "8": 0,
+            "9": 0,
+            "10": 0,
+            "11": 5,
+            "12": 5,
+            "13": 5,
+            "A0": 5,
+            "A1": 5,
+            "A2": 5,
+            "A3": 5,
+            "A4": 5,
+            "A5": 5,
+            "vin": 5,
+            "VIN": 5,
+            "gnd_1": 0,
+            "gnd_2": 0,
+            "gnd_3": 0,
+            "GND": 0,
+            "5V": 5,
+            "3v3": 0,
+            "3V3": 3.3,
+            "rst": 0,
+            "RST": 0,
+            "ioref": 0,
+            "IOREF": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.205,
+          "timing": {
+            "totalMs": 0.3999999761581421,
+            "maxMs": 0.09999999403953552,
+            "avgMs": 0.0006734006332628654,
+            "count": 594,
+            "lastUpdateAtMs": 1779139360666
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "stateSize": 52,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359587,
+            "lastStateChangeCycles": null,
+            "stateMutationCount": 4,
+            "idleMs": 1080
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 7803,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 3.3,
+              "average": 4.575,
+              "samples": 4
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 3.3
+          },
+          "custom": {
+            "txActive": true,
+            "rxActive": true,
+            "pin13Active": true
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:40.667Z",
+        "_metrics": {
+          "sampleCount": 50,
+          "updateFreqHz": 48.077,
+          "stateSizeBytes": 52,
+          "stateMutationCount": 0,
+          "idleMs": 1040,
+          "pinToggleCount": 0,
+          "pinCount": 33
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=txActive, rxActive, pin13Active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:40.667Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139360668-j6eqwu",
+      "timestamp": "02:52:40.668",
+      "summary": "Freq: 553.173Hz | Avg: 0.00ms | angle: N/A | pins: {} | pinToggles: {} | pwmTraffic: 0.00",
+      "details": {
+        "id": "stepper_motor_1",
+        "type": "openhw-stepper-motor",
+        "state": {
+          "step_angle": "1.8",
+          "targetBoard": "uno1",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "A+": 0,
+            "A-": 0,
+            "B+": 0,
+            "B-": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 553.173,
+          "timing": {
+            "totalMs": 0.30000001192092896,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.000505050525119409,
+            "count": 594,
+            "lastUpdateAtMs": 1779139360666
+          },
+          "pinToggles": {},
+          "stateSize": 41,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 1042
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "step_angle": "1.8",
+            "targetBoard": "uno1"
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:40.667Z",
+        "_metrics": {
+          "sampleCount": 50,
+          "updateFreqHz": 48.077,
+          "stateSizeBytes": 41,
+          "stateMutationCount": 0,
+          "idleMs": 1040,
+          "pinToggleCount": 0,
+          "pinCount": 4
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=step_angle, targetBoard",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:40.667Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139360668-z7zxft",
+      "timestamp": "02:52:40.668",
+      "summary": "Freq: 552.205Hz | Avg: 0.00ms | active: true | stepCount: N/A | pins: {Object: 9 keys} | pinToggles: {\"1A\":2,\"2A\":2,\"ENABLE\":1}",
+      "details": {
+        "id": "a4988_stepper_motor_1",
+        "type": "openhw-a4988",
+        "state": {
+          "active": true,
+          "pins": {
+            "VDD": true,
+            "RESET": true,
+            "SLEEP": true,
+            "1A": true,
+            "2A": true,
+            "ENABLE": false,
+            "STEP": false,
+            "DIR": false,
+            "GND_LOGIC": false
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "analogVoltages": {
+            "ENABLE": 0,
+            "MS1": 0,
+            "MS2": 0,
+            "MS3": 0,
+            "RESET": 5,
+            "SLEEP": 5,
+            "STEP": 0,
+            "DIR": 0,
+            "VMOT": 0,
+            "GND_MOT": 0,
+            "2B": 0,
+            "2A": 5,
+            "1A": 5,
+            "1B": 0,
+            "VDD": 5,
+            "GND_LOGIC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.205,
+          "timing": {
+            "totalMs": 0.29999998211860657,
+            "maxMs": 0.09999999403953552,
+            "avgMs": 0.0005050504749471492,
+            "count": 594,
+            "lastUpdateAtMs": 1779139360666
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "stateSize": 15,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359593,
+            "lastStateChangeCycles": 3486,
+            "stateMutationCount": 1,
+            "idleMs": 1074
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 2691,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 5,
+              "average": 5,
+              "samples": 1
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 5
+          },
+          "custom": {
+            "active": true
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:40.667Z",
+        "_metrics": {
+          "sampleCount": 50,
+          "updateFreqHz": 48.077,
+          "stateSizeBytes": 15,
+          "stateMutationCount": 0,
+          "idleMs": 1040,
+          "pinToggleCount": 0,
+          "pinCount": 16
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:40.667Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139360668-kpb79r",
+      "timestamp": "02:52:40.668",
+      "summary": "Freq: 553.173Hz | Avg: 0.00ms | voltage: 12.0 | current: N/A | pins: {} | pinToggles: {}",
+      "details": {
+        "id": "power-supply_stepper_motor_1",
+        "type": "openhw-power-supply",
+        "state": {
+          "voltage": "12.0",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "GND": 0,
+            "VCC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 553.173,
+          "timing": {
+            "totalMs": 1,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0016835016835016834,
+            "count": 594,
+            "lastUpdateAtMs": 1779139360666
+          },
+          "pinToggles": {},
+          "stateSize": 18,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 1042
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "voltage": "12.0"
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:40.667Z",
+        "_metrics": {
+          "sampleCount": 50,
+          "updateFreqHz": 48.077,
+          "stateSizeBytes": 18,
+          "stateMutationCount": 0,
+          "idleMs": 1040,
+          "pinToggleCount": 0,
+          "pinCount": 2
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=voltage",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:40.667Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139361675-bn55cx",
+      "timestamp": "02:52:41.675",
+      "summary": "Freq: 550.77Hz | Avg: 0.00ms | leds: N/A | deepSiliconRegisters: N/A | deepSiliconSRAM: N/A | deepSiliconTimers: N/A | deepSiliconPower: N/A | deepSiliconInterrupts: N/A | pins: {Object: 25 keys} | pinToggles: {\"10\":1} | analogVoltages: {Object: 33 keys} | i2cTraffic: [] | spiTraffic: [] | serialBytes: 0.00 | pwmTraffic: 0.00 | oneWireTraffic: 0.00 | pioTraffic: 0.00 | i2sTraffic: 0.00",
+      "details": {
+        "id": "uno1",
+        "type": "openhw-arduino-uno",
+        "state": {
+          "txActive": true,
+          "rxActive": true,
+          "pin13Active": true,
+          "pins": {
+            "0": true,
+            "1": true,
+            "2": true,
+            "3": true,
+            "4": true,
+            "5": true,
+            "6": true,
+            "7": true,
+            "8": false,
+            "9": false,
+            "10": false,
+            "11": true,
+            "12": true,
+            "13": true,
+            "5V": true,
+            "vin": true,
+            "VIN": true,
+            "3V3": true,
+            "A0": true,
+            "A1": true,
+            "A2": true,
+            "A3": true,
+            "A4": true,
+            "A5": true,
+            "GND": false
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "analogVoltages": {
+            "0": 5,
+            "1": 5,
+            "2": 5,
+            "3": 5,
+            "4": 5,
+            "5": 5,
+            "6": 5,
+            "7": 5,
+            "8": 0,
+            "9": 0,
+            "10": 0,
+            "11": 5,
+            "12": 5,
+            "13": 5,
+            "A0": 5,
+            "A1": 5,
+            "A2": 5,
+            "A3": 5,
+            "A4": 5,
+            "A5": 5,
+            "vin": 5,
+            "VIN": 5,
+            "gnd_1": 0,
+            "gnd_2": 0,
+            "gnd_3": 0,
+            "GND": 0,
+            "5V": 5,
+            "3v3": 0,
+            "3V3": 3.3,
+            "rst": 0,
+            "RST": 0,
+            "ioref": 0,
+            "IOREF": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 550.77,
+          "timing": {
+            "totalMs": 0.9000000357627869,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.000786713317974464,
+            "count": 1144,
+            "lastUpdateAtMs": 1779139361667
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "stateSize": 52,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359587,
+            "lastStateChangeCycles": null,
+            "stateMutationCount": 4,
+            "idleMs": 2081
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 15459,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 3.3,
+              "average": 4.575,
+              "samples": 4
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 3.3
+          },
+          "custom": {
+            "txActive": true,
+            "rxActive": true,
+            "pin13Active": true
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:41.668Z",
+        "_metrics": {
+          "sampleCount": 95,
+          "updateFreqHz": 46.546,
+          "stateSizeBytes": 52,
+          "stateMutationCount": 0,
+          "idleMs": 2041,
+          "pinToggleCount": 0,
+          "pinCount": 33
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=txActive, rxActive, pin13Active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:41.668Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139361675-yb9nti",
+      "timestamp": "02:52:41.675",
+      "summary": "Freq: 551.27Hz | Avg: 0.00ms | angle: N/A | pins: {} | pinToggles: {} | pwmTraffic: 0.00",
+      "details": {
+        "id": "stepper_motor_1",
+        "type": "openhw-stepper-motor",
+        "state": {
+          "step_angle": "1.8",
+          "targetBoard": "uno1",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "A+": 0,
+            "A-": 0,
+            "B+": 0,
+            "B-": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 551.27,
+          "timing": {
+            "totalMs": 0.4000000059604645,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.00034965035486054586,
+            "count": 1144,
+            "lastUpdateAtMs": 1779139361667
+          },
+          "pinToggles": {},
+          "stateSize": 41,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 2043
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "step_angle": "1.8",
+            "targetBoard": "uno1"
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:41.668Z",
+        "_metrics": {
+          "sampleCount": 95,
+          "updateFreqHz": 46.546,
+          "stateSizeBytes": 41,
+          "stateMutationCount": 0,
+          "idleMs": 2041,
+          "pinToggleCount": 0,
+          "pinCount": 4
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=step_angle, targetBoard",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:41.668Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139361675-e32kr6",
+      "timestamp": "02:52:41.675",
+      "summary": "Freq: 550.77Hz | Avg: 0.00ms | active: true | stepCount: N/A | pins: {Object: 9 keys} | pinToggles: {\"1A\":2,\"2A\":2,\"ENABLE\":1}",
+      "details": {
+        "id": "a4988_stepper_motor_1",
+        "type": "openhw-a4988",
+        "state": {
+          "active": true,
+          "pins": {
+            "VDD": true,
+            "RESET": true,
+            "SLEEP": true,
+            "1A": true,
+            "2A": true,
+            "ENABLE": false,
+            "STEP": false,
+            "DIR": false,
+            "GND_LOGIC": false
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "analogVoltages": {
+            "ENABLE": 0,
+            "MS1": 0,
+            "MS2": 0,
+            "MS3": 0,
+            "RESET": 5,
+            "SLEEP": 5,
+            "STEP": 0,
+            "DIR": 0,
+            "VMOT": 0,
+            "GND_MOT": 0,
+            "2B": 0,
+            "2A": 5,
+            "1A": 5,
+            "1B": 0,
+            "VDD": 5,
+            "GND_LOGIC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 550.77,
+          "timing": {
+            "totalMs": 0.29999998211860657,
+            "maxMs": 0.09999999403953552,
+            "avgMs": 0.00026223774660717356,
+            "count": 1144,
+            "lastUpdateAtMs": 1779139361667
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "stateSize": 15,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359593,
+            "lastStateChangeCycles": 3486,
+            "stateMutationCount": 1,
+            "idleMs": 2075
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 5331,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 5,
+              "average": 5,
+              "samples": 1
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 5
+          },
+          "custom": {
+            "active": true
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:41.668Z",
+        "_metrics": {
+          "sampleCount": 95,
+          "updateFreqHz": 46.546,
+          "stateSizeBytes": 15,
+          "stateMutationCount": 0,
+          "idleMs": 2041,
+          "pinToggleCount": 0,
+          "pinCount": 16
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:41.668Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139361675-7j6s5o",
+      "timestamp": "02:52:41.675",
+      "summary": "Freq: 551.27Hz | Avg: 0.00ms | voltage: 12.0 | current: N/A | pins: {} | pinToggles: {}",
+      "details": {
+        "id": "power-supply_stepper_motor_1",
+        "type": "openhw-power-supply",
+        "state": {
+          "voltage": "12.0",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "GND": 0,
+            "VCC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 551.27,
+          "timing": {
+            "totalMs": 1.5000000298023224,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0013111888372397923,
+            "count": 1144,
+            "lastUpdateAtMs": 1779139361667
+          },
+          "pinToggles": {},
+          "stateSize": 18,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 2043
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "voltage": "12.0"
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:41.668Z",
+        "_metrics": {
+          "sampleCount": 95,
+          "updateFreqHz": 46.546,
+          "stateSizeBytes": 18,
+          "stateMutationCount": 0,
+          "idleMs": 2041,
+          "pinToggleCount": 0,
+          "pinCount": 2
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=voltage",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:41.668Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139362680-1qnfu7",
+      "timestamp": "02:52:42.680",
+      "summary": "Freq: 550.507Hz | Avg: 0.00ms | leds: N/A | deepSiliconRegisters: N/A | deepSiliconSRAM: N/A | deepSiliconTimers: N/A | deepSiliconPower: N/A | deepSiliconInterrupts: N/A | pins: {Object: 25 keys} | pinToggles: {\"10\":1} | analogVoltages: {Object: 33 keys} | i2cTraffic: [] | spiTraffic: [] | serialBytes: 0.00 | pwmTraffic: 0.00 | oneWireTraffic: 0.00 | pioTraffic: 0.00 | i2sTraffic: 0.00",
+      "details": {
+        "id": "uno1",
+        "type": "openhw-arduino-uno",
+        "state": {
+          "txActive": true,
+          "rxActive": true,
+          "pin13Active": true,
+          "pins": {
+            "0": true,
+            "1": true,
+            "2": true,
+            "3": true,
+            "4": true,
+            "5": true,
+            "6": true,
+            "7": true,
+            "8": false,
+            "9": false,
+            "10": false,
+            "11": true,
+            "12": true,
+            "13": true,
+            "5V": true,
+            "vin": true,
+            "VIN": true,
+            "3V3": true,
+            "A0": true,
+            "A1": true,
+            "A2": true,
+            "A3": true,
+            "A4": true,
+            "A5": true,
+            "GND": false
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "analogVoltages": {
+            "0": 5,
+            "1": 5,
+            "2": 5,
+            "3": 5,
+            "4": 5,
+            "5": 5,
+            "6": 5,
+            "7": 5,
+            "8": 0,
+            "9": 0,
+            "10": 0,
+            "11": 5,
+            "12": 5,
+            "13": 5,
+            "A0": 5,
+            "A1": 5,
+            "A2": 5,
+            "A3": 5,
+            "A4": 5,
+            "A5": 5,
+            "vin": 5,
+            "VIN": 5,
+            "gnd_1": 0,
+            "gnd_2": 0,
+            "gnd_3": 0,
+            "GND": 0,
+            "5V": 5,
+            "3v3": 0,
+            "3V3": 3.3,
+            "rst": 0,
+            "RST": 0,
+            "ioref": 0,
+            "IOREF": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 550.507,
+          "timing": {
+            "totalMs": 1.2000000178813934,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0007050528894720291,
+            "count": 1702,
+            "lastUpdateAtMs": 1779139362679
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "stateSize": 52,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359587,
+            "lastStateChangeCycles": null,
+            "stateMutationCount": 4,
+            "idleMs": 3092
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 23724,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 3.3,
+              "average": 4.575,
+              "samples": 4
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 3.3
+          },
+          "custom": {
+            "txActive": true,
+            "rxActive": true,
+            "pin13Active": true
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:42.679Z",
+        "_metrics": {
+          "sampleCount": 142,
+          "updateFreqHz": 46.527,
+          "stateSizeBytes": 52,
+          "stateMutationCount": 0,
+          "idleMs": 3052,
+          "pinToggleCount": 0,
+          "pinCount": 33
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=txActive, rxActive, pin13Active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:42.679Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139362680-lr8pfu",
+      "timestamp": "02:52:42.680",
+      "summary": "Freq: 550.842Hz | Avg: 0.00ms | angle: N/A | pins: {} | pinToggles: {} | pwmTraffic: 0.00",
+      "details": {
+        "id": "stepper_motor_1",
+        "type": "openhw-stepper-motor",
+        "state": {
+          "step_angle": "1.8",
+          "targetBoard": "uno1",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "A+": 0,
+            "A-": 0,
+            "B+": 0,
+            "B-": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 550.842,
+          "timing": {
+            "totalMs": 0.699999988079071,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0004112808390593837,
+            "count": 1702,
+            "lastUpdateAtMs": 1779139362679
+          },
+          "pinToggles": {},
+          "stateSize": 41,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 3054
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "step_angle": "1.8",
+            "targetBoard": "uno1"
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:42.679Z",
+        "_metrics": {
+          "sampleCount": 142,
+          "updateFreqHz": 46.527,
+          "stateSizeBytes": 41,
+          "stateMutationCount": 0,
+          "idleMs": 3052,
+          "pinToggleCount": 0,
+          "pinCount": 4
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=step_angle, targetBoard",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:42.679Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139362680-bpkp6h",
+      "timestamp": "02:52:42.680",
+      "summary": "Freq: 550.507Hz | Avg: 0.00ms | active: true | stepCount: N/A | pins: {Object: 9 keys} | pinToggles: {\"1A\":2,\"2A\":2,\"ENABLE\":1}",
+      "details": {
+        "id": "a4988_stepper_motor_1",
+        "type": "openhw-a4988",
+        "state": {
+          "active": true,
+          "pins": {
+            "VDD": true,
+            "RESET": true,
+            "SLEEP": true,
+            "1A": true,
+            "2A": true,
+            "ENABLE": false,
+            "STEP": false,
+            "DIR": false,
+            "GND_LOGIC": false
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "analogVoltages": {
+            "ENABLE": 0,
+            "MS1": 0,
+            "MS2": 0,
+            "MS3": 0,
+            "RESET": 5,
+            "SLEEP": 5,
+            "STEP": 0,
+            "DIR": 0,
+            "VMOT": 0,
+            "GND_MOT": 0,
+            "2B": 0,
+            "2A": 5,
+            "1A": 5,
+            "1B": 0,
+            "VDD": 5,
+            "GND_LOGIC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 550.507,
+          "timing": {
+            "totalMs": 0.5999999642372131,
+            "maxMs": 0.09999999403953552,
+            "avgMs": 0.00035252641847074805,
+            "count": 1702,
+            "lastUpdateAtMs": 1779139362679
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "stateSize": 15,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359593,
+            "lastStateChangeCycles": 3486,
+            "stateMutationCount": 1,
+            "idleMs": 3086
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 8181,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 5,
+              "average": 5,
+              "samples": 1
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 5
+          },
+          "custom": {
+            "active": true
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:42.679Z",
+        "_metrics": {
+          "sampleCount": 142,
+          "updateFreqHz": 46.527,
+          "stateSizeBytes": 15,
+          "stateMutationCount": 0,
+          "idleMs": 3052,
+          "pinToggleCount": 0,
+          "pinCount": 16
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:42.679Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139362680-ktqkjp",
+      "timestamp": "02:52:42.680",
+      "summary": "Freq: 550.842Hz | Avg: 0.00ms | voltage: 12.0 | current: N/A | pins: {} | pinToggles: {}",
+      "details": {
+        "id": "power-supply_stepper_motor_1",
+        "type": "openhw-power-supply",
+        "state": {
+          "voltage": "12.0",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "GND": 0,
+            "VCC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 550.842,
+          "timing": {
+            "totalMs": 2.100000023841858,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0012338425521985065,
+            "count": 1702,
+            "lastUpdateAtMs": 1779139362679
+          },
+          "pinToggles": {},
+          "stateSize": 18,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 3054
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "voltage": "12.0"
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:42.679Z",
+        "_metrics": {
+          "sampleCount": 142,
+          "updateFreqHz": 46.527,
+          "stateSizeBytes": 18,
+          "stateMutationCount": 0,
+          "idleMs": 3052,
+          "pinToggleCount": 0,
+          "pinCount": 2
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=voltage",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:42.679Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139363695-rthnlx",
+      "timestamp": "02:52:43.695",
+      "summary": "Freq: 551.821Hz | Avg: 0.00ms | leds: N/A | deepSiliconRegisters: N/A | deepSiliconSRAM: N/A | deepSiliconTimers: N/A | deepSiliconPower: N/A | deepSiliconInterrupts: N/A | pins: {Object: 25 keys} | pinToggles: {\"10\":1} | analogVoltages: {Object: 33 keys} | i2cTraffic: [] | spiTraffic: [] | serialBytes: 0.00 | pwmTraffic: 0.00 | oneWireTraffic: 0.00 | pioTraffic: 0.00 | i2sTraffic: 0.00",
+      "details": {
+        "id": "uno1",
+        "type": "openhw-arduino-uno",
+        "state": {
+          "txActive": true,
+          "rxActive": true,
+          "pin13Active": true,
+          "pins": {
+            "0": true,
+            "1": true,
+            "2": true,
+            "3": true,
+            "4": true,
+            "5": true,
+            "6": true,
+            "7": true,
+            "8": false,
+            "9": false,
+            "10": false,
+            "11": true,
+            "12": true,
+            "13": true,
+            "5V": true,
+            "vin": true,
+            "VIN": true,
+            "3V3": true,
+            "A0": true,
+            "A1": true,
+            "A2": true,
+            "A3": true,
+            "A4": true,
+            "A5": true,
+            "GND": false
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "analogVoltages": {
+            "0": 5,
+            "1": 5,
+            "2": 5,
+            "3": 5,
+            "4": 5,
+            "5": 5,
+            "6": 5,
+            "7": 5,
+            "8": 0,
+            "9": 0,
+            "10": 0,
+            "11": 5,
+            "12": 5,
+            "13": 5,
+            "A0": 5,
+            "A1": 5,
+            "A2": 5,
+            "A3": 5,
+            "A4": 5,
+            "A5": 5,
+            "vin": 5,
+            "VIN": 5,
+            "gnd_1": 0,
+            "gnd_2": 0,
+            "gnd_3": 0,
+            "GND": 0,
+            "5V": 5,
+            "3v3": 0,
+            "3V3": 3.3,
+            "rst": 0,
+            "RST": 0,
+            "ioref": 0,
+            "IOREF": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 551.821,
+          "timing": {
+            "totalMs": 1.5000000298023224,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0006619594129754291,
+            "count": 2266,
+            "lastUpdateAtMs": 1779139363694
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "stateSize": 52,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359587,
+            "lastStateChangeCycles": null,
+            "stateMutationCount": 4,
+            "idleMs": 4108
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 32627,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 3.3,
+              "average": 4.575,
+              "samples": 4
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 3.3
+          },
+          "custom": {
+            "txActive": true,
+            "rxActive": true,
+            "pin13Active": true
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:43.695Z",
+        "_metrics": {
+          "sampleCount": 189,
+          "updateFreqHz": 46.46,
+          "stateSizeBytes": 52,
+          "stateMutationCount": 0,
+          "idleMs": 4068,
+          "pinToggleCount": 0,
+          "pinCount": 33
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=txActive, rxActive, pin13Active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:43.695Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139363695-70ozda",
+      "timestamp": "02:52:43.695",
+      "summary": "Freq: 552.074Hz | Avg: 0.00ms | angle: N/A | pins: {} | pinToggles: {} | pwmTraffic: 0.00",
+      "details": {
+        "id": "stepper_motor_1",
+        "type": "openhw-stepper-motor",
+        "state": {
+          "step_angle": "1.8",
+          "targetBoard": "uno1",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "A+": 0,
+            "A-": 0,
+            "B+": 0,
+            "B-": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.074,
+          "timing": {
+            "totalMs": 0.699999988079071,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0003089143813235088,
+            "count": 2266,
+            "lastUpdateAtMs": 1779139363694
+          },
+          "pinToggles": {},
+          "stateSize": 41,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 4070
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "step_angle": "1.8",
+            "targetBoard": "uno1"
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:43.695Z",
+        "_metrics": {
+          "sampleCount": 189,
+          "updateFreqHz": 46.46,
+          "stateSizeBytes": 41,
+          "stateMutationCount": 0,
+          "idleMs": 4068,
+          "pinToggleCount": 0,
+          "pinCount": 4
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=step_angle, targetBoard",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:43.695Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139363695-kaowy0",
+      "timestamp": "02:52:43.695",
+      "summary": "Freq: 551.821Hz | Avg: 0.00ms | active: true | stepCount: N/A | pins: {Object: 9 keys} | pinToggles: {\"1A\":2,\"2A\":2,\"ENABLE\":1}",
+      "details": {
+        "id": "a4988_stepper_motor_1",
+        "type": "openhw-a4988",
+        "state": {
+          "active": true,
+          "pins": {
+            "VDD": true,
+            "RESET": true,
+            "SLEEP": true,
+            "1A": true,
+            "2A": true,
+            "ENABLE": false,
+            "STEP": false,
+            "DIR": false,
+            "GND_LOGIC": false
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "analogVoltages": {
+            "ENABLE": 0,
+            "MS1": 0,
+            "MS2": 0,
+            "MS3": 0,
+            "RESET": 5,
+            "SLEEP": 5,
+            "STEP": 0,
+            "DIR": 0,
+            "VMOT": 0,
+            "GND_MOT": 0,
+            "2B": 0,
+            "2A": 5,
+            "1A": 5,
+            "1B": 0,
+            "VDD": 5,
+            "GND_LOGIC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 551.821,
+          "timing": {
+            "totalMs": 0.6999999582767487,
+            "maxMs": 0.09999999403953552,
+            "avgMs": 0.00030891436817155724,
+            "count": 2266,
+            "lastUpdateAtMs": 1779139363694
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "stateSize": 15,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359593,
+            "lastStateChangeCycles": 3486,
+            "stateMutationCount": 1,
+            "idleMs": 4102
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 11251,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 5,
+              "average": 5,
+              "samples": 1
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 5
+          },
+          "custom": {
+            "active": true
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:43.695Z",
+        "_metrics": {
+          "sampleCount": 189,
+          "updateFreqHz": 46.46,
+          "stateSizeBytes": 15,
+          "stateMutationCount": 0,
+          "idleMs": 4068,
+          "pinToggleCount": 0,
+          "pinCount": 16
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:43.695Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139363695-b2q50k",
+      "timestamp": "02:52:43.695",
+      "summary": "Freq: 552.074Hz | Avg: 0.00ms | voltage: 12.0 | current: N/A | pins: {} | pinToggles: {}",
+      "details": {
+        "id": "power-supply_stepper_motor_1",
+        "type": "openhw-power-supply",
+        "state": {
+          "voltage": "12.0",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "GND": 0,
+            "VCC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.074,
+          "timing": {
+            "totalMs": 3.200000047683716,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0014121800739998747,
+            "count": 2266,
+            "lastUpdateAtMs": 1779139363694
+          },
+          "pinToggles": {},
+          "stateSize": 18,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 4070
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "voltage": "12.0"
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:43.695Z",
+        "_metrics": {
+          "sampleCount": 189,
+          "updateFreqHz": 46.46,
+          "stateSizeBytes": 18,
+          "stateMutationCount": 0,
+          "idleMs": 4068,
+          "pinToggleCount": 0,
+          "pinCount": 2
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=voltage",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:43.695Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139364752-5zogjz",
+      "timestamp": "02:52:44.752",
+      "summary": "Freq: 552.455Hz | Avg: 0.00ms | leds: N/A | deepSiliconRegisters: N/A | deepSiliconSRAM: N/A | deepSiliconTimers: N/A | deepSiliconPower: N/A | deepSiliconInterrupts: N/A | pins: {Object: 25 keys} | pinToggles: {\"10\":1} | analogVoltages: {Object: 33 keys} | i2cTraffic: [] | spiTraffic: [] | serialBytes: 0.00 | pwmTraffic: 0.00 | oneWireTraffic: 0.00 | pioTraffic: 0.00 | i2sTraffic: 0.00",
+      "details": {
+        "id": "uno1",
+        "type": "openhw-arduino-uno",
+        "state": {
+          "txActive": true,
+          "rxActive": true,
+          "pin13Active": true,
+          "pins": {
+            "0": true,
+            "1": true,
+            "2": true,
+            "3": true,
+            "4": true,
+            "5": true,
+            "6": true,
+            "7": true,
+            "8": false,
+            "9": false,
+            "10": false,
+            "11": true,
+            "12": true,
+            "13": true,
+            "5V": true,
+            "vin": true,
+            "VIN": true,
+            "3V3": true,
+            "A0": true,
+            "A1": true,
+            "A2": true,
+            "A3": true,
+            "A4": true,
+            "A5": true,
+            "GND": false
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "analogVoltages": {
+            "0": 5,
+            "1": 5,
+            "2": 5,
+            "3": 5,
+            "4": 5,
+            "5": 5,
+            "6": 5,
+            "7": 5,
+            "8": 0,
+            "9": 0,
+            "10": 0,
+            "11": 5,
+            "12": 5,
+            "13": 5,
+            "A0": 5,
+            "A1": 5,
+            "A2": 5,
+            "A3": 5,
+            "A4": 5,
+            "A5": 5,
+            "vin": 5,
+            "VIN": 5,
+            "gnd_1": 0,
+            "gnd_2": 0,
+            "gnd_3": 0,
+            "GND": 0,
+            "5V": 5,
+            "3v3": 0,
+            "3V3": 3.3,
+            "rst": 0,
+            "RST": 0,
+            "ioref": 0,
+            "IOREF": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.455,
+          "timing": {
+            "totalMs": 2.000000089406967,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0007062147208357934,
+            "count": 2832,
+            "lastUpdateAtMs": 1779139364716
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "stateSize": 52,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359587,
+            "lastStateChangeCycles": null,
+            "stateMutationCount": 4,
+            "idleMs": 5130
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 41269,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 3.3,
+              "average": 4.575,
+              "samples": 4
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 3.3
+          },
+          "custom": {
+            "txActive": true,
+            "rxActive": true,
+            "pin13Active": true
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:44.717Z",
+        "_metrics": {
+          "sampleCount": 236,
+          "updateFreqHz": 46.365,
+          "stateSizeBytes": 52,
+          "stateMutationCount": 0,
+          "idleMs": 5090,
+          "pinToggleCount": 0,
+          "pinCount": 33
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=txActive, rxActive, pin13Active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:44.717Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139364752-r6ndci",
+      "timestamp": "02:52:44.752",
+      "summary": "Freq: 552.658Hz | Avg: 0.00ms | angle: N/A | pins: {} | pinToggles: {} | pwmTraffic: 0.00",
+      "details": {
+        "id": "stepper_motor_1",
+        "type": "openhw-stepper-motor",
+        "state": {
+          "step_angle": "1.8",
+          "targetBoard": "uno1",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "A+": 0,
+            "A-": 0,
+            "B+": 0,
+            "B-": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.658,
+          "timing": {
+            "totalMs": 0.7999999821186066,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0002824858693921633,
+            "count": 2832,
+            "lastUpdateAtMs": 1779139364716
+          },
+          "pinToggles": {},
+          "stateSize": 41,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 5092
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "step_angle": "1.8",
+            "targetBoard": "uno1"
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:44.717Z",
+        "_metrics": {
+          "sampleCount": 236,
+          "updateFreqHz": 46.365,
+          "stateSizeBytes": 41,
+          "stateMutationCount": 0,
+          "idleMs": 5090,
+          "pinToggleCount": 0,
+          "pinCount": 4
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=step_angle, targetBoard",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:44.717Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139364752-kp9j6e",
+      "timestamp": "02:52:44.752",
+      "summary": "Freq: 552.455Hz | Avg: 0.00ms | active: true | stepCount: N/A | pins: {Object: 9 keys} | pinToggles: {\"1A\":2,\"2A\":2,\"ENABLE\":1}",
+      "details": {
+        "id": "a4988_stepper_motor_1",
+        "type": "openhw-a4988",
+        "state": {
+          "active": true,
+          "pins": {
+            "VDD": true,
+            "RESET": true,
+            "SLEEP": true,
+            "1A": true,
+            "2A": true,
+            "ENABLE": false,
+            "STEP": false,
+            "DIR": false,
+            "GND_LOGIC": false
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "analogVoltages": {
+            "ENABLE": 0,
+            "MS1": 0,
+            "MS2": 0,
+            "MS3": 0,
+            "RESET": 5,
+            "SLEEP": 5,
+            "STEP": 0,
+            "DIR": 0,
+            "VMOT": 0,
+            "GND_MOT": 0,
+            "2B": 0,
+            "2A": 5,
+            "1A": 5,
+            "1B": 0,
+            "VDD": 5,
+            "GND_LOGIC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.455,
+          "timing": {
+            "totalMs": 0.8999999463558197,
+            "maxMs": 0.09999999403953552,
+            "avgMs": 0.00031779659122733745,
+            "count": 2832,
+            "lastUpdateAtMs": 1779139364716
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "stateSize": 15,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359593,
+            "lastStateChangeCycles": 3486,
+            "stateMutationCount": 1,
+            "idleMs": 5124
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 14231,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 5,
+              "average": 5,
+              "samples": 1
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 5
+          },
+          "custom": {
+            "active": true
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:44.717Z",
+        "_metrics": {
+          "sampleCount": 236,
+          "updateFreqHz": 46.365,
+          "stateSizeBytes": 15,
+          "stateMutationCount": 0,
+          "idleMs": 5090,
+          "pinToggleCount": 0,
+          "pinCount": 16
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:44.717Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139364752-jwjh1h",
+      "timestamp": "02:52:44.752",
+      "summary": "Freq: 552.658Hz | Avg: 0.00ms | voltage: 12.0 | current: N/A | pins: {} | pinToggles: {}",
+      "details": {
+        "id": "power-supply_stepper_motor_1",
+        "type": "openhw-power-supply",
+        "state": {
+          "voltage": "12.0",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "GND": 0,
+            "VCC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.658,
+          "timing": {
+            "totalMs": 3.5000000596046448,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.001235875727261527,
+            "count": 2832,
+            "lastUpdateAtMs": 1779139364716
+          },
+          "pinToggles": {},
+          "stateSize": 18,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 5092
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "voltage": "12.0"
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:44.717Z",
+        "_metrics": {
+          "sampleCount": 236,
+          "updateFreqHz": 46.365,
+          "stateSizeBytes": 18,
+          "stateMutationCount": 0,
+          "idleMs": 5090,
+          "pinToggleCount": 0,
+          "pinCount": 2
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=voltage",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:44.717Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139365760-goety5",
+      "timestamp": "02:52:45.760",
+      "summary": "Freq: 551.809Hz | Avg: 0.00ms | leds: N/A | deepSiliconRegisters: N/A | deepSiliconSRAM: N/A | deepSiliconTimers: N/A | deepSiliconPower: N/A | deepSiliconInterrupts: N/A | pins: {Object: 25 keys} | pinToggles: {\"10\":1} | analogVoltages: {Object: 33 keys} | i2cTraffic: [] | spiTraffic: [] | serialBytes: 0.00 | pwmTraffic: 0.00 | oneWireTraffic: 0.00 | pioTraffic: 0.00 | i2sTraffic: 0.00",
+      "details": {
+        "id": "uno1",
+        "type": "openhw-arduino-uno",
+        "state": {
+          "txActive": true,
+          "rxActive": true,
+          "pin13Active": true,
+          "pins": {
+            "0": true,
+            "1": true,
+            "2": true,
+            "3": true,
+            "4": true,
+            "5": true,
+            "6": true,
+            "7": true,
+            "8": false,
+            "9": false,
+            "10": false,
+            "11": true,
+            "12": true,
+            "13": true,
+            "5V": true,
+            "vin": true,
+            "VIN": true,
+            "3V3": true,
+            "A0": true,
+            "A1": true,
+            "A2": true,
+            "A3": true,
+            "A4": true,
+            "A5": true,
+            "GND": false
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "analogVoltages": {
+            "0": 5,
+            "1": 5,
+            "2": 5,
+            "3": 5,
+            "4": 5,
+            "5": 5,
+            "6": 5,
+            "7": 5,
+            "8": 0,
+            "9": 0,
+            "10": 0,
+            "11": 5,
+            "12": 5,
+            "13": 5,
+            "A0": 5,
+            "A1": 5,
+            "A2": 5,
+            "A3": 5,
+            "A4": 5,
+            "A5": 5,
+            "vin": 5,
+            "VIN": 5,
+            "gnd_1": 0,
+            "gnd_2": 0,
+            "gnd_3": 0,
+            "GND": 0,
+            "5V": 5,
+            "3v3": 0,
+            "3V3": 3.3,
+            "rst": 0,
+            "RST": 0,
+            "ioref": 0,
+            "IOREF": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 551.809,
+          "timing": {
+            "totalMs": 2.5000001192092896,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0007342144256121261,
+            "count": 3405,
+            "lastUpdateAtMs": 1779139365758
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "stateSize": 52,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359587,
+            "lastStateChangeCycles": null,
+            "stateMutationCount": 4,
+            "idleMs": 6172
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 50230,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 3.3,
+              "average": 4.575,
+              "samples": 4
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 3.3
+          },
+          "custom": {
+            "txActive": true,
+            "rxActive": true,
+            "pin13Active": true
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:45.759Z",
+        "_metrics": {
+          "sampleCount": 283,
+          "updateFreqHz": 46.151,
+          "stateSizeBytes": 52,
+          "stateMutationCount": 0,
+          "idleMs": 6132,
+          "pinToggleCount": 0,
+          "pinCount": 33
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=txActive, rxActive, pin13Active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:45.759Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139365760-snh4cz",
+      "timestamp": "02:52:45.760",
+      "summary": "Freq: 551.978Hz | Avg: 0.00ms | angle: N/A | pins: {} | pinToggles: {} | pwmTraffic: 0.00",
+      "details": {
+        "id": "stepper_motor_1",
+        "type": "openhw-stepper-motor",
+        "state": {
+          "step_angle": "1.8",
+          "targetBoard": "uno1",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "A+": 0,
+            "A-": 0,
+            "B+": 0,
+            "B-": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 551.978,
+          "timing": {
+            "totalMs": 1,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0002936857562408223,
+            "count": 3405,
+            "lastUpdateAtMs": 1779139365758
+          },
+          "pinToggles": {},
+          "stateSize": 41,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 6134
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "step_angle": "1.8",
+            "targetBoard": "uno1"
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:45.759Z",
+        "_metrics": {
+          "sampleCount": 283,
+          "updateFreqHz": 46.151,
+          "stateSizeBytes": 41,
+          "stateMutationCount": 0,
+          "idleMs": 6132,
+          "pinToggleCount": 0,
+          "pinCount": 4
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=step_angle, targetBoard",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:45.759Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139365760-1atmkz",
+      "timestamp": "02:52:45.760",
+      "summary": "Freq: 551.809Hz | Avg: 0.00ms | active: true | stepCount: N/A | pins: {Object: 9 keys} | pinToggles: {\"1A\":2,\"2A\":2,\"ENABLE\":1}",
+      "details": {
+        "id": "a4988_stepper_motor_1",
+        "type": "openhw-a4988",
+        "state": {
+          "active": true,
+          "pins": {
+            "VDD": true,
+            "RESET": true,
+            "SLEEP": true,
+            "1A": true,
+            "2A": true,
+            "ENABLE": false,
+            "STEP": false,
+            "DIR": false,
+            "GND_LOGIC": false
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "analogVoltages": {
+            "ENABLE": 0,
+            "MS1": 0,
+            "MS2": 0,
+            "MS3": 0,
+            "RESET": 5,
+            "SLEEP": 5,
+            "STEP": 0,
+            "DIR": 0,
+            "VMOT": 0,
+            "GND_MOT": 0,
+            "2B": 0,
+            "2A": 5,
+            "1A": 5,
+            "1B": 0,
+            "VDD": 5,
+            "GND_LOGIC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 551.809,
+          "timing": {
+            "totalMs": 1.199999988079071,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.00035242290398797976,
+            "count": 3405,
+            "lastUpdateAtMs": 1779139365758
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "stateSize": 15,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359593,
+            "lastStateChangeCycles": 3486,
+            "stateMutationCount": 1,
+            "idleMs": 6166
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 17321,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 5,
+              "average": 5,
+              "samples": 1
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 5
+          },
+          "custom": {
+            "active": true
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:45.759Z",
+        "_metrics": {
+          "sampleCount": 283,
+          "updateFreqHz": 46.151,
+          "stateSizeBytes": 15,
+          "stateMutationCount": 0,
+          "idleMs": 6132,
+          "pinToggleCount": 0,
+          "pinCount": 16
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:45.759Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139365760-2ys1r1",
+      "timestamp": "02:52:45.760",
+      "summary": "Freq: 551.978Hz | Avg: 0.00ms | voltage: 12.0 | current: N/A | pins: {} | pinToggles: {}",
+      "details": {
+        "id": "power-supply_stepper_motor_1",
+        "type": "openhw-power-supply",
+        "state": {
+          "voltage": "12.0",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "GND": 0,
+            "VCC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 551.978,
+          "timing": {
+            "totalMs": 3.8000000417232513,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0011160058859686493,
+            "count": 3405,
+            "lastUpdateAtMs": 1779139365758
+          },
+          "pinToggles": {},
+          "stateSize": 18,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 6135
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "voltage": "12.0"
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:45.760Z",
+        "_metrics": {
+          "sampleCount": 283,
+          "updateFreqHz": 46.144,
+          "stateSizeBytes": 18,
+          "stateMutationCount": 0,
+          "idleMs": 6133,
+          "pinToggleCount": 0,
+          "pinCount": 2
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=voltage",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:45.760Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139366782-emp1no",
+      "timestamp": "02:52:46.782",
+      "summary": "Freq: 551.33Hz | Avg: 0.00ms | leds: N/A | deepSiliconRegisters: N/A | deepSiliconSRAM: N/A | deepSiliconTimers: N/A | deepSiliconPower: N/A | deepSiliconInterrupts: N/A | pins: {Object: 25 keys} | pinToggles: {\"10\":1} | analogVoltages: {Object: 33 keys} | i2cTraffic: [] | spiTraffic: [] | serialBytes: 0.00 | pwmTraffic: 0.00 | oneWireTraffic: 0.00 | pioTraffic: 0.00 | i2sTraffic: 0.00",
+      "details": {
+        "id": "uno1",
+        "type": "openhw-arduino-uno",
+        "state": {
+          "txActive": true,
+          "rxActive": true,
+          "pin13Active": true,
+          "pins": {
+            "0": true,
+            "1": true,
+            "2": true,
+            "3": true,
+            "4": true,
+            "5": true,
+            "6": true,
+            "7": true,
+            "8": false,
+            "9": false,
+            "10": false,
+            "11": true,
+            "12": true,
+            "13": true,
+            "5V": true,
+            "vin": true,
+            "VIN": true,
+            "3V3": true,
+            "A0": true,
+            "A1": true,
+            "A2": true,
+            "A3": true,
+            "A4": true,
+            "A5": true,
+            "GND": false
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "analogVoltages": {
+            "0": 5,
+            "1": 5,
+            "2": 5,
+            "3": 5,
+            "4": 5,
+            "5": 5,
+            "6": 5,
+            "7": 5,
+            "8": 0,
+            "9": 0,
+            "10": 0,
+            "11": 5,
+            "12": 5,
+            "13": 5,
+            "A0": 5,
+            "A1": 5,
+            "A2": 5,
+            "A3": 5,
+            "A4": 5,
+            "A5": 5,
+            "vin": 5,
+            "VIN": 5,
+            "gnd_1": 0,
+            "gnd_2": 0,
+            "gnd_3": 0,
+            "GND": 0,
+            "5V": 5,
+            "3v3": 0,
+            "3V3": 3.3,
+            "rst": 0,
+            "RST": 0,
+            "ioref": 0,
+            "IOREF": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 551.33,
+          "timing": {
+            "totalMs": 2.9000000953674316,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0007312153543538658,
+            "count": 3966,
+            "lastUpdateAtMs": 1779139366781
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "stateSize": 52,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359587,
+            "lastStateChangeCycles": null,
+            "stateMutationCount": 4,
+            "idleMs": 7194
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 57248,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 3.3,
+              "average": 4.575,
+              "samples": 4
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 3.3
+          },
+          "custom": {
+            "txActive": true,
+            "rxActive": true,
+            "pin13Active": true
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:46.781Z",
+        "_metrics": {
+          "sampleCount": 331,
+          "updateFreqHz": 46.268,
+          "stateSizeBytes": 52,
+          "stateMutationCount": 0,
+          "idleMs": 7154,
+          "pinToggleCount": 0,
+          "pinCount": 33
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=txActive, rxActive, pin13Active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:46.781Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139366782-y45sd2",
+      "timestamp": "02:52:46.782",
+      "summary": "Freq: 551.474Hz | Avg: 0.00ms | angle: N/A | pins: {} | pinToggles: {} | pwmTraffic: 0.00",
+      "details": {
+        "id": "stepper_motor_1",
+        "type": "openhw-stepper-motor",
+        "state": {
+          "step_angle": "1.8",
+          "targetBoard": "uno1",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "A+": 0,
+            "A-": 0,
+            "B+": 0,
+            "B-": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 551.474,
+          "timing": {
+            "totalMs": 1.2000000178813934,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0003025718653256161,
+            "count": 3966,
+            "lastUpdateAtMs": 1779139366781
+          },
+          "pinToggles": {},
+          "stateSize": 41,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 7156
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "step_angle": "1.8",
+            "targetBoard": "uno1"
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:46.781Z",
+        "_metrics": {
+          "sampleCount": 331,
+          "updateFreqHz": 46.268,
+          "stateSizeBytes": 41,
+          "stateMutationCount": 0,
+          "idleMs": 7154,
+          "pinToggleCount": 0,
+          "pinCount": 4
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=step_angle, targetBoard",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:46.781Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139366782-rr47w8",
+      "timestamp": "02:52:46.782",
+      "summary": "Freq: 551.33Hz | Avg: 0.00ms | active: true | stepCount: N/A | pins: {Object: 9 keys} | pinToggles: {\"1A\":2,\"2A\":2,\"ENABLE\":1}",
+      "details": {
+        "id": "a4988_stepper_motor_1",
+        "type": "openhw-a4988",
+        "state": {
+          "active": true,
+          "pins": {
+            "VDD": true,
+            "RESET": true,
+            "SLEEP": true,
+            "1A": true,
+            "2A": true,
+            "ENABLE": false,
+            "STEP": false,
+            "DIR": false,
+            "GND_LOGIC": false
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "analogVoltages": {
+            "ENABLE": 0,
+            "MS1": 0,
+            "MS2": 0,
+            "MS3": 0,
+            "RESET": 5,
+            "SLEEP": 5,
+            "STEP": 0,
+            "DIR": 0,
+            "VMOT": 0,
+            "GND_MOT": 0,
+            "2B": 0,
+            "2A": 5,
+            "1A": 5,
+            "1B": 0,
+            "VDD": 5,
+            "GND_LOGIC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 551.33,
+          "timing": {
+            "totalMs": 1.4999999701976776,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.00037821481850672657,
+            "count": 3966,
+            "lastUpdateAtMs": 1779139366781
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "stateSize": 15,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359593,
+            "lastStateChangeCycles": 3486,
+            "stateMutationCount": 1,
+            "idleMs": 7188
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 19741,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 5,
+              "average": 5,
+              "samples": 1
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 5
+          },
+          "custom": {
+            "active": true
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:46.781Z",
+        "_metrics": {
+          "sampleCount": 331,
+          "updateFreqHz": 46.268,
+          "stateSizeBytes": 15,
+          "stateMutationCount": 0,
+          "idleMs": 7154,
+          "pinToggleCount": 0,
+          "pinCount": 16
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:46.781Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139366782-bksa4k",
+      "timestamp": "02:52:46.782",
+      "summary": "Freq: 551.474Hz | Avg: 0.00ms | voltage: 12.0 | current: N/A | pins: {} | pinToggles: {}",
+      "details": {
+        "id": "power-supply_stepper_motor_1",
+        "type": "openhw-power-supply",
+        "state": {
+          "voltage": "12.0",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "GND": 0,
+            "VCC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 551.474,
+          "timing": {
+            "totalMs": 4.000000029802322,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0010085728769042668,
+            "count": 3966,
+            "lastUpdateAtMs": 1779139366781
+          },
+          "pinToggles": {},
+          "stateSize": 18,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 7156
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "voltage": "12.0"
+          }
+        },
+        "heuristics": {
+          "status": "ok",
+          "summary": "OK: No anomalies detected.",
+          "findings": []
+        },
+        "capturedAt": "2026-05-18T21:22:46.781Z",
+        "_metrics": {
+          "sampleCount": 331,
+          "updateFreqHz": 46.268,
+          "stateSizeBytes": 18,
+          "stateMutationCount": 0,
+          "idleMs": 7154,
+          "pinToggleCount": 0,
+          "pinCount": 2
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=voltage",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:46.781Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139367792-yx65t0",
+      "timestamp": "02:52:47.792",
+      "summary": "Freq: 551.302Hz | Avg: 0.00ms | [STATE HAS BEEN STABLE FOR 8205MS WHILE UPDATES CONTINUE.] STATE HAS BEEN STABLE FOR 8205MS WHILE UPDATES CONTINUE.: warn | leds: N/A | deepSiliconRegisters: N/A | deepSiliconSRAM: N/A | deepSiliconTimers: N/A | deepSiliconPower: N/A | deepSiliconInterrupts: N/A | pins: {Object: 25 keys} | pinToggles: {\"10\":1} | analogVoltages: {Object: 33 keys} | i2cTraffic: [] | spiTraffic: [] | serialBytes: 0.00 | pwmTraffic: 0.00 | oneWireTraffic: 0.00 | pioTraffic: 0.00 | i2sTraffic: 0.00",
+      "details": {
+        "id": "uno1",
+        "type": "openhw-arduino-uno",
+        "state": {
+          "txActive": true,
+          "rxActive": true,
+          "pin13Active": true,
+          "pins": {
+            "0": true,
+            "1": true,
+            "2": true,
+            "3": true,
+            "4": true,
+            "5": true,
+            "6": true,
+            "7": true,
+            "8": false,
+            "9": false,
+            "10": false,
+            "11": true,
+            "12": true,
+            "13": true,
+            "5V": true,
+            "vin": true,
+            "VIN": true,
+            "3V3": true,
+            "A0": true,
+            "A1": true,
+            "A2": true,
+            "A3": true,
+            "A4": true,
+            "A5": true,
+            "GND": false
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "analogVoltages": {
+            "0": 5,
+            "1": 5,
+            "2": 5,
+            "3": 5,
+            "4": 5,
+            "5": 5,
+            "6": 5,
+            "7": 5,
+            "8": 0,
+            "9": 0,
+            "10": 0,
+            "11": 5,
+            "12": 5,
+            "13": 5,
+            "A0": 5,
+            "A1": 5,
+            "A2": 5,
+            "A3": 5,
+            "A4": 5,
+            "A5": 5,
+            "vin": 5,
+            "VIN": 5,
+            "gnd_1": 0,
+            "gnd_2": 0,
+            "gnd_3": 0,
+            "GND": 0,
+            "5V": 5,
+            "3v3": 0,
+            "3V3": 3.3,
+            "rst": 0,
+            "RST": 0,
+            "ioref": 0,
+            "IOREF": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 551.302,
+          "timing": {
+            "totalMs": 3.1000000834465027,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0006853858243304229,
+            "count": 4523,
+            "lastUpdateAtMs": 1779139367791
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "stateSize": 52,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359587,
+            "lastStateChangeCycles": null,
+            "stateMutationCount": 4,
+            "idleMs": 8205
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 65977,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 3.3,
+              "average": 4.575,
+              "samples": 4
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 3.3
+          },
+          "custom": {
+            "txActive": true,
+            "rxActive": true,
+            "pin13Active": true
+          }
+        },
+        "heuristics": {
+          "status": "State has been stable for 8205ms while updates continue.",
+          "summary": "STATE HAS BEEN STABLE FOR 8205MS WHILE UPDATES CONTINUE.: warn",
+          "findings": [
+            "warn"
+          ]
+        },
+        "capturedAt": "2026-05-18T21:22:47.792Z",
+        "_metrics": {
+          "sampleCount": 376,
+          "updateFreqHz": 46.05,
+          "stateSizeBytes": 52,
+          "stateMutationCount": 0,
+          "idleMs": 8165,
+          "pinToggleCount": 0,
+          "pinCount": 33
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=txActive, rxActive, pin13Active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:47.792Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139367792-fh74of",
+      "timestamp": "02:52:47.792",
+      "summary": "Freq: 551.428Hz | Avg: 0.00ms | [STATE HAS BEEN STABLE FOR 8167MS WHILE UPDATES CONTINUE.] STATE HAS BEEN STABLE FOR 8167MS WHILE UPDATES CONTINUE.: warn | angle: N/A | pins: {} | pinToggles: {} | pwmTraffic: 0.00",
+      "details": {
+        "id": "stepper_motor_1",
+        "type": "openhw-stepper-motor",
+        "state": {
+          "step_angle": "1.8",
+          "targetBoard": "uno1",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "A+": 0,
+            "A-": 0,
+            "B+": 0,
+            "B-": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 551.428,
+          "timing": {
+            "totalMs": 1.2000000178813934,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.00026531063848803744,
+            "count": 4523,
+            "lastUpdateAtMs": 1779139367791
+          },
+          "pinToggles": {},
+          "stateSize": 41,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 8167
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "step_angle": "1.8",
+            "targetBoard": "uno1"
+          }
+        },
+        "heuristics": {
+          "status": "State has been stable for 8167ms while updates continue.",
+          "summary": "STATE HAS BEEN STABLE FOR 8167MS WHILE UPDATES CONTINUE.: warn",
+          "findings": [
+            "warn"
+          ]
+        },
+        "capturedAt": "2026-05-18T21:22:47.792Z",
+        "_metrics": {
+          "sampleCount": 376,
+          "updateFreqHz": 46.05,
+          "stateSizeBytes": 41,
+          "stateMutationCount": 0,
+          "idleMs": 8165,
+          "pinToggleCount": 0,
+          "pinCount": 4
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=step_angle, targetBoard",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:47.792Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139367792-j2umcp",
+      "timestamp": "02:52:47.792",
+      "summary": "Freq: 551.302Hz | Avg: 0.00ms | [STATE HAS BEEN STABLE FOR 8199MS WHILE UPDATES CONTINUE.] STATE HAS BEEN STABLE FOR 8199MS WHILE UPDATES CONTINUE.: warn | active: true | stepCount: N/A | pins: {Object: 9 keys} | pinToggles: {\"1A\":2,\"2A\":2,\"ENABLE\":1}",
+      "details": {
+        "id": "a4988_stepper_motor_1",
+        "type": "openhw-a4988",
+        "state": {
+          "active": true,
+          "pins": {
+            "VDD": true,
+            "RESET": true,
+            "SLEEP": true,
+            "1A": true,
+            "2A": true,
+            "ENABLE": false,
+            "STEP": false,
+            "DIR": false,
+            "GND_LOGIC": false
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "analogVoltages": {
+            "ENABLE": 0,
+            "MS1": 0,
+            "MS2": 0,
+            "MS3": 0,
+            "RESET": 5,
+            "SLEEP": 5,
+            "STEP": 0,
+            "DIR": 0,
+            "VMOT": 0,
+            "GND_MOT": 0,
+            "2B": 0,
+            "2A": 5,
+            "1A": 5,
+            "1B": 0,
+            "VDD": 5,
+            "GND_LOGIC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 551.302,
+          "timing": {
+            "totalMs": 1.7999999523162842,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.000397965941259404,
+            "count": 4523,
+            "lastUpdateAtMs": 1779139367791
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "stateSize": 15,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359593,
+            "lastStateChangeCycles": 3486,
+            "stateMutationCount": 1,
+            "idleMs": 8199
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 22751,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 5,
+              "average": 5,
+              "samples": 1
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 5
+          },
+          "custom": {
+            "active": true
+          }
+        },
+        "heuristics": {
+          "status": "State has been stable for 8199ms while updates continue.",
+          "summary": "STATE HAS BEEN STABLE FOR 8199MS WHILE UPDATES CONTINUE.: warn",
+          "findings": [
+            "warn"
+          ]
+        },
+        "capturedAt": "2026-05-18T21:22:47.792Z",
+        "_metrics": {
+          "sampleCount": 376,
+          "updateFreqHz": 46.05,
+          "stateSizeBytes": 15,
+          "stateMutationCount": 0,
+          "idleMs": 8165,
+          "pinToggleCount": 0,
+          "pinCount": 16
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:47.792Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139367792-u7erfr",
+      "timestamp": "02:52:47.792",
+      "summary": "Freq: 551.428Hz | Avg: 0.00ms | [STATE HAS BEEN STABLE FOR 8167MS WHILE UPDATES CONTINUE.] STATE HAS BEEN STABLE FOR 8167MS WHILE UPDATES CONTINUE.: warn | voltage: 12.0 | current: N/A | pins: {} | pinToggles: {}",
+      "details": {
+        "id": "power-supply_stepper_motor_1",
+        "type": "openhw-power-supply",
+        "state": {
+          "voltage": "12.0",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "GND": 0,
+            "VCC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 551.428,
+          "timing": {
+            "totalMs": 4.900000095367432,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0010833517787679485,
+            "count": 4523,
+            "lastUpdateAtMs": 1779139367791
+          },
+          "pinToggles": {},
+          "stateSize": 18,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 8167
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "voltage": "12.0"
+          }
+        },
+        "heuristics": {
+          "status": "State has been stable for 8167ms while updates continue.",
+          "summary": "STATE HAS BEEN STABLE FOR 8167MS WHILE UPDATES CONTINUE.: warn",
+          "findings": [
+            "warn"
+          ]
+        },
+        "capturedAt": "2026-05-18T21:22:47.792Z",
+        "_metrics": {
+          "sampleCount": 376,
+          "updateFreqHz": 46.05,
+          "stateSizeBytes": 18,
+          "stateMutationCount": 0,
+          "idleMs": 8165,
+          "pinToggleCount": 0,
+          "pinCount": 2
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=voltage",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:47.792Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139368824-pk77dj",
+      "timestamp": "02:52:48.824",
+      "summary": "Freq: 552.105Hz | Avg: 0.00ms | [STATE HAS BEEN STABLE FOR 9197MS WHILE UPDATES CONTINUE.] STATE HAS BEEN STABLE FOR 9197MS WHILE UPDATES CONTINUE.: warn | leds: N/A | deepSiliconRegisters: N/A | deepSiliconSRAM: N/A | deepSiliconTimers: N/A | deepSiliconPower: N/A | deepSiliconInterrupts: N/A | pins: {Object: 25 keys} | pinToggles: {\"10\":1} | analogVoltages: {Object: 33 keys} | i2cTraffic: [] | spiTraffic: [] | serialBytes: 0.00 | pwmTraffic: 0.00 | oneWireTraffic: 0.00 | pioTraffic: 0.00 | i2sTraffic: 0.00",
+      "details": {
+        "id": "uno1",
+        "type": "openhw-arduino-uno",
+        "state": {
+          "txActive": true,
+          "rxActive": true,
+          "pin13Active": true,
+          "pins": {
+            "0": true,
+            "1": true,
+            "2": true,
+            "3": true,
+            "4": true,
+            "5": true,
+            "6": true,
+            "7": true,
+            "8": false,
+            "9": false,
+            "10": false,
+            "11": true,
+            "12": true,
+            "13": true,
+            "5V": true,
+            "vin": true,
+            "VIN": true,
+            "3V3": true,
+            "A0": true,
+            "A1": true,
+            "A2": true,
+            "A3": true,
+            "A4": true,
+            "A5": true,
+            "GND": false
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "analogVoltages": {
+            "0": 5,
+            "1": 5,
+            "2": 5,
+            "3": 5,
+            "4": 5,
+            "5": 5,
+            "6": 5,
+            "7": 5,
+            "8": 0,
+            "9": 0,
+            "10": 0,
+            "11": 5,
+            "12": 5,
+            "13": 5,
+            "A0": 5,
+            "A1": 5,
+            "A2": 5,
+            "A3": 5,
+            "A4": 5,
+            "A5": 5,
+            "vin": 5,
+            "VIN": 5,
+            "gnd_1": 0,
+            "gnd_2": 0,
+            "gnd_3": 0,
+            "GND": 0,
+            "5V": 5,
+            "3v3": 0,
+            "3V3": 3.3,
+            "rst": 0,
+            "RST": 0,
+            "ioref": 0,
+            "IOREF": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.105,
+          "timing": {
+            "totalMs": 3.3000000715255737,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.000649862164538317,
+            "count": 5078,
+            "lastUpdateAtMs": 1779139368783
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "stateSize": 52,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359587,
+            "lastStateChangeCycles": null,
+            "stateMutationCount": 4,
+            "idleMs": 9197
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 74503,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 3.3,
+              "average": 4.575,
+              "samples": 4
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 3.3
+          },
+          "custom": {
+            "txActive": true,
+            "rxActive": true,
+            "pin13Active": true
+          }
+        },
+        "heuristics": {
+          "status": "State has been stable for 9197ms while updates continue.",
+          "summary": "STATE HAS BEEN STABLE FOR 9197MS WHILE UPDATES CONTINUE.: warn",
+          "findings": [
+            "warn"
+          ]
+        },
+        "capturedAt": "2026-05-18T21:22:48.784Z",
+        "_metrics": {
+          "sampleCount": 422,
+          "updateFreqHz": 46.085,
+          "stateSizeBytes": 52,
+          "stateMutationCount": 0,
+          "idleMs": 9157,
+          "pinToggleCount": 0,
+          "pinCount": 33
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=txActive, rxActive, pin13Active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:48.784Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139368824-5gvjaq",
+      "timestamp": "02:52:48.824",
+      "summary": "Freq: 552.218Hz | Avg: 0.00ms | [STATE HAS BEEN STABLE FOR 9159MS WHILE UPDATES CONTINUE.] STATE HAS BEEN STABLE FOR 9159MS WHILE UPDATES CONTINUE.: warn | angle: N/A | pins: {} | pinToggles: {} | pwmTraffic: 0.00",
+      "details": {
+        "id": "stepper_motor_1",
+        "type": "openhw-stepper-motor",
+        "state": {
+          "step_angle": "1.8",
+          "targetBoard": "uno1",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "A+": 0,
+            "A-": 0,
+            "B+": 0,
+            "B-": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.218,
+          "timing": {
+            "totalMs": 1.3000000417232513,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.00025600630991005343,
+            "count": 5078,
+            "lastUpdateAtMs": 1779139368783
+          },
+          "pinToggles": {},
+          "stateSize": 41,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 9159
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "step_angle": "1.8",
+            "targetBoard": "uno1"
+          }
+        },
+        "heuristics": {
+          "status": "State has been stable for 9159ms while updates continue.",
+          "summary": "STATE HAS BEEN STABLE FOR 9159MS WHILE UPDATES CONTINUE.: warn",
+          "findings": [
+            "warn"
+          ]
+        },
+        "capturedAt": "2026-05-18T21:22:48.784Z",
+        "_metrics": {
+          "sampleCount": 422,
+          "updateFreqHz": 46.085,
+          "stateSizeBytes": 41,
+          "stateMutationCount": 0,
+          "idleMs": 9157,
+          "pinToggleCount": 0,
+          "pinCount": 4
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=step_angle, targetBoard",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:48.784Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139368824-0shzm8",
+      "timestamp": "02:52:48.824",
+      "summary": "Freq: 552.105Hz | Avg: 0.00ms | [STATE HAS BEEN STABLE FOR 9191MS WHILE UPDATES CONTINUE.] STATE HAS BEEN STABLE FOR 9191MS WHILE UPDATES CONTINUE.: warn | active: true | stepCount: N/A | pins: {Object: 9 keys} | pinToggles: {\"1A\":2,\"2A\":2,\"ENABLE\":1}",
+      "details": {
+        "id": "a4988_stepper_motor_1",
+        "type": "openhw-a4988",
+        "state": {
+          "active": true,
+          "pins": {
+            "VDD": true,
+            "RESET": true,
+            "SLEEP": true,
+            "1A": true,
+            "2A": true,
+            "ENABLE": false,
+            "STEP": false,
+            "DIR": false,
+            "GND_LOGIC": false
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "analogVoltages": {
+            "ENABLE": 0,
+            "MS1": 0,
+            "MS2": 0,
+            "MS3": 0,
+            "RESET": 5,
+            "SLEEP": 5,
+            "STEP": 0,
+            "DIR": 0,
+            "VMOT": 0,
+            "GND_MOT": 0,
+            "2B": 0,
+            "2A": 5,
+            "1A": 5,
+            "1B": 0,
+            "VDD": 5,
+            "GND_LOGIC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.105,
+          "timing": {
+            "totalMs": 1.9999999403953552,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0003938558370215351,
+            "count": 5078,
+            "lastUpdateAtMs": 1779139368783
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "stateSize": 15,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359593,
+            "lastStateChangeCycles": 3486,
+            "stateMutationCount": 1,
+            "idleMs": 9191
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 25691,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 5,
+              "average": 5,
+              "samples": 1
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 5
+          },
+          "custom": {
+            "active": true
+          }
+        },
+        "heuristics": {
+          "status": "State has been stable for 9191ms while updates continue.",
+          "summary": "STATE HAS BEEN STABLE FOR 9191MS WHILE UPDATES CONTINUE.: warn",
+          "findings": [
+            "warn"
+          ]
+        },
+        "capturedAt": "2026-05-18T21:22:48.784Z",
+        "_metrics": {
+          "sampleCount": 422,
+          "updateFreqHz": 46.085,
+          "stateSizeBytes": 15,
+          "stateMutationCount": 0,
+          "idleMs": 9157,
+          "pinToggleCount": 0,
+          "pinCount": 16
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:48.784Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139368824-fri1uh",
+      "timestamp": "02:52:48.824",
+      "summary": "Freq: 552.218Hz | Avg: 0.00ms | [STATE HAS BEEN STABLE FOR 9159MS WHILE UPDATES CONTINUE.] STATE HAS BEEN STABLE FOR 9159MS WHILE UPDATES CONTINUE.: warn | voltage: 12.0 | current: N/A | pins: {} | pinToggles: {}",
+      "details": {
+        "id": "power-supply_stepper_motor_1",
+        "type": "openhw-power-supply",
+        "state": {
+          "voltage": "12.0",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "GND": 0,
+            "VCC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.218,
+          "timing": {
+            "totalMs": 5.600000113248825,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0011027963988280475,
+            "count": 5078,
+            "lastUpdateAtMs": 1779139368783
+          },
+          "pinToggles": {},
+          "stateSize": 18,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 9159
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "voltage": "12.0"
+          }
+        },
+        "heuristics": {
+          "status": "State has been stable for 9159ms while updates continue.",
+          "summary": "STATE HAS BEEN STABLE FOR 9159MS WHILE UPDATES CONTINUE.: warn",
+          "findings": [
+            "warn"
+          ]
+        },
+        "capturedAt": "2026-05-18T21:22:48.784Z",
+        "_metrics": {
+          "sampleCount": 422,
+          "updateFreqHz": 46.085,
+          "stateSizeBytes": 18,
+          "stateMutationCount": 0,
+          "idleMs": 9157,
+          "pinToggleCount": 0,
+          "pinCount": 2
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=voltage",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:48.784Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139369840-ly8wvz",
+      "timestamp": "02:52:49.840",
+      "summary": "Freq: 552.306Hz | Avg: 0.00ms | [STATE HAS BEEN STABLE FOR 10249MS WHILE UPDATES CONTINUE.] STATE HAS BEEN STABLE FOR 10249MS WHILE UPDATES CONTINUE.: warn | leds: N/A | deepSiliconRegisters: N/A | deepSiliconSRAM: N/A | deepSiliconTimers: N/A | deepSiliconPower: N/A | deepSiliconInterrupts: N/A | pins: {Object: 25 keys} | pinToggles: {\"10\":1} | analogVoltages: {Object: 33 keys} | i2cTraffic: [] | spiTraffic: [] | serialBytes: 0.00 | pwmTraffic: 0.00 | oneWireTraffic: 0.00 | pioTraffic: 0.00 | i2sTraffic: 0.00",
+      "details": {
+        "id": "uno1",
+        "type": "openhw-arduino-uno",
+        "state": {
+          "txActive": true,
+          "rxActive": true,
+          "pin13Active": true,
+          "pins": {
+            "0": true,
+            "1": true,
+            "2": true,
+            "3": true,
+            "4": true,
+            "5": true,
+            "6": true,
+            "7": true,
+            "8": false,
+            "9": false,
+            "10": false,
+            "11": true,
+            "12": true,
+            "13": true,
+            "5V": true,
+            "vin": true,
+            "VIN": true,
+            "3V3": true,
+            "A0": true,
+            "A1": true,
+            "A2": true,
+            "A3": true,
+            "A4": true,
+            "A5": true,
+            "GND": false
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "analogVoltages": {
+            "0": 5,
+            "1": 5,
+            "2": 5,
+            "3": 5,
+            "4": 5,
+            "5": 5,
+            "6": 5,
+            "7": 5,
+            "8": 0,
+            "9": 0,
+            "10": 0,
+            "11": 5,
+            "12": 5,
+            "13": 5,
+            "A0": 5,
+            "A1": 5,
+            "A2": 5,
+            "A3": 5,
+            "A4": 5,
+            "A5": 5,
+            "vin": 5,
+            "VIN": 5,
+            "gnd_1": 0,
+            "gnd_2": 0,
+            "gnd_3": 0,
+            "GND": 0,
+            "5V": 5,
+            "3v3": 0,
+            "3V3": 3.3,
+            "rst": 0,
+            "RST": 0,
+            "ioref": 0,
+            "IOREF": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.306,
+          "timing": {
+            "totalMs": 3.4000000655651093,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0006008128760496747,
+            "count": 5659,
+            "lastUpdateAtMs": 1779139369835
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "stateSize": 52,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359587,
+            "lastStateChangeCycles": null,
+            "stateMutationCount": 4,
+            "idleMs": 10249
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 82594,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 3.3,
+              "average": 4.575,
+              "samples": 4
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 3.3
+          },
+          "custom": {
+            "txActive": true,
+            "rxActive": true,
+            "pin13Active": true
+          }
+        },
+        "heuristics": {
+          "status": "State has been stable for 10249ms while updates continue.",
+          "summary": "STATE HAS BEEN STABLE FOR 10249MS WHILE UPDATES CONTINUE.: warn",
+          "findings": [
+            "warn"
+          ]
+        },
+        "capturedAt": "2026-05-18T21:22:49.836Z",
+        "_metrics": {
+          "sampleCount": 472,
+          "updateFreqHz": 46.234,
+          "stateSizeBytes": 52,
+          "stateMutationCount": 0,
+          "idleMs": 10209,
+          "pinToggleCount": 0,
+          "pinCount": 33
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=txActive, rxActive, pin13Active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:49.836Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139369840-9yhr5k",
+      "timestamp": "02:52:49.840",
+      "summary": "Freq: 552.407Hz | Avg: 0.00ms | [STATE HAS BEEN STABLE FOR 10211MS WHILE UPDATES CONTINUE.] STATE HAS BEEN STABLE FOR 10211MS WHILE UPDATES CONTINUE.: warn | angle: N/A | pins: {} | pinToggles: {} | pwmTraffic: 0.00",
+      "details": {
+        "id": "stepper_motor_1",
+        "type": "openhw-stepper-motor",
+        "state": {
+          "step_angle": "1.8",
+          "targetBoard": "uno1",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "A+": 0,
+            "A-": 0,
+            "B+": 0,
+            "B-": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.407,
+          "timing": {
+            "totalMs": 1.3000000417232513,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0002297225731972524,
+            "count": 5659,
+            "lastUpdateAtMs": 1779139369835
+          },
+          "pinToggles": {},
+          "stateSize": 41,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 10211
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "step_angle": "1.8",
+            "targetBoard": "uno1"
+          }
+        },
+        "heuristics": {
+          "status": "State has been stable for 10211ms while updates continue.",
+          "summary": "STATE HAS BEEN STABLE FOR 10211MS WHILE UPDATES CONTINUE.: warn",
+          "findings": [
+            "warn"
+          ]
+        },
+        "capturedAt": "2026-05-18T21:22:49.836Z",
+        "_metrics": {
+          "sampleCount": 472,
+          "updateFreqHz": 46.234,
+          "stateSizeBytes": 41,
+          "stateMutationCount": 0,
+          "idleMs": 10209,
+          "pinToggleCount": 0,
+          "pinCount": 4
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=step_angle, targetBoard",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:49.836Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139369840-nbiyrg",
+      "timestamp": "02:52:49.840",
+      "summary": "Freq: 552.306Hz | Avg: 0.00ms | [STATE HAS BEEN STABLE FOR 10243MS WHILE UPDATES CONTINUE.] STATE HAS BEEN STABLE FOR 10243MS WHILE UPDATES CONTINUE.: warn | active: true | stepCount: N/A | pins: {Object: 9 keys} | pinToggles: {\"1A\":2,\"2A\":2,\"ENABLE\":1}",
+      "details": {
+        "id": "a4988_stepper_motor_1",
+        "type": "openhw-a4988",
+        "state": {
+          "active": true,
+          "pins": {
+            "VDD": true,
+            "RESET": true,
+            "SLEEP": true,
+            "1A": true,
+            "2A": true,
+            "ENABLE": false,
+            "STEP": false,
+            "DIR": false,
+            "GND_LOGIC": false
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "analogVoltages": {
+            "ENABLE": 0,
+            "MS1": 0,
+            "MS2": 0,
+            "MS3": 0,
+            "RESET": 5,
+            "SLEEP": 5,
+            "STEP": 0,
+            "DIR": 0,
+            "VMOT": 0,
+            "GND_MOT": 0,
+            "2B": 0,
+            "2A": 5,
+            "1A": 5,
+            "1B": 0,
+            "VDD": 5,
+            "GND_LOGIC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.306,
+          "timing": {
+            "totalMs": 1.9999999403953552,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.00035341932150474557,
+            "count": 5659,
+            "lastUpdateAtMs": 1779139369835
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "stateSize": 15,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359593,
+            "lastStateChangeCycles": 3486,
+            "stateMutationCount": 1,
+            "idleMs": 10243
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 28481,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 5,
+              "average": 5,
+              "samples": 1
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 5
+          },
+          "custom": {
+            "active": true
+          }
+        },
+        "heuristics": {
+          "status": "State has been stable for 10243ms while updates continue.",
+          "summary": "STATE HAS BEEN STABLE FOR 10243MS WHILE UPDATES CONTINUE.: warn",
+          "findings": [
+            "warn"
+          ]
+        },
+        "capturedAt": "2026-05-18T21:22:49.836Z",
+        "_metrics": {
+          "sampleCount": 472,
+          "updateFreqHz": 46.234,
+          "stateSizeBytes": 15,
+          "stateMutationCount": 0,
+          "idleMs": 10209,
+          "pinToggleCount": 0,
+          "pinCount": 16
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:49.836Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139369840-5ajf9r",
+      "timestamp": "02:52:49.840",
+      "summary": "Freq: 552.407Hz | Avg: 0.00ms | [STATE HAS BEEN STABLE FOR 10211MS WHILE UPDATES CONTINUE.] STATE HAS BEEN STABLE FOR 10211MS WHILE UPDATES CONTINUE.: warn | voltage: 12.0 | current: N/A | pins: {} | pinToggles: {}",
+      "details": {
+        "id": "power-supply_stepper_motor_1",
+        "type": "openhw-power-supply",
+        "state": {
+          "voltage": "12.0",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "GND": 0,
+            "VCC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.407,
+          "timing": {
+            "totalMs": 5.8000001311302185,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.0010249160860806182,
+            "count": 5659,
+            "lastUpdateAtMs": 1779139369835
+          },
+          "pinToggles": {},
+          "stateSize": 18,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 10211
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "voltage": "12.0"
+          }
+        },
+        "heuristics": {
+          "status": "State has been stable for 10211ms while updates continue.",
+          "summary": "STATE HAS BEEN STABLE FOR 10211MS WHILE UPDATES CONTINUE.: warn",
+          "findings": [
+            "warn"
+          ]
+        },
+        "capturedAt": "2026-05-18T21:22:49.836Z",
+        "_metrics": {
+          "sampleCount": 472,
+          "updateFreqHz": 46.234,
+          "stateSizeBytes": 18,
+          "stateMutationCount": 0,
+          "idleMs": 10209,
+          "pinToggleCount": 0,
+          "pinCount": 2
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=voltage",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:49.836Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139370858-x85xy2",
+      "timestamp": "02:52:50.858",
+      "summary": "Freq: 552.413Hz | Avg: 0.00ms | [STATE HAS BEEN STABLE FOR 11270MS WHILE UPDATES CONTINUE.] STATE HAS BEEN STABLE FOR 11270MS WHILE UPDATES CONTINUE.: warn | leds: N/A | deepSiliconRegisters: N/A | deepSiliconSRAM: N/A | deepSiliconTimers: N/A | deepSiliconPower: N/A | deepSiliconInterrupts: N/A | pins: {Object: 25 keys} | pinToggles: {\"10\":1} | analogVoltages: {Object: 33 keys} | i2cTraffic: [] | spiTraffic: [] | serialBytes: 0.00 | pwmTraffic: 0.00 | oneWireTraffic: 0.00 | pioTraffic: 0.00 | i2sTraffic: 0.00",
+      "details": {
+        "id": "uno1",
+        "type": "openhw-arduino-uno",
+        "state": {
+          "txActive": true,
+          "rxActive": true,
+          "pin13Active": true,
+          "pins": {
+            "0": true,
+            "1": true,
+            "2": true,
+            "3": true,
+            "4": true,
+            "5": true,
+            "6": true,
+            "7": true,
+            "8": false,
+            "9": false,
+            "10": false,
+            "11": true,
+            "12": true,
+            "13": true,
+            "5V": true,
+            "vin": true,
+            "VIN": true,
+            "3V3": true,
+            "A0": true,
+            "A1": true,
+            "A2": true,
+            "A3": true,
+            "A4": true,
+            "A5": true,
+            "GND": false
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "analogVoltages": {
+            "0": 5,
+            "1": 5,
+            "2": 5,
+            "3": 5,
+            "4": 5,
+            "5": 5,
+            "6": 5,
+            "7": 5,
+            "8": 0,
+            "9": 0,
+            "10": 0,
+            "11": 5,
+            "12": 5,
+            "13": 5,
+            "A0": 5,
+            "A1": 5,
+            "A2": 5,
+            "A3": 5,
+            "A4": 5,
+            "A5": 5,
+            "vin": 5,
+            "VIN": 5,
+            "gnd_1": 0,
+            "gnd_2": 0,
+            "gnd_3": 0,
+            "GND": 0,
+            "5V": 5,
+            "3v3": 0,
+            "3V3": 3.3,
+            "rst": 0,
+            "RST": 0,
+            "ioref": 0,
+            "IOREF": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.413,
+          "timing": {
+            "totalMs": 3.5000000596046448,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.000562339341196119,
+            "count": 6224,
+            "lastUpdateAtMs": 1779139370857
+          },
+          "pinToggles": {
+            "10": 1
+          },
+          "stateSize": 52,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359587,
+            "lastStateChangeCycles": null,
+            "stateMutationCount": 4,
+            "idleMs": 11270
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 90917,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 3.3,
+              "average": 4.575,
+              "samples": 4
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 3.3
+          },
+          "custom": {
+            "txActive": true,
+            "rxActive": true,
+            "pin13Active": true
+          }
+        },
+        "heuristics": {
+          "status": "State has been stable for 11270ms while updates continue.",
+          "summary": "STATE HAS BEEN STABLE FOR 11270MS WHILE UPDATES CONTINUE.: warn",
+          "findings": [
+            "warn"
+          ]
+        },
+        "capturedAt": "2026-05-18T21:22:50.857Z",
+        "_metrics": {
+          "sampleCount": 519,
+          "updateFreqHz": 46.215,
+          "stateSizeBytes": 52,
+          "stateMutationCount": 0,
+          "idleMs": 11230,
+          "pinToggleCount": 0,
+          "pinCount": 33
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=txActive, rxActive, pin13Active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:50.857Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139370858-t4kbiz",
+      "timestamp": "02:52:50.858",
+      "summary": "Freq: 552.505Hz | Avg: 0.00ms | [STATE HAS BEEN STABLE FOR 11232MS WHILE UPDATES CONTINUE.] STATE HAS BEEN STABLE FOR 11232MS WHILE UPDATES CONTINUE.: warn | angle: N/A | pins: {} | pinToggles: {} | pwmTraffic: 0.00",
+      "details": {
+        "id": "stepper_motor_1",
+        "type": "openhw-stepper-motor",
+        "state": {
+          "step_angle": "1.8",
+          "targetBoard": "uno1",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "A+": 0,
+            "A-": 0,
+            "B+": 0,
+            "B-": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.505,
+          "timing": {
+            "totalMs": 1.4000000357627869,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.00022493573839376397,
+            "count": 6224,
+            "lastUpdateAtMs": 1779139370857
+          },
+          "pinToggles": {},
+          "stateSize": 41,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 11232
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "step_angle": "1.8",
+            "targetBoard": "uno1"
+          }
+        },
+        "heuristics": {
+          "status": "State has been stable for 11232ms while updates continue.",
+          "summary": "STATE HAS BEEN STABLE FOR 11232MS WHILE UPDATES CONTINUE.: warn",
+          "findings": [
+            "warn"
+          ]
+        },
+        "capturedAt": "2026-05-18T21:22:50.857Z",
+        "_metrics": {
+          "sampleCount": 519,
+          "updateFreqHz": 46.215,
+          "stateSizeBytes": 41,
+          "stateMutationCount": 0,
+          "idleMs": 11230,
+          "pinToggleCount": 0,
+          "pinCount": 4
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=step_angle, targetBoard",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:50.857Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139370858-y80nos",
+      "timestamp": "02:52:50.858",
+      "summary": "Freq: 552.413Hz | Avg: 0.00ms | [STATE HAS BEEN STABLE FOR 11264MS WHILE UPDATES CONTINUE.] STATE HAS BEEN STABLE FOR 11264MS WHILE UPDATES CONTINUE.: warn | active: true | stepCount: N/A | pins: {Object: 9 keys} | pinToggles: {\"1A\":2,\"2A\":2,\"ENABLE\":1}",
+      "details": {
+        "id": "a4988_stepper_motor_1",
+        "type": "openhw-a4988",
+        "state": {
+          "active": true,
+          "pins": {
+            "VDD": true,
+            "RESET": true,
+            "SLEEP": true,
+            "1A": true,
+            "2A": true,
+            "ENABLE": false,
+            "STEP": false,
+            "DIR": false,
+            "GND_LOGIC": false
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "analogVoltages": {
+            "ENABLE": 0,
+            "MS1": 0,
+            "MS2": 0,
+            "MS3": 0,
+            "RESET": 5,
+            "SLEEP": 5,
+            "STEP": 0,
+            "DIR": 0,
+            "VMOT": 0,
+            "GND_MOT": 0,
+            "2B": 0,
+            "2A": 5,
+            "1A": 5,
+            "1B": 0,
+            "VDD": 5,
+            "GND_LOGIC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.413,
+          "timing": {
+            "totalMs": 1.9999999403953552,
+            "maxMs": 0.10000002384185791,
+            "avgMs": 0.00032133675134886813,
+            "count": 6224,
+            "lastUpdateAtMs": 1779139370857
+          },
+          "pinToggles": {
+            "1A": 2,
+            "2A": 2,
+            "ENABLE": 1
+          },
+          "stateSize": 15,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359593,
+            "lastStateChangeCycles": 3486,
+            "stateMutationCount": 1,
+            "idleMs": 11264
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 31351,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 5,
+              "average": 5,
+              "samples": 1
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 5
+          },
+          "custom": {
+            "active": true
+          }
+        },
+        "heuristics": {
+          "status": "State has been stable for 11264ms while updates continue.",
+          "summary": "STATE HAS BEEN STABLE FOR 11264MS WHILE UPDATES CONTINUE.: warn",
+          "findings": [
+            "warn"
+          ]
+        },
+        "capturedAt": "2026-05-18T21:22:50.857Z",
+        "_metrics": {
+          "sampleCount": 519,
+          "updateFreqHz": 46.215,
+          "stateSizeBytes": 15,
+          "stateMutationCount": 0,
+          "idleMs": 11230,
+          "pinToggleCount": 0,
+          "pinCount": 16
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=active",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:50.857Z",
+        "_fallbackGenerated": true
+      }
+    },
+    {
+      "id": "1779139370858-gqyjtt",
+      "timestamp": "02:52:50.858",
+      "summary": "Freq: 552.505Hz | Avg: 0.00ms | [STATE HAS BEEN STABLE FOR 11232MS WHILE UPDATES CONTINUE.] STATE HAS BEEN STABLE FOR 11232MS WHILE UPDATES CONTINUE.: warn | voltage: 12.0 | current: N/A | pins: {} | pinToggles: {}",
+      "details": {
+        "id": "power-supply_stepper_motor_1",
+        "type": "openhw-power-supply",
+        "state": {
+          "voltage": "12.0",
+          "pins": {},
+          "pinToggles": {},
+          "analogVoltages": {
+            "GND": 0,
+            "VCC": 0
+          },
+          "i2cTraffic": [],
+          "spiTraffic": [],
+          "serialBytes": 0,
+          "pwmTraffic": 0,
+          "oneWireTraffic": 0,
+          "pioTraffic": 0,
+          "i2sTraffic": 0
+        },
+        "metrics": {
+          "updateFreq": 552.505,
+          "timing": {
+            "totalMs": 6.700000137090683,
+            "maxMs": 0.30000001192092896,
+            "avgMs": 0.001076478171126395,
+            "count": 6224,
+            "lastUpdateAtMs": 1779139370857
+          },
+          "pinToggles": {},
+          "stateSize": 18,
+          "stateStability": {
+            "lastStateChangeAtMs": 1779139359625,
+            "lastStateChangeCycles": 451203,
+            "stateMutationCount": 1,
+            "idleMs": 11232
+          },
+          "ioThroughput": {
+            "i2cTransactions": 0,
+            "i2cBytes": 0,
+            "spiTransactions": 0,
+            "spiBytes": 0,
+            "uartBytes": 0,
+            "lastIoAtMs": 0
+          },
+          "interactionAudit": {
+            "onEventCount": 0,
+            "onPinStateChangeCount": 0,
+            "byType": {},
+            "lastEventAtMs": 0
+          },
+          "powerProfile": {
+            "vcc": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "gnd": {
+              "current": 0,
+              "average": 0,
+              "samples": 0
+            },
+            "railDelta": 0
+          },
+          "custom": {
+            "voltage": "12.0"
+          }
+        },
+        "heuristics": {
+          "status": "State has been stable for 11232ms while updates continue.",
+          "summary": "STATE HAS BEEN STABLE FOR 11232MS WHILE UPDATES CONTINUE.: warn",
+          "findings": [
+            "warn"
+          ]
+        },
+        "capturedAt": "2026-05-18T21:22:50.857Z",
+        "_metrics": {
+          "sampleCount": 519,
+          "updateFreqHz": 46.215,
+          "stateSizeBytes": 18,
+          "stateMutationCount": 0,
+          "idleMs": 11230,
+          "pinToggleCount": 0,
+          "pinCount": 2
+        },
+        "_heuristics": {
+          "status": "ok",
+          "summary": "OK: stateKeys=voltage",
+          "findings": []
+        },
+        "_capturedAt": "2026-05-18T21:22:50.857Z",
+        "_fallbackGenerated": true
+      }
+    }
+  ]
+}

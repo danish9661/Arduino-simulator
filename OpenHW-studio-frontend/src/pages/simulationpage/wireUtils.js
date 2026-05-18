@@ -1,3 +1,10 @@
+import { buildWireRoutePoints } from '../../utils/wireRouting.js';
+import { makeOrthogonal } from '../../utils/wireUtils.js';
+
+function snapPointsToHalfPixel(pts) {
+  return (pts || []).map(p => ({ x: Math.round(p.x * 2) / 2, y: Math.round(p.y * 2) / 2, _corner: p._corner }));
+}
+
 // ─── RENDER ROUNDED PATH FROM POINT ARRAY ─────────────────────────────────
 export function renderRoundedPath(pts) {
   if (!pts || pts.length < 2) return '';
@@ -20,116 +27,32 @@ export function renderRoundedPath(pts) {
   return d;
 }
 
-// ─── INTERNAL: ENSURE STRICT ORTHOGONALITY ────────────────────────────────
-function makeOrthogonal(pts) {
-  if (pts.length < 2) return pts;
-  const result = [pts[0]];
-  for (let i = 1; i < pts.length; i++) {
-    const prev = result[result.length - 1];
-    const curr = pts[i];
-    if (Math.abs(prev.x - curr.x) > 0.1 && Math.abs(prev.y - curr.y) > 0.1) {
-      const lastSegWasVert = result.length > 1 && Math.abs(result[result.length - 2].x - prev.x) < 0.1;
-      if (lastSegWasVert) {
-        result.push({ x: curr.x, y: prev.y });
-      } else {
-        result.push({ x: prev.x, y: curr.y });
-      }
-    }
-    result.push(curr);
-  }
-  return result.filter((pt, i, arr) => i === 0 || (Math.abs(pt.x - arr[i - 1].x) > 0.1 || Math.abs(pt.y - arr[i - 1].y) > 0.1));
-}
-
 // ─── COMPUTE ORTHOGONAL WIRE CORNER POINTS ─────────────────────────────────
 export function computeWireOrthoPoints(p1, e1, e2, p2, waypoints = [], offset = 0) {
-  if (waypoints.length > 0) {
-    // If manual waypoints (canvas clicks) or interactive corners exist, 
-    // we follow them strictly and skip the automatic Manhattan routing logic.
-    const pts = [p1, e1, ...waypoints, e2, p2].filter((pt, i, arr) => 
-      i === 0 || Math.abs(pt.x - arr[i - 1].x) > 0.1 || Math.abs(pt.y - arr[i - 1].y) > 0.1
-    );
-    return makeOrthogonal(pts);
+  if (waypoints.length > 0 && waypoints[0]?._corner) {
+    const pts = [p1, ...waypoints, p2];
+    const out = pts.filter((pt, i, arr) => i === 0 || Math.abs(pt.x - arr[i - 1].x) > 0.1 || Math.abs(pt.y - arr[i - 1].y) > 0.1);
+    return snapPointsToHalfPixel(makeOrthogonal(out));
   }
-
-  // offset is now a laneIndex (0-6). trunkShift centres the bundle symmetrically.
-  // 5px inter-wire spacing with a 10px "Safety Offset" to prevent overlaps with pin centers.
-  const laneIndex = offset;
-  const trunkShift = (laneIndex - 3) * 5 + (laneIndex < 3 ? -10 : 10); 
-
-  const se1 = { ...e1 }, se2 = { ...e2 };
-  const sdx1 = se1.x - p1.x, sdy1 = se1.y - p1.y;
-  const sdx2 = se2.x - p2.x, sdy2 = se2.y - p2.y;
-  const e1Horiz = Math.abs(sdx1) >= Math.abs(sdy1);
-  const e2Horiz = Math.abs(sdx2) >= Math.abs(sdy2);
-
-  let midPts = [];
-
-  if (e1Horiz && e2Horiz) {
-    const dir1 = Math.sign(sdx1) || 1;
-    const dir2 = Math.sign(sdx2) || 1;
-    let midX;
-    if (dir1 !== dir2) {
-      midX = (se1.x + se2.x) / 2 + trunkShift;
-    } else {
-      const base = dir1 > 0 ? Math.max(se1.x, se2.x) : Math.min(se1.x, se2.x);
-      midX = base + dir1 * (25 + Math.abs(trunkShift));
-    }
-    // We add extra points to ensure the "trunk" is staggered away from the pin X
-    midPts = [
-      { x: se1.x, y: se1.y },
-      { x: midX, y: se1.y },
-      { x: midX, y: se2.y },
-      { x: se2.x, y: se2.y }
-    ];
-
-  } else if (!e1Horiz && !e2Horiz) {
-    const dir1 = Math.sign(sdy1) || 1;
-    const dir2 = Math.sign(sdy2) || 1;
-    let midY;
-    if (dir1 !== dir2) {
-      midY = (se1.y + se2.y) / 2 + trunkShift;
-    } else {
-      const base = dir1 > 0 ? Math.max(se1.y, se2.y) : Math.min(se1.y, se2.y);
-      midY = base + dir1 * (25 + Math.abs(trunkShift));
-    }
-    // We add extra points to ensure the "trunk" is staggered away from the pin Y
-    midPts = [
-      { x: se1.x, y: se1.y },
-      { x: se1.x, y: midY },
-      { x: se2.x, y: midY },
-      { x: se2.x, y: se2.y }
-    ];
-
-  } else if (e1Horiz && !e2Horiz) {
-    // Mixed: E1 Horiz, E2 Vert. 
-    const midX = se2.x + trunkShift;
-    const midY = se1.y + trunkShift;
-    midPts = [{ x: midX, y: se1.y }, { x: midX, y: midY }];
-
-  } else {
-    // Mixed: E1 Vert, E2 Horiz.
-    const midX = se1.x + trunkShift;
-    const midY = se2.y + trunkShift;
-    midPts = [{ x: se1.x, y: midY }, { x: midX, y: midY }];
-  }
-
-  return makeOrthogonal([p1, se1, ...midPts, se2, p2]);
+  const pts = buildWireRoutePoints(p1, e1, e2, p2, waypoints, offset);
+  return snapPointsToHalfPixel(makeOrthogonal(pts));
 }
 
 
 // ─── BUILD FULL WIRE PATH STRING ───────────────────────────────────────────
 
 export function buildWirePath(p1, e1, e2, p2, waypoints = [], pathOverride = null, offset = 0) {
-  // If we have a pathOverride (from Autowiring), we still want to apply staggering 
-  // to prevent overlapping. We do this by passing it through our computeWireOrthoPoints
-  // unless it's a completely freeform custom path.
-  const pts = computeWireOrthoPoints(p1, e1, e2, p2, waypoints, offset);
+  const rawPts = Array.isArray(pathOverride) && pathOverride.length > 1
+    ? pathOverride
+    : computeWireOrthoPoints(p1, e1, e2, p2, waypoints, offset);
+  const pts = snapPointsToHalfPixel(makeOrthogonal(rawPts));
   return renderRoundedPath(pts);
 }
 
 // ─── GET WIRE POINTS FOR DRAGGING ──────────────────────────────────────────
 export function getWirePoints(p1, e1, e2, p2, waypoints = [], offset = 0) {
-  return computeWireOrthoPoints(p1, e1, e2, p2, waypoints, offset);
+  const pts = computeWireOrthoPoints(p1, e1, e2, p2, waypoints, offset);
+  return snapPointsToHalfPixel(makeOrthogonal(pts));
 }
 
 // ─── PREVIEW WIRE ROUTER (Drawing mode) ───────────────────────────────────

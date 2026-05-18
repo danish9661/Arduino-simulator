@@ -978,6 +978,16 @@ pub fn generate_autonomous_setup(
                             };
 
                             resolved_pins.insert(original_pref.clone(), resolved.clone());
+                            resolved_pins.insert(conn.from.clone(), resolved.clone());
+                            if conn.from.contains('|') {
+                                let parts: Vec<&str> = conn.from.split(':').collect();
+                                if parts.len() >= 3 {
+                                    let prefix = format!("{}:{}", parts[0], parts[1]);
+                                    for opt in parts[2].split('|') {
+                                        resolved_pins.insert(format!("{}:{}", prefix, opt), resolved.clone());
+                                    }
+                                }
+                            }
                             target = format!("{}:{}", board_id, resolved);
                             if !plan.reasoning.iter().any(|r| r.contains("Bus")) {
                                 plan.reasoning.push(format!("Strict Routing: Assigned {} hardware (Bus {}) for {}.", bt.to_uppercase(), bus_idx, main_id));
@@ -988,6 +998,16 @@ pub fn generate_autonomous_setup(
                         }
                     } else if let Some(p) = engine.resolve_best_pin(&board_id, &preferred) {
                         resolved_pins.insert(original_pref.clone(), p.clone());
+                        resolved_pins.insert(conn.from.clone(), p.clone());
+                        if conn.from.contains('|') {
+                            let parts: Vec<&str> = conn.from.split(':').collect();
+                            if parts.len() >= 3 {
+                                let prefix = format!("{}:{}", parts[0], parts[1]);
+                                for opt in parts[2].split('|') {
+                                    resolved_pins.insert(format!("{}:{}", prefix, opt), p.clone());
+                                }
+                            }
+                        }
                         target = format!("{}:{}", board_id, p);
                     } else {
                         plan.reasoning.push(format!("CRITICAL: No available pins on {} for connection '{}'.", board_id, preferred));
@@ -1263,14 +1283,129 @@ pub fn generate_code_for_component(
         }
     }
 
+    // Universal Helper & Autowiring Tracing Rule
+    // If the manifest defines autowiring connections (especially for composite components like motors),
+    // trace those connections on the active canvas to find which board pins the helpers or main component connect to!
+    if let Some(autowiring) = &manifest.autowiring {
+        // 1. Build helper alias map
+        let mut helper_map: HashMap<String, String> = HashMap::new();
+        if let Some(helpers) = &autowiring.helpers {
+            for h in helpers {
+                // Find matching component on canvas: prefer one ending with comp_id, fallback to matching type
+                if let Some(matched) = components.iter().find(|c| {
+                    let c_type = c.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                    let c_id = c.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                    c_type == h.kind && c_id.ends_with(&comp_id)
+                }).or_else(|| components.iter().find(|c| {
+                    let c_type = c.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                    c_type == h.kind
+                })) {
+                    if let Some(m_id) = matched.get("id").and_then(|v| v.as_str()) {
+                        helper_map.insert(h.id.clone(), m_id.to_string());
+                    }
+                }
+            }
+        }
+
+        // 2. Trace each connection
+        for conn in &autowiring.connections {
+            let mut start_pins_to_trace = Vec::new();
+
+            if conn.from.starts_with("helper:") {
+                let parts: Vec<&str> = conn.from.split(':').collect();
+                if parts.len() >= 3 {
+                    let alias = parts[1];
+                    let pin_options = parts[2];
+                    if let Some(real_id) = helper_map.get(alias) {
+                        for opt in pin_options.split('|') {
+                            start_pins_to_trace.push((format!("{}:{}", real_id, opt), opt.to_string()));
+                        }
+                    }
+                }
+            } else {
+                start_pins_to_trace.push((format!("{}:{}", comp_id, conn.from), conn.from.clone()));
+                // If conn.via is present (e.g. resistor for LED), also trace from the via component's output!
+                if let Some(via_type) = &conn.via {
+                    // Find the via component on the canvas
+                    if let Some(via_comp) = components.iter().find(|c| {
+                        let c_id = c.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                        let c_type = c.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                        c_id.starts_with(&format!("via_{}_{}", conn.from, comp_id)) || (c_type == via_type && c_id.contains(&comp_id))
+                    }).or_else(|| components.iter().find(|c| {
+                        let c_type = c.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                        c_type == via_type
+                    })) {
+                        if let Some(via_id) = via_comp.get("id").and_then(|v| v.as_str()) {
+                            start_pins_to_trace.push((format!("{}:p2", via_id), conn.from.clone()));
+                            start_pins_to_trace.push((format!("{}:2", via_id), conn.from.clone()));
+                        }
+                    }
+                }
+            }
+
+            for (start_pin, opt_name) in start_pins_to_trace {
+                let net = get_connected_net(&start_pin, &existing_wires, &components);
+                for pin_in_net in net {
+                    let parts: Vec<&str> = pin_in_net.split(':').collect();
+                    if parts.len() < 2 { continue; }
+                    let owner_id = parts[0];
+                    let pin_id = parts[1];
+                    
+                    let comp_type = components.iter()
+                        .find(|c| c.get("id").and_then(|v| v.as_str()) == Some(owner_id))
+                        .and_then(|c| c.get("type").and_then(|v| v.as_str()))
+                        .unwrap_or("");
+
+                    let is_board = comp_type.contains("arduino") || 
+                                   comp_type.contains("esp32") || 
+                                   comp_type.contains("stm32") || 
+                                   comp_type.contains("pico") || 
+                                   comp_type.contains("rp2040");
+                    
+                    if is_board {
+                        let clean_board_pin = if pin_id.starts_with('D') && pin_id.len() > 1 && pin_id[1..].chars().all(char::is_numeric) {
+                            &pin_id[1..]
+                        } else if pin_id.starts_with("GPIO") {
+                            &pin_id[4..]
+                        } else if pin_id.starts_with("GP") {
+                            &pin_id[2..]
+                        } else {
+                            pin_id
+                        };
+                        resolved_pins.insert(conn.to.clone(), clean_board_pin.to_string());
+                        resolved_pins.insert(conn.from.clone(), clean_board_pin.to_string());
+                        if conn.from.starts_with("helper:") {
+                            let from_parts: Vec<&str> = conn.from.split(':').collect();
+                            if from_parts.len() >= 3 {
+                                resolved_pins.insert(format!("{}:{}:{}", from_parts[0], from_parts[1], opt_name), clean_board_pin.to_string());
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     if let Some(autocoding) = manifest.autocoding {
         if let Some(mut snippet) = autocoding.arduino {
+            let suffix = if let Some(idx) = comp_id.rfind('_') {
+                &comp_id[idx + 1..]
+            } else {
+                &comp_id
+            };
+
             for (pref, real) in &resolved_pins {
                 let placeholder = format!("${{{}}}", pref);
                 if let Some(g) = &mut snippet.globals   { *g = g.replace(&placeholder, real.as_str()); }
                 if let Some(s) = &mut snippet.setup     { *s = s.replace(&placeholder, real.as_str()); }
                 if let Some(l) = &mut snippet.loop_code { *l = l.replace(&placeholder, real.as_str()); }
             }
+
+            if let Some(g) = &mut snippet.globals   { *g = g.replace("${COMP_ID}", &comp_id).replace("${COMP_SUFFIX}", suffix); }
+            if let Some(s) = &mut snippet.setup     { *s = s.replace("${COMP_ID}", &comp_id).replace("${COMP_SUFFIX}", suffix); }
+            if let Some(l) = &mut snippet.loop_code { *l = l.replace("${COMP_ID}", &comp_id).replace("${COMP_SUFFIX}", suffix); }
+
             use serde::Serialize;
             let serializer = serde_wasm_bindgen::Serializer::new().serialize_maps_as_objects(true);
             return snippet.serialize(&serializer).unwrap();
@@ -1331,6 +1466,7 @@ fn get_connected_net(start_pin: &str, wires: &[serde_json::Value], components: &
                 }
             }
             
+            /*
             if comp_type == "wokwi-resistor" || comp_type == "openhw-resistor" || 
                comp_type == "wokwi-photoresistor" || comp_type == "openhw-photoresistor" || 
                comp_type == "wokwi-ntc-temperature-sensor" || comp_type == "openhw-ntc-temperature-sensor" {
@@ -1345,6 +1481,7 @@ fn get_connected_net(start_pin: &str, wires: &[serde_json::Value], components: &
                     queue.push_back(other_pin);
                 }
             }
+            */
         }
     }
 

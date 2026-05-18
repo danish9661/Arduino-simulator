@@ -1,0 +1,35 @@
+{
+  "type": "openhw-ds18b20-temperature-breakout-modified",
+  "label": "DS18B20 Blue Module (Modified)",
+  "group": "Sensors",
+  "description": "A breakout board for the Dallas Semiconductor DS18B20 digital temperature sensor (Blue Variant), modified to remove text below the pins.",
+  "w": 50,
+  "h": 100,
+  "attrs": {
+    "temperature": "25",
+    "resolution": "12"
+  },
+  "pins": [
+    {
+      "id": "GND",
+      "x": 10.0,
+      "y": 87.5,
+      "type": "power",
+      "description": "Ground"
+    },
+    {
+      "id": "DQ",
+      "x": 25.0,
+      "y": 87.5,
+      "type": "bidirectional",
+      "description": "Digital DQ Data line (1-Wire)"
+    },
+    {
+      "id": "VCC",
+      "x": 40.0,
+      "y": 87.5,
+      "type": "power",
+      "description": "Voltage Input (3V - 5.5V)"
+    }
+  ]
+}

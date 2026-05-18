@@ -53,6 +53,7 @@ import { Btn } from './Btn';
 import { RightPanel } from './RightPanel';
 import { ProjectsSidebarChrome } from './components/ProjectsSidebar';
 import { multiRoutePath, wireColor } from './wireUtils';
+import { getResolvedPinExitSide } from '../../utils/pinExit.js';
 import { useSimulatorShortcuts } from './hooks/useSimulatorShortcuts';
 import { simplifyOrthogonalPath } from './utils/wireHitDetection';
 import { useEditorStore } from './store/useEditorStore';
@@ -3251,6 +3252,14 @@ export function SimulatorPage({ gamificationMode = false }) {
     return getPinPosForComp(componentsMap.get(compId), pinId);
   }, [componentsMap, getPinPosForComp]);
 
+  const getComponentBounds = useCallback((comp) => {
+    if (!comp) return { x: 0, y: 0, w: 0, h: 0 };
+    const reg = COMPONENT_REGISTRY[comp.type];
+    if (!reg) return { x: 0, y: 0, w: comp.w || 0, h: comp.h || 0 };
+    if (typeof reg.BOUNDS === 'function') return reg.BOUNDS(getComponentStateAttrs(comp));
+    return reg.BOUNDS || { x: 0, y: 0, w: comp.w || 0, h: comp.h || 0 };
+  }, [COMPONENT_REGISTRY, getComponentStateAttrs]);
+
   // -- Get the point a wire should exit/enter at 90 deg from a pin --
   const getPinExitPoint = useCallback((compId, pinId, offset = 0, targetPos = null) => {
     const comp = componentsMap.get(compId);
@@ -3289,48 +3298,48 @@ export function SimulatorPage({ gamificationMode = false }) {
     const pPos = getPinPosForComp(comp, pinId);
     if (!pPos) return null;
 
+    const bounds = getComponentBounds(comp);
+    const localX = (Number(pin.x) || 0) - (Number(bounds.x) || 0);
+    const localY = (Number(pin.y) || 0) - (Number(bounds.y) || 0);
+    const distLeft = localX;
+    const distRight = (Number(bounds.w) || comp.w || 0) - localX;
+    const distTop = localY;
+    const distBottom = (Number(bounds.h) || comp.h || 0) - localY;
+    const bodyEdgeGap = 3;
     const rotation = comp.rotation || 0;
-    // Monotonic stagger: laneIndex 0..6 → exitLen 9, 14, 19, 24, 29, 34, 39
-    // offset here is already the laneIndex (0-based)
-    const exitLen = 9 + offset * 5;
+    // Spread grouped wires along the exit edge, then step outward.
+    const laneOffset = Number(offset) || 0;
     let dx = 0, dy = 0;
 
-    // Always exit from the nearest physical edge, ignoring manifest-defined 'dir'. 
-    // We use a 15px "Snap Zone" to ensure pins near a border always exit from it.
-    const cw = comp.w || 40;
-    const ch = comp.h || 40;
-    const px = pin.x;
-    const py = pin.y;
+    const dir = getResolvedPinExitSide(comp, pin, pins, bounds);
+    if (!dir) return { x: pPos.x, y: pPos.y, dir: 'bottom' };
 
-    const dTop = py;
-    const dBottom = ch - py;
-    const dLeft = px;
-    const dRight = cw - px;
-
-    // Priority 1: Snap to any edge within 15px
-    let dir = '';
-    if (dTop <= 15) dir = 'top';
-    else if (dBottom <= 15) dir = 'bottom';
-    else if (dLeft <= 15) dir = 'left';
-    else if (dRight <= 15) dir = 'right';
-    else {
-      // Priority 2: Mathematical nearest
-      const minDist = Math.min(dTop, dBottom, dLeft, dRight);
-      dir = minDist === dTop ? 'top' : (minDist === dBottom ? 'bottom' : (minDist === dRight ? 'right' : 'left'));
+    if (dir === 'left') {
+      dx = -(distLeft + bodyEdgeGap);
+      dy = laneOffset;
+    } else if (dir === 'right') {
+      dx = distRight + bodyEdgeGap;
+      dy = laneOffset;
+    } else if (dir === 'top') {
+      dx = laneOffset;
+      dy = -(distTop + bodyEdgeGap);
+    } else if (dir === 'bottom') {
+      dx = laneOffset;
+      dy = distBottom + bodyEdgeGap;
     }
-
-    if (dir === 'left') dx = -exitLen;
-    else if (dir === 'right') dx = exitLen;
-    else if (dir === 'top') dy = -exitLen;
-    else if (dir === 'bottom') dy = exitLen;
 
     const rad = (rotation * Math.PI) / 180;
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
 
+    const exitX = pPos.x + (dx * cos - dy * sin);
+    const exitY = pPos.y + (dx * sin + dy * cos);
+    try {
+      console.debug('[getPinExitPoint]', { compId: comp.id, pinId: pin.id, bounds, localX, localY, dir, laneOffset, exitX, exitY });
+    } catch (e) {}
     return {
-      x: pPos.x + (dx * cos - dy * sin),
-      y: pPos.y + (dx * sin + dy * cos),
+      x: exitX,
+      y: exitY,
       dir
     };
   }, [componentsMap, PIN_DEFS, getPinPosForComp]);

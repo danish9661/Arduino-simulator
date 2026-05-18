@@ -2531,8 +2531,8 @@ export const COMPONENT_PINS: Record<string, { id: string }[]> = {
     'openhw-ili9341': [{ id: 'VCC' }, { id: 'GND' }, { id: 'CS' }, { id: 'RESET' }, { id: 'DC' }, { id: 'MOSI' }, { id: 'SCK' }, { id: 'LED' }, { id: 'MISO' }],
     'wokwi-sd-card': [{ id: 'VCC' }, { id: 'GND' }, { id: 'CS' }, { id: 'SCK' }, { id: 'MOSI' }, { id: 'MISO' }],
     'openhw-sd-card': [{ id: 'VCC' }, { id: 'GND' }, { id: 'CS' }, { id: 'SCK' }, { id: 'MOSI' }, { id: 'MISO' }],
-    'wokwi-power-supply': [{ id: 'GND' }, { id: 'VCC' }],
-    'openhw-power-supply': [{ id: 'GND' }, { id: 'VCC' }],
+    'wokwi-power-supply': [{ id: 'GND' }, { id: '5V' }, { id: 'VCC' }],
+    'openhw-power-supply': [{ id: 'GND' }, { id: '5V' }, { id: 'VCC' }],
     'shift_register': [{ id: 'vcc' }, { id: 'gnd' }, { id: 'ser' }, { id: 'srclk' }, { id: 'rclk' }, { id: 'oe' }, { id: 'srclr' }, { id: 'q0' }, { id: 'q1' }, { id: 'q2' }, { id: 'q3' }, { id: 'q4' }, { id: 'q5' }, { id: 'q6' }, { id: 'q7' }, { id: 'q7s' }],
     'wokwi-membrane-keypad': [{ id: 'R1' }, { id: 'R2' }, { id: 'R3' }, { id: 'R4' }, { id: 'C1' }, { id: 'C2' }, { id: 'C3' }, { id: 'C4' }],
     'openhw-membrane-keypad': [{ id: 'R1' }, { id: 'R2' }, { id: 'R3' }, { id: 'R4' }, { id: 'C1' }, { id: 'C2' }, { id: 'C3' }, { id: 'C4' }],
@@ -4548,9 +4548,7 @@ export class AVRRunner {
             });
 
             return rails;
-        };
-
-        const updateOopPin = (arduinoPinStr: string, isHighOrVoltage: boolean | number) => {
+        };        const updateOopPin = (arduinoPinStr: string, isHighOrVoltage: boolean | number, customCompId?: string) => {
             const voltage = typeof isHighOrVoltage === 'number' ? isHighOrVoltage : (isHighOrVoltage ? 5.0 : 0.0);
             if (arduinoPinStr === '5') {
                 console.log(`[Worker updateOopPin] Pin 5, isHighOrVoltage: ${isHighOrVoltage}, voltage: ${voltage}V`);
@@ -4656,7 +4654,8 @@ export class AVRRunner {
                 }
             };
 
-            visitNode(`${this.boardId}:${arduinoPinStr}`, voltage);
+            const startCompId = customCompId || this.boardId;
+            visitNode(`${startCompId}:${arduinoPinStr}`, voltage);
         };
 
         this.updatePhysics = () => {};
@@ -4706,6 +4705,31 @@ export class AVRRunner {
                     updateOopPin(pin, isHigh);
                 }
             });
+
+            // Re-propagate active driver outputs from non-board helper components (e.g. A4988 motor drivers, logic gates)
+            this.instances.forEach((inst, compId) => {
+                if (compId === this.boardId) return;
+                if (inst.type.includes('a4988')) {
+                    ['1A', '1B', '2A', '2B'].forEach(pin => {
+                        if (inst.pins[pin]) {
+                            updateOopPin(pin, inst.pins[pin].voltage, compId);
+                        }
+                    });
+                } else if (inst.type.includes('motor-driver')) {
+                    ['OUT1', 'OUT2', 'OUT3', 'OUT4'].forEach(pin => {
+                        if (inst.pins[pin]) {
+                            updateOopPin(pin, inst.pins[pin].voltage, compId);
+                        }
+                    });
+                } else if (inst.type.includes('logic-gate') || inst.type.includes('timer') || inst.type.includes('opamp')) {
+                    Object.keys(inst.pins).forEach(pin => {
+                        if (pin.startsWith('OUT') || pin.startsWith('out') || pin === 'Q' || pin === 'Q#') {
+                            updateOopPin(pin, inst.pins[pin].voltage, compId);
+                        }
+                    });
+                }
+            });
+
             // Then, re-propagate GND and power rails LAST so they dominate and pull pins down/up
             ['gnd_1', 'gnd_2', 'gnd_3', 'GND'].forEach(pin => {
                 updateOopPin(pin, 0.0);
@@ -4715,6 +4739,17 @@ export class AVRRunner {
             });
             ['3v3', '3V3'].forEach(pin => {
                 updateOopPin(pin, 3.3);
+            });
+
+            // Re-propagate standalone power supply rails LAST so they dominate external power nets
+            this.instances.forEach((inst, compId) => {
+                if (compId === this.boardId) return;
+                if (inst.type.includes('power-supply') || inst.type.includes('battery')) {
+                    if (inst.pins['GND']) updateOopPin('GND', 0.0, compId);
+                    if (inst.pins['5V']) updateOopPin('5V', inst.pins['5V'].voltage, compId);
+                    if (inst.pins['VCC']) updateOopPin('VCC', inst.pins['VCC'].voltage, compId);
+                    if (inst.pins['3V3']) updateOopPin('3V3', inst.pins['3V3'].voltage, compId);
+                }
             });
         };
 
