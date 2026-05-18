@@ -15,14 +15,14 @@ async function runGradingTest() {
       components: [
         {
           id: 'uno1',
-          type: 'wokwi-arduino-uno',
+          type: 'openhw-arduino-uno',
           attrs: {
             firmwareHex: 'placeholder'
           }
         },
         {
           id: 'wokwi_led_1',
-          type: 'wokwi-led',
+          type: 'openhw-led',
           attrs: {
             color: '#ff0000'
           }
@@ -32,7 +32,7 @@ async function runGradingTest() {
         ['uno1', '13', 'wokwi_led_1', 'anode']
       ]
     },
-    board: 'wokwi-arduino-uno',
+    board: 'openhw-arduino-uno',
     speed: 8
   };
 

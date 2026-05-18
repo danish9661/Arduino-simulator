@@ -22,9 +22,9 @@ function setupUnoUno() {
   if (fs.existsSync(proj)) fs.unlinkSync(proj);
   
   run(runCli + ' project init ' + proj + ' --name "UNO-UNO" --board arduino_uno');
-  run(runCli + ' project add-component ' + proj + ' --type wokwi-arduino-uno --id board2');
-  run(runCli + ' project add-component ' + proj + ' --type wokwi-pushbutton --id btn');
-  run(runCli + ' project add-component ' + proj + ' --type wokwi-led --id led');
+  run(runCli + ' project add-component ' + proj + ' --type openhw-arduino-uno --id board2');
+  run(runCli + ' project add-component ' + proj + ' --type openhw-pushbutton --id btn');
+  run(runCli + ' project add-component ' + proj + ' --type openhw-led --id led');
   
   // Wokwi pushbutton pins are '1.l', '2.l' or '1' etc. If '1.l' is not found, we use '1' and '2'
   run(runCli + ' project connect ' + proj + ' --from btn:1 --to board1:2');

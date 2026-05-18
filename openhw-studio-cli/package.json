@@ -5,8 +5,8 @@
   "type": "module",
   "description": "Terminal CLI for OpenHW Studio simulation workflows",
   "scripts": {
-    "cli": "tsx src/cli.ts",
-    "dev": "tsx src/cli.ts",
+    "cli": "tsx --experimental-loader ./scripts/raw-loader.js src/cli.ts",
+    "dev": "tsx --experimental-loader ./scripts/raw-loader.js src/cli.ts",
     "mcp": "tsx src/cli.ts mcp serve",
     "typecheck": "tsc --noEmit",
     "test:mcp:smoke": "node scripts/mcp-smoke.mjs",
@@ -23,6 +23,8 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "commander": "^12.1.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
     "serialport": "^12.0.0",
     "yaml": "^2.8.3"
   },

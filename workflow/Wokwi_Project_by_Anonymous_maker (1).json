@@ -1,0 +1,261 @@
+{
+  "schemaVersion": "openhw-project-v2",
+  "board": "openhw-arduino-uno",
+  "components": [
+    {
+      "id": "uno1",
+      "type": "openhw-arduino-uno",
+      "label": "Arduino Uno",
+      "x": 42.3,
+      "y": 288.9,
+      "w": 311,
+      "h": 228,
+      "rotation": 0,
+      "attrs": {}
+    },
+    {
+      "id": "led1",
+      "type": "openhw-led",
+      "label": "LED",
+      "x": 221.70000000000002,
+      "y": 37.8,
+      "w": 38,
+      "h": 38,
+      "rotation": 0,
+      "attrs": {
+        "color": "blue"
+      }
+    },
+    {
+      "id": "led2",
+      "type": "openhw-led",
+      "label": "LED",
+      "x": 164.10000000000002,
+      "y": 37.8,
+      "w": 38,
+      "h": 38,
+      "rotation": 0,
+      "attrs": {
+        "color": "red"
+      }
+    },
+    {
+      "id": "r1",
+      "type": "openhw-resistor",
+      "label": "Resistor",
+      "x": 157.575,
+      "y": 151.2,
+      "w": 60,
+      "h": 12,
+      "rotation": 0,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "id": "r2",
+      "type": "openhw-resistor",
+      "label": "Resistor",
+      "x": 215.17499999999998,
+      "y": 151.2,
+      "w": 60,
+      "h": 12,
+      "rotation": 0,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "id": "btn1",
+      "type": "openhw-pushbutton",
+      "label": "Push Button",
+      "x": 316.79999999999995,
+      "y": 124.5,
+      "w": 68,
+      "h": 44,
+      "rotation": 0,
+      "attrs": {
+        "color": "blue",
+        "xray": "1"
+      }
+    },
+    {
+      "id": "btn2",
+      "type": "openhw-pushbutton",
+      "label": "Push Button",
+      "x": 43.2,
+      "y": 124.5,
+      "w": 68,
+      "h": 44,
+      "rotation": 0,
+      "attrs": {
+        "color": "red",
+        "xray": "1"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "w_wokwi_0",
+      "from": "led2:K",
+      "to": "uno1:gnd_1",
+      "color": "black",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "K",
+      "toLabel": "gnd_1"
+    },
+    {
+      "id": "w_wokwi_1",
+      "from": "led1:K",
+      "to": "uno1:gnd_1",
+      "color": "black",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "K",
+      "toLabel": "gnd_1"
+    },
+    {
+      "id": "w_wokwi_2",
+      "from": "btn1:1l",
+      "to": "uno1:gnd_1",
+      "color": "black",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "1l",
+      "toLabel": "gnd_1"
+    },
+    {
+      "id": "w_wokwi_3",
+      "from": "btn2:1l",
+      "to": "uno1:gnd_1",
+      "color": "black",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "1l",
+      "toLabel": "gnd_1"
+    },
+    {
+      "id": "w_wokwi_4",
+      "from": "r1:p1",
+      "to": "led2:A",
+      "color": "green",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "p1",
+      "toLabel": "A"
+    },
+    {
+      "id": "w_wokwi_5",
+      "from": "led1:A",
+      "to": "r2:p1",
+      "color": "green",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "A",
+      "toLabel": "p1"
+    },
+    {
+      "id": "w_wokwi_6",
+      "from": "r1:p2",
+      "to": "uno1:13",
+      "color": "red",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "p2",
+      "toLabel": "13"
+    },
+    {
+      "id": "w_wokwi_7",
+      "from": "r2:p2",
+      "to": "uno1:12",
+      "color": "blue",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "p2",
+      "toLabel": "12"
+    },
+    {
+      "id": "w_wokwi_8",
+      "from": "btn2:2r",
+      "to": "uno1:10",
+      "color": "green",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "2r",
+      "toLabel": "10"
+    },
+    {
+      "id": "w_wokwi_9",
+      "from": "btn1:2r",
+      "to": "uno1:11",
+      "color": "cyan",
+      "waypoints": [],
+      "isBelow": false,
+      "isSocket": false,
+      "isHidden": false,
+      "isHelp": false,
+      "fromLabel": "2r",
+      "toLabel": "11"
+    }
+  ],
+  "blocklyXml": "",
+  "blocklyGeneratedCode": "",
+  "useBlocklyCode": false,
+  "projectFiles": [
+    {
+      "id": "project/uno1/sketch.ino",
+      "path": "project/uno1/sketch.ino",
+      "name": "sketch.ino",
+      "kind": "code",
+      "boardId": "uno1",
+      "boardKind": "arduino_uno",
+      "content": "int ledb = 12;\nint ledm = 13;\n\nint btnb = 11;\nint btnm = 10;\n\nint btnstateb = 0;\nint btnstatem = 0;\n\nvoid setup()  {\n  // put  your setup code here, to run once:\n  pinMode(ledb, OUTPUT);\n  pinMode(ledm, OUTPUT);\n  pinMode(btnb, INPUT);\n  pinMode(btnm, INPUT);\n\n\n}\n\nvoid loop() {\n  // put your main code here, to run repeatedly:\n  btnstateb = digitalRead(btnb);\n  btnstatem =digitalRead(btnm);\n\n\nif(btnstateb == HIGH) {\n  digitalWrite(ledb, HIGH);\n}\nelse{\n  digitalWrite(ledb, LOW);\n}\n\nif(btnstatem == HIGH){\n  digitalWrite(ledm, HIGH);\n}\nelse{\n  digitalWrite(ledm, LOW);\n}\n\n}\n",
+      "dirty": true
+    },
+    {
+      "id": "project/uno1/library.txt",
+      "path": "project/uno1/library.txt",
+      "name": "library.txt",
+      "kind": "code",
+      "boardId": "uno1",
+      "boardKind": "arduino_uno",
+      "content": "Adafruit MCP23017 Arduino Library\nSparkFun MAX3010x Pulse and Proximity Sensor Library\nAdafruit GFX Library\nAdafruit TSC2007\nLiquidCrystal I2C\nServo\n107-Arduino-24LCxx\nAdafruit NeoPixel\nAdafruit LiquidCrystal\nAdafruit STMPE610\nAdafruit SSD1306\nAdafruit SH110X\nAdafruit BusIO\n107-Arduino-Servo-RP2040\nAdafruit ILI9341\nAdafruit TouchScreen",
+      "dirty": false
+    }
+  ],
+  "openCodeTabs": [
+    "project/uno1/sketch.ino"
+  ],
+  "activeCodeFileId": "project/uno1/sketch.ino",
+  "code": "int ledb = 12;\nint ledm = 13;\n\nint btnb = 11;\nint btnm = 10;\n\nint btnstateb = 0;\nint btnstatem = 0;\n\nvoid setup()  {\n  // put  your setup code here, to run once:\n  pinMode(ledb, OUTPUT);\n  pinMode(ledm, OUTPUT);\n  pinMode(btnb, INPUT);\n  pinMode(btnm, INPUT);\n\n\n}\n\nvoid loop() {\n  // put your main code here, to run repeatedly:\n  btnstateb = digitalRead(btnb);\n  btnstatem =digitalRead(btnm);\n\n\nif(btnstateb == HIGH) {\n  digitalWrite(ledb, HIGH);\n}\nelse{\n  digitalWrite(ledb, LOW);\n}\n\nif(btnstatem == HIGH){\n  digitalWrite(ledm, HIGH);\n}\nelse{\n  digitalWrite(ledm, LOW);\n}\n\n}\n",
+  "name": "Wokwi Project by Anonymous maker",
+  "exportedAt": "2026-05-18T07:53:32.355Z"
+}

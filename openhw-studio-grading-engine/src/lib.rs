@@ -1071,9 +1071,9 @@ fn check_overlaps(components: &[Component]) -> i32 {
 
 fn get_pin_offsets(kind: &str) -> Vec<(f32, f32)> {
     match kind {
-        "wokwi-led" => vec![(0.0, 0.0), (15.0, 0.0)], // Approximate relative to anchor
-        "wokwi-resistor" => vec![(0.0, 0.0), (75.0, 0.0)], // Assuming standard 5-hole span
-        "wokwi-pushbutton" => vec![(0.0, 0.0), (0.0, 15.0), (15.0, 0.0), (15.0, 15.0)],
+        "openhw-led" => vec![(0.0, 0.0), (15.0, 0.0)], // Approximate relative to anchor
+        "openhw-resistor" => vec![(0.0, 0.0), (75.0, 0.0)], // Assuming standard 5-hole span
+        "openhw-pushbutton" => vec![(0.0, 0.0), (0.0, 15.0), (15.0, 0.0), (15.0, 15.0)],
         _ => vec![(0.0, 0.0)], // Default to origin
     }
 }
@@ -1121,7 +1121,7 @@ fn validate_breadboard_snapping(components: &[Component], is_teacher: bool) -> (
         if pins_on_holes == 0 {
             // If it's not on a breadboard at all, we don't necessarily penalize 
             // unless it's a component that MUST be (like an LED).
-            if comp.kind == "wokwi-led" || comp.kind == "wokwi-resistor" {
+            if comp.kind == "openhw-led" || comp.kind == "openhw-resistor" {
                 score -= 10;
                 let msg = if is_teacher {
                     format!("Teacher Alert: {} is not snapped to any breadboard hole.", comp.id)

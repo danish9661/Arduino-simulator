@@ -1,0 +1,63 @@
+{
+    "type": "wokwi-ili9341",
+    "label": "ILI9341 2.8\" TFT LCD",
+    "group": "Displays",
+    "w": 234.9,
+    "h": 352.3,
+    "pins": [
+        {
+            "id": "VCC",
+            "x": 58.7,
+            "y": 345,
+            "type": "power"
+        },
+        {
+            "id": "GND",
+            "x": 73.4,
+            "y": 345,
+            "type": "power"
+        },
+        {
+            "id": "CS",
+            "x": 88.1,
+            "y": 345,
+            "type": "digital"
+        },
+        {
+            "id": "RESET",
+            "x": 102.8,
+            "y": 345,
+            "type": "digital"
+        },
+        {
+            "id": "DC",
+            "x": 118.7,
+            "y": 345,
+            "type": "digital"
+        },
+        {
+            "id": "MOSI",
+            "x": 133.7,
+            "y": 345,
+            "type": "digital"
+        },
+        {
+            "id": "SCK",
+            "x": 148.8,
+            "y": 345,
+            "type": "digital"
+        },
+        {
+            "id": "LED",
+            "x": 163.5,
+            "y": 345,
+            "type": "digital"
+        },
+        {
+            "id": "MISO",
+            "x": 178.2,
+            "y": 345,
+            "type": "digital"
+        }
+    ]
+}

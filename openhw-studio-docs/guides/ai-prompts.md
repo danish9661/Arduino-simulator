@@ -1,4 +1,6 @@
-﻿# AI AGENT PROMPT: OpenHW Studio Component Generator
+<div v-pre>
+
+# AI AGENT PROMPT: OpenHW Studio Component Generator
 
 **ACT AS**: A Senior Embedded Systems & Full-Stack Engineer.
 **YOUR TASK**: Generate a fully functional custom component for the OpenHW Studio simulator based on the technical specification provided below.
@@ -784,3 +786,4 @@ To make components reusable across Arduino Uno, ESP32, RP2040/Pico, and STM32 fa
 To add a floating context menu with configurable properties, see [Section 5A](#5a-context-menus-component-configuration-ui-new).
 
 
+</div>

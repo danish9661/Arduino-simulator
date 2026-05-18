@@ -1,0 +1,53 @@
+{
+    "type": "logic-d-flipflop-dsr",
+    "label": "D Flip-Flop (Set/Reset)",
+    "description": "Edge-triggered D Flip-Flop with active-HIGH asynchronous Set and Reset.",
+    "group": "Logic",
+    "w": 142.5,
+    "h": 126.7,
+    "attrs": {},
+    "pins": [
+        {
+            "id": "D",
+            "x": 0,
+            "y": 34.8,
+            "type": "digital",
+            "description": "Data input"
+        },
+        {
+            "id": "CLK",
+            "x": 0,
+            "y": 93.9,
+            "type": "digital",
+            "description": "Clock input (rising-edge triggered)"
+        },
+        {
+            "id": "S",
+            "x": 74.3,
+            "y": -10.9,
+            "type": "digital",
+            "description": "Asynchronous Set (Active HIGH forces Q=1)"
+        },
+        {
+            "id": "R",
+            "x": 74.7,
+            "y": 125.2,
+            "type": "digital",
+            "description": "Asynchronous Reset (Active HIGH forces Q=0)"
+        },
+        {
+            "id": "Q",
+            "x": 150.9,
+            "y": 34.8,
+            "type": "digital",
+            "description": "Output"
+        },
+        {
+            "id": "Qbar",
+            "x": 149.9,
+            "y": 94.3,
+            "type": "digital",
+            "description": "Inverted output"
+        }
+    ]
+}

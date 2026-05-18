@@ -13,7 +13,7 @@ const proj = 'temp/tests/uno_pico.json';
 if (fs.existsSync(proj)) fs.unlinkSync(proj);
 
 run(runCli + ' project init ' + proj + ' --name "UNO-PICO" --board arduino_uno');
-run(runCli + ' project add-component ' + proj + ' --type wokwi-raspberry-pi-pico --id board2');
+run(runCli + ' project add-component ' + proj + ' --type openhw-raspberry-pi-pico --id board2');
 
 run(runCli + ' project connect ' + proj + ' --from board1:1 --to board2:GP1');
 run(runCli + ' project connect ' + proj + ' --from board1:0 --to board2:GP0');

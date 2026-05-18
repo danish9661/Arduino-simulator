@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-const DOCS_URL = import.meta.env.VITE_DOCS_URL || 'https://danish9661.github.io/Arduino-simulator/';
+const DOCS_URL = import.meta.env.VITE_DOCS_URL || 'https://openhw-studio.fossee.in/docs/';
 
 import { Btn } from './Btn';
 import AutofixPreviewPanel from '../../components/AutofixPreviewPanel.jsx';
@@ -185,7 +185,7 @@ function TopToolboxInternal(props) {
   const TITLE_WIDTH = '180px'; // Adjust this to change the project title area width
   // -----------------
 
-  const { board, setBoard, isRunning, isPaused, handleRun, handlePause, handleResume, handleStop, isCompiling, assessmentMode, assessmentProjectName, isSubmittingAssessment, handleAssessmentSubmit, undo, redo, selected, rotateComponent, theme, toggleTheme, showViewPanel, setShowViewPanel, viewPanelSection, setViewPanelSection, schematicDataUrl, setSchematicDataUrl, schematicLoading, setSchematicLoading, downloadSchematicPng, downloadSchematicPdf, generateSchematic, downloadCompCsv, importFileRef, downloadPng, importPng, downloadSimulationJson, handleSave, isExporting, handleShareSimulation, isSharingSimulation, refreshProjectList, showProjectsDropdown, setShowProjectsDropdown, handleNewProject, handleStartRename, handleConfirmRename, renamingProjectId, setRenamingProjectId, renameValue, setRenameValue, handleLoadProject, handleDeleteProject, handleBackupWorkflow, backupRestoreInputRef, handleRestoreWorkflow, handleSyncToCloud, user, isAuthenticated, myProjects, currentProjectId, projectName: projectNameProp, formatProjectDate, saveHistory, setWires, setComponents, setSelected, history, components, wires, webSerialSupported, hardwareBoards, hardwareBoardId, setHardwareBoardId, hardwarePortPath, setHardwarePortPath, resolvedHardwarePort, hardwareAvailablePorts, showAllHardwarePorts, setShowAllHardwarePorts, refreshHardwarePorts, isLoadingHardwarePorts, hardwareBaudRate, setHardwareBaudRate, hardwareResetMethod, setHardwareResetMethod, connectHardwareSerial, disconnectHardwareSerial, uploadToHardware, hardwareConnected, hardwareConnecting, isUploadingHardware, hardwareStatus, setShowProjectsSidebar, setProjectsSidebarTab, editingDisabled = false, validationErrors = [], autofixPlan, autofixStatus, autofixLog, onApplyPlan, onRefresh, autoWiringEnabled, setAutoWiringEnabled, autoBreadboardEnabled, setAutoBreadboardEnabled, autoCodingEnabled, setAutoCodingEnabled, showAutofix, setShowAutofix, showShortcuts, setShowShortcuts } = props;
+  const { board, setBoard, isRunning, isPaused, handleRun, handlePause, handleResume, handleStop, isCompiling, assessmentMode, assessmentProjectName, isSubmittingAssessment, handleAssessmentSubmit, undo, redo, selected, rotateComponent, theme, toggleTheme, showViewPanel, setShowViewPanel, viewPanelSection, setViewPanelSection, schematicDataUrl, setSchematicDataUrl, schematicLoading, setSchematicLoading, downloadSchematicPng, downloadSchematicPdf, generateSchematic, downloadCompCsv, importFileRef, downloadPng, importPng, downloadSimulationJson, handleSave, isExporting, handleShareSimulation, isSharingSimulation, refreshProjectList, showProjectsDropdown, setShowProjectsDropdown, handleNewProject, handleStartRename, handleConfirmRename, renamingProjectId, setRenamingProjectId, renameValue, setRenameValue, handleLoadProject, handleDeleteProject, handleBackupWorkflow, backupRestoreInputRef, wokwiImportInputRef, handleImportWokwiZip, handleRestoreWorkflow, handleSyncToCloud, user, isAuthenticated, myProjects, currentProjectId, projectName: projectNameProp, formatProjectDate, saveHistory, setWires, setComponents, setSelected, history, components, wires, webSerialSupported, hardwareBoards, hardwareBoardId, setHardwareBoardId, hardwarePortPath, setHardwarePortPath, resolvedHardwarePort, hardwareAvailablePorts, showAllHardwarePorts, setShowAllHardwarePorts, refreshHardwarePorts, isLoadingHardwarePorts, hardwareBaudRate, setHardwareBaudRate, hardwareResetMethod, setHardwareResetMethod, connectHardwareSerial, disconnectHardwareSerial, uploadToHardware, hardwareConnected, hardwareConnecting, isUploadingHardware, hardwareStatus, setShowProjectsSidebar, setProjectsSidebarTab, editingDisabled = false, validationErrors = [], autofixPlan, autofixStatus, autofixLog, onApplyPlan, onRefresh, autoWiringEnabled, setAutoWiringEnabled, autoBreadboardEnabled, setAutoBreadboardEnabled, autoCodingEnabled, setAutoCodingEnabled, showAutofix, setShowAutofix, showShortcuts, setShowShortcuts, onStartTour } = props;
   const navigate = useNavigate();
 
 
@@ -266,6 +266,7 @@ function TopToolboxInternal(props) {
   ];
 
   const helpMenuItems = [
+    { label: 'Start Tour', onClick: onStartTour },
     { label: 'Documentation', onClick: () => window.open(DOCS_URL, '_blank') },
     { label: 'Keyboard Shortcuts', shortcut: 'H', onClick: () => setShowShortcuts(true) },
     { 
@@ -632,6 +633,7 @@ function TopToolboxInternal(props) {
         {/* Hidden file inputs */}
         <input ref={importFileRef} type="file" accept=".png,image/png,.json,application/json" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) importPng(e.target.files[0]); }} />
         <input ref={backupRestoreInputRef} type="file" accept=".zip" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) { handleRestoreWorkflow(e.target.files[0]); e.target.value = ''; } }} />
+        <input ref={wokwiImportInputRef} type="file" accept=".zip" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) { handleImportWokwiZip(e.target.files[0]); e.target.value = ''; } }} />
 
         {user?.role && user.role !== 'student' && (
           <Btn
@@ -777,24 +779,25 @@ function TopToolboxInternal(props) {
               { key: '⌘ + S', desc: 'Save Project' },
               { key: '⌘ + O', desc: 'Toggle Projects' },
               { key: '⌘ + Alt + N', desc: 'New Project' },
-              { key: 'H', desc: 'Toggle Shortcuts Help' },
+              { key: 'Alt + H', desc: 'Toggle Shortcuts Help' },
             ]},
             { group: 'Edit', shortcuts: [
               { key: '⌘ + Z', desc: 'Undo' },
               { key: '⌘ + Y', desc: 'Redo' },
               { key: 'Del / Backspace', desc: 'Delete Selected' },
-              { key: 'R', desc: 'Rotate Component' },
+              { key: 'Alt + ⇧ + R', desc: 'Rotate Component' },
             ]},
             { group: 'View & Panels', shortcuts: [
-              { key: '+ / -', desc: 'Zoom In / Out' },
-              { key: '0', desc: 'Reset Zoom' },
-              { key: 'V', desc: 'Toggle Right Panel' },
+              { key: 'Alt + (+ / -)', desc: 'Zoom In / Out' },
+              { key: 'Alt + 0', desc: 'Reset Zoom' },
+              { key: 'Alt + V', desc: 'Toggle Right Panel' },
               { key: '⌘ + B', desc: 'Toggle Console' },
               { key: 'Alt + C', desc: 'Open Code Panel' },
+              { key: 'Alt + E', desc: 'Toggle Code Explorer' },
               { key: 'Alt + S', desc: 'Open Serial Panel' },
               { key: '⌘ + G', desc: 'Toggle Grid' },
               { key: '⌘ + L', desc: 'Toggle Canvas Lock' },
-              { key: 'F', desc: 'Fit to View' },
+              { key: 'Alt + F', desc: 'Fit to View' },
               { key: 'Alt + T', desc: 'Wires Top / Bottom' },
               { key: '⌘ + ⇧ + Del', desc: 'Clear Canvas' },
             ]},

@@ -1,0 +1,72 @@
+{
+    "attrs": {
+        "pixels": "16"
+    },
+    "default": {
+        "type": "wokwi-neopixel-ring",
+        "label": "NeoPixel Ring",
+        "group": "Outputs",
+        "w": 80,
+        "h": 80,
+        "attrs": {
+            "pixels": "16"
+        },
+        "pins": [
+            {
+                "id": "VDD",
+                "x": 10,
+                "y": 80,
+                "type": "power"
+            },
+            {
+                "id": "VSS",
+                "x": 30,
+                "y": 80,
+                "type": "power"
+            },
+            {
+                "id": "DIN",
+                "x": 50,
+                "y": 80,
+                "type": "digital"
+            },
+            {
+                "id": "DOUT",
+                "x": 70,
+                "y": 80,
+                "type": "digital"
+            }
+        ]
+    },
+    "group": "Outputs",
+    "h": 63.3,
+    "label": "NeoPixel Ring",
+    "pins": [
+        {
+            "id": "VDD",
+            "x": 7.9,
+            "y": 63.3,
+            "type": "power"
+        },
+        {
+            "id": "VSS",
+            "x": 23.8,
+            "y": 63.3,
+            "type": "power"
+        },
+        {
+            "id": "DIN",
+            "x": 38.6,
+            "y": 63.3,
+            "type": "digital"
+        },
+        {
+            "id": "DOUT",
+            "x": 53.4,
+            "y": 63.3,
+            "type": "digital"
+        }
+    ],
+    "type": "wokwi-neopixel-ring",
+    "w": 63.3
+}

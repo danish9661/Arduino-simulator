@@ -1,0 +1,32 @@
+{
+    "type": "logic-nor-gate",
+    "label": "NOR Gate",
+    "description": "Logical NOR gate. Outputs high only when both inputs are low.",
+    "group": "Logic",
+    "w": 105,
+    "h": 75,
+    "attrs": {},
+    "pins": [
+        {
+            "id": "IN1",
+            "x": 0,
+            "y": 22.5,
+            "type": "digital",
+            "description": "Input 1"
+        },
+        {
+            "id": "IN2",
+            "x": 0,
+            "y": 52.5,
+            "type": "digital",
+            "description": "Input 2"
+        },
+        {
+            "id": "OUT",
+            "x": 105,
+            "y": 37.5,
+            "type": "digital",
+            "description": "Output"
+        }
+    ]
+}

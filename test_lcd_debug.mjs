@@ -11,8 +11,8 @@ const proj = 'temp/tests/pico_lcd_debug.json';
 if (fs.existsSync(proj)) fs.unlinkSync(proj);
 
 console.log('[TEST] Creating Pico + LCD2004 project...');
-execSync(runCli + ' project init ' + proj + ' --name "Pico LCD Debug" --board wokwi-raspberry-pi-pico', { stdio: 'inherit' });
-execSync(runCli + ' project add-component ' + proj + ' --type wokwi-lcd-20x4 --id lcd1', { stdio: 'inherit' });
+execSync(runCli + ' project init ' + proj + ' --name "Pico LCD Debug" --board openhw-raspberry-pi-pico', { stdio: 'inherit' });
+execSync(runCli + ' project add-component ' + proj + ' --type openhw-lcd-20x4 --id lcd1', { stdio: 'inherit' });
 execSync(runCli + ' project connect ' + proj + ' --from board1:4 --to lcd1:SDA', { stdio: 'inherit' });
 execSync(runCli + ' project connect ' + proj + ' --from board1:5 --to lcd1:SCL', { stdio: 'inherit' });
 

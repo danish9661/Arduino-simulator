@@ -245,7 +245,7 @@ impl Engine {
                             target_rule_id: rule.to_string(),
                             added_components: vec![JsComponent {
                                 id: res_id.clone(),
-                                kind: "wokwi-resistor".to_string(),
+                                kind: "openhw-resistor".to_string(),
                                 x: res_x,
                                 y: res_y,
                                 rotation: 0.0,
@@ -333,7 +333,7 @@ impl Engine {
                             
                             plan.added_components.push(JsComponent {
                                 id: res_id.clone(),
-                                kind: "wokwi-resistor".to_string(),
+                                kind: "openhw-resistor".to_string(),
                                 x: res_x,
                                 y: res_y,
                                 rotation: 90.0,
@@ -396,11 +396,11 @@ impl Engine {
                             let r2_id = format!("vd2_{}", comp_id);
                             
                             plan.added_components.push(JsComponent {
-                                id: r1_id.clone(), kind: "wokwi-resistor".to_string(),
+                                id: r1_id.clone(), kind: "openhw-resistor".to_string(),
                                 x: comp.x - 100.0, y: comp.y - 40.0, rotation: 0.0,
                             });
                             plan.added_components.push(JsComponent {
-                                id: r2_id.clone(), kind: "wokwi-resistor".to_string(),
+                                id: r2_id.clone(), kind: "openhw-resistor".to_string(),
                                 x: comp.x - 100.0, y: comp.y + 40.0, rotation: 90.0,
                             });
 
@@ -487,7 +487,7 @@ impl Engine {
                             let sh_id = format!("ls_{}", comp_id);
                             plan.removed_wires.push(JsWireShort { from: w.from, to: w.to });
                             plan.added_components.push(JsComponent {
-                                id: sh_id.clone(), kind: "wokwi-logic-level-shifter".to_string(),
+                                id: sh_id.clone(), kind: "openhw-logic-level-shifter".to_string(),
                                 x: comp.x - 60.0, y: comp.y + 120.0, rotation: 0.0,
                             });
                             plan.added_wires.push(JsWire {
@@ -771,15 +771,15 @@ impl Engine {
         let mut dx: f64 = 20.0;
         let mut dy: f64 = 20.0;
 
-        if comp.kind == "wokwi-resistor" {
+        if comp.kind == "wokwi-resistor" || comp.kind == "openhw-resistor" {
             dy = 16.0;
             if pin_name == "1" { dx = 0.0; }
             else if pin_name == "2" { dx = 70.0; }
-        } else if comp.kind == "wokwi-led" {
+        } else if comp.kind == "wokwi-led" || comp.kind == "openhw-led" {
             dy = 22.0;
             if pin_name == "A" { dx = 0.0; }
             else if pin_name == "K" { dx = 72.0; }
-        } else if comp.kind == "wokwi-potentiometer" {
+        } else if comp.kind == "wokwi-potentiometer" || comp.kind == "openhw-potentiometer" {
             dy = 68.0;
             if pin_name == "1" { dx = 15.0; }
             else if pin_name == "SIG" { dx = 30.0; }

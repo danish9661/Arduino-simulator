@@ -1,0 +1,106 @@
+{
+    "type": "wokwi-a4988",
+    "label": "A4988 Stepper Driver",
+    "group": "Actuators",
+    "w": 120,
+    "h": 75,
+    "attrs": {},
+    "pins": [
+        {
+            "id": "ENABLE",
+            "x": 105,
+            "y": 7.5,
+            "type": "digital"
+        },
+        {
+            "id": "MS1",
+            "x": 90,
+            "y": 7.5,
+            "type": "digital"
+        },
+        {
+            "id": "MS2",
+            "x": 75,
+            "y": 7.5,
+            "type": "digital"
+        },
+        {
+            "id": "MS3",
+            "x": 60,
+            "y": 7.5,
+            "type": "digital"
+        },
+        {
+            "id": "RESET",
+            "x": 45,
+            "y": 7.5,
+            "type": "digital"
+        },
+        {
+            "id": "SLEEP",
+            "x": 30,
+            "y": 7.5,
+            "type": "digital"
+        },
+        {
+            "id": "STEP",
+            "x": 15,
+            "y": 7.5,
+            "type": "digital"
+        },
+        {
+            "id": "DIR",
+            "x": 0,
+            "y": 7.5,
+            "type": "digital"
+        },
+        {
+            "id": "VMOT",
+            "x": 105,
+            "y": 67.5,
+            "type": "power"
+        },
+        {
+            "id": "GND_MOT",
+            "x": 90,
+            "y": 67.5,
+            "type": "power"
+        },
+        {
+            "id": "2B",
+            "x": 75,
+            "y": 67.5,
+            "type": "digital"
+        },
+        {
+            "id": "2A",
+            "x": 60,
+            "y": 67.5,
+            "type": "digital"
+        },
+        {
+            "id": "1A",
+            "x": 45,
+            "y": 67.5,
+            "type": "digital"
+        },
+        {
+            "id": "1B",
+            "x": 29.8,
+            "y": 67.1,
+            "type": "digital"
+        },
+        {
+            "id": "VDD",
+            "x": 15,
+            "y": 67.5,
+            "type": "power"
+        },
+        {
+            "id": "GND_LOGIC",
+            "x": 0,
+            "y": 67.5,
+            "type": "power"
+        }
+    ]
+}

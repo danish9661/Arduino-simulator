@@ -1,0 +1,27 @@
+{
+    "type": "wokwi-battery",
+    "label": "Li-ion Battery",
+    "description": "3.7V rechargeable Lithium-ion battery. Simulates real-time discharge and voltage curves.",
+    "group": "Power",
+    "pins": [
+        {
+            "id": "VCC",
+            "label": "+",
+            "x": 0,
+            "y": 10.8
+        },
+        {
+            "id": "GND",
+            "label": "-",
+            "x": 0,
+            "y": 40.5
+        }
+    ],
+    "attrs": {
+        "capacityMah": "2000",
+        "currentChargeMah": "2000",
+        "nominalVoltage": "3.7"
+    },
+    "w": 128.3,
+    "h": 128.3
+}

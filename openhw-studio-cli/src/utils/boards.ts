@@ -41,14 +41,14 @@ export function resolveBoardFqbn(typeOrKind: string): string {
 export function defaultBoardTypeForKind(kind: BoardKind): string {
   switch (kind) {
     case 'rp2040':
-      return 'wokwi-raspberry-pi-pico';
+      return 'openhw-pico';
     case 'esp32':
-      return 'wokwi-esp32-devkit-v1';
+      return 'openhw-esp32-devkit';
     case 'stm32':
-      return 'wokwi-stm32-blue-pill';
+      return 'openhw-stm32';
     case 'arduino_uno':
     default:
-      return 'wokwi-arduino-uno';
+      return 'openhw-arduino-uno';
   }
 }
 

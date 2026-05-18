@@ -1189,6 +1189,7 @@ export async function startSimulation(
     boardTypes,
     stop,
     sendSerial,
+    sendComponentEvent,
     getSnapshot,
     getTelemetryReport,
     getRichTelemetrySnapshot: (options: { mode?: 'standard' | 'deep' | 'delta' } = {}) => {

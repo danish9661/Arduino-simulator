@@ -248,7 +248,7 @@ async function main() {
 
     const initPayload = await callTool(client, 'project_init', {
       name: runName,
-      board: 'wokwi-raspberry-pi-pico',
+      board: 'openhw-raspberry-pi-pico',
       ...(token ? { token } : {}),
     });
 
@@ -259,7 +259,7 @@ async function main() {
     let offset = 0;
 
     for (const type of componentTypes) {
-      if (/(wokwi-arduino|wokwi-esp32|wokwi-stm32|wokwi-raspberry-pi-pico)/i.test(type)) {
+      if (/(openhw-arduino|openhw-esp32|openhw-stm32|openhw-raspberry-pi-pico)/i.test(type)) {
         continue;
       }
 

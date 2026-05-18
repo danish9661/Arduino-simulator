@@ -1,4 +1,4 @@
-﻿# OpenHW Studio - Keyboard Shortcuts
+# OpenHW Studio - Keyboard Shortcuts
 
 This document lists all the global keyboard shortcuts integrated into the simulator.
 
@@ -12,13 +12,14 @@ This document lists all the global keyboard shortcuts integrated into the simula
 | **⌘ + Alt + N** | New Project |
 | **⌘ + B** | Toggle Simulation Console |
 | **Alt + C** | Open Code Panel |
+| **Alt + E** | Toggle Code Explorer |
 | **Alt + S** | Open Serial Panel |
 | **⌘ + G** | Toggle Grid |
 | **⌘ + L** | Toggle Canvas Lock |
-| **F** | Fit to View |
+| **Alt + F** | Fit to View |
 | **Alt + T** | Move Wires to Top / Bottom |
 | **⌘ + Shift + Delete** | Clear Canvas (Delete All) |
-| **H** | Toggle Keyboard Shortcuts Panel |
+| **Alt + H** | Toggle Keyboard Shortcuts Panel |
 | **F1** | Toggle Command Palette |
 
 ## Editing
@@ -27,15 +28,15 @@ This document lists all the global keyboard shortcuts integrated into the simula
 | **⌘ + Z** | Undo |
 | **⌘ + Y** | Redo |
 | **Delete** or **Backspace** | Delete Selected Component / Wire |
-| **R** | Rotate Selected Component |
+| **Alt + Shift + R** | Rotate Selected Component |
 
 ## View
 | Shortcut | Action |
 |----------|--------|
-| **+** or **=** | Zoom In |
-| **-** or **_** | Zoom Out |
-| **0** | Reset Zoom & Pan |
-| **V** | Toggle View Panel (Schematic/Layout) |
+| **Alt + (+)** or **Alt + (=)** | Zoom In |
+| **Alt + (-)** or **Alt + (_)** | Zoom Out |
+| **Alt + 0** | Reset Zoom & Pan |
+| **Alt + V** | Toggle Right Panel |
 
 ---
 *Note: Some shortcuts (like Ctrl+S) work globally even if an input is focused. Most others require the main canvas area to be active.*

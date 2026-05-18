@@ -131,7 +131,7 @@ function appendComponentSpecificTemplates(templates: ComponentInputTemplate[], m
     return;
   }
 
-  if (type.includes('wokwi-sd-card')) {
+  if (type.includes('openhw-sd-card')) {
     const sdTemplates: ComponentInputTemplate[] = [
       { type: 'SD_MOUNT' },
       { type: 'SD_UNMOUNT' },

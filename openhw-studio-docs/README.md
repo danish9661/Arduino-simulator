@@ -41,3 +41,4 @@ This portal is configured for **unified deployment** with the [OpenHW Studio Fro
 
 ---
 © 2024-present OpenHW Studio Team
+

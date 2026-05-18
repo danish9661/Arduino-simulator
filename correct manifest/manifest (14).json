@@ -1,0 +1,28 @@
+{
+    "type": "wokwi-npn-transistor",
+    "label": "NPN Transistor",
+    "group": "Basic",
+    "w": 57,
+    "h": 95,
+    "attrs": {},
+    "pins": [
+        {
+            "id": "E",
+            "x": 0,
+            "y": 95,
+            "type": "digital"
+        },
+        {
+            "id": "B",
+            "x": 29.5,
+            "y": 95,
+            "type": "digital"
+        },
+        {
+            "id": "C",
+            "x": 60,
+            "y": 95,
+            "type": "digital"
+        }
+    ]
+}

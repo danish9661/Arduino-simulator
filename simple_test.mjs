@@ -13,7 +13,7 @@ const proj = 'temp/tests/uno_uno.json';
 if (fs.existsSync(proj)) fs.unlinkSync(proj);
 
 run(runCli + ' project init ' + proj + ' --name "UNO-UNO" --board arduino_uno');
-run(runCli + ' project add-component ' + proj + ' --type wokwi-arduino-uno --id board2');
+run(runCli + ' project add-component ' + proj + ' --type openhw-arduino-uno --id board2');
 run(runCli + ' project connect ' + proj + ' --from board1:1 --to board2:0');
 run(runCli + ' project connect ' + proj + ' --from board1:0 --to board2:1');
 

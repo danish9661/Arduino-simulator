@@ -39,23 +39,23 @@ export function formatValidationError(error) {
 }
 
 function makeUno(id) {
-    return { id, type: 'wokwi-arduino-uno', pins: UNO_PINS };
+    return { id, type: 'openhw-arduino-uno', pins: UNO_PINS };
 }
 
 function makeLed(id) {
-    return { id, type: 'wokwi-led', pins: LED_PINS };
+    return { id, type: 'openhw-led', pins: LED_PINS };
 }
 
 function makeResistor(id, value = '220') {
-    return { id, type: 'wokwi-resistor', pins: RES_PINS, attrs: { value } };
+    return { id, type: 'openhw-resistor', pins: RES_PINS, attrs: { value } };
 }
 
 function makePowerSupply(id, voltage = 5) {
-    return { id, type: 'wokwi-power-supply', pins: POWER_SUPPLY_PINS, attrs: { voltage } };
+    return { id, type: 'openhw-power-supply', pins: POWER_SUPPLY_PINS, attrs: { voltage } };
 }
 
 function makePushbutton(id) {
-    return { id, type: 'wokwi-pushbutton', pins: PUSHBUTTON_PINS };
+    return { id, type: 'openhw-pushbutton', pins: PUSHBUTTON_PINS };
 }
 
 function makeDemoSensor(id, severity = 'warn') {
@@ -141,12 +141,12 @@ export const validationCases = [
         expectMessageIncludes: 'Unsupported pin-to-pin drive',
         project: {
             components: [
-                makeUno('wokwi-arduino-uno_2'),
-                makeLed('wokwi-led_4'),
+                makeUno('openhw-arduino-uno_2'),
+                makeLed('openhw-led_4'),
             ],
             connections: [
-                { from: 'wokwi-arduino-uno_2.13', to: 'wokwi-led_4.A' },
-                { from: 'wokwi-led_4.K', to: 'wokwi-arduino-uno_2.10' },
+                { from: 'openhw-arduino-uno_2.13', to: 'openhw-led_4.A' },
+                { from: 'openhw-led_4.K', to: 'openhw-arduino-uno_2.10' },
             ],
         },
     },
@@ -238,7 +238,7 @@ export const validationCases = [
             components: [
                 {
                     id: 'pb_1',
-                    type: 'wokwi-pushbutton',
+                    type: 'openhw-pushbutton',
                     pins: PUSHBUTTON_PINS,
                     validation: {
                         rules: [
@@ -284,4 +284,74 @@ export const validationCases = [
             ],
         },
     },
+    {
+        name: 'colon_separator_resilience',
+        expectPass: false,
+        expectMessageIncludes: 'FATAL SHORT CIRCUIT',
+        project: {
+            components: [
+                makeUno('uno_colon'),
+            ],
+            connections: [
+                { from: 'uno_colon:5V', to: 'uno_colon:gnd' },
+            ],
+        },
+    },
+    {
+        name: 'valid_servo_wiring',
+        expectPass: true,
+        project: {
+            components: [
+                makeUno('uno1'),
+                makePowerSupply('psu', 5),
+                { id: 'openhw_servo_1', type: 'openhw-servo', pins: [
+                    { id: 'GND', type: 'power' },
+                    { id: 'V+', type: 'power' },
+                    { id: 'PWM', type: 'digital' }
+                ]}
+            ],
+            connections: [
+                { from: 'psu.gnd', to: 'uno1.gnd' },
+                { from: 'openhw_servo_1.GND', to: 'uno1.gnd' },
+                { from: 'openhw_servo_1.V+', to: 'psu.5V' },
+                { from: 'openhw_servo_1.PWM', to: 'uno1.6' }
+            ],
+        },
+    },
+    {
+        name: 'valid_i2c_pullup',
+        expectPass: true,
+        project: {
+            components: [
+                makeUno('uno1'),
+                { 
+                    id: 'oled', 
+                    type: 'openhw-ssd1306-oled',
+                    pins: [{id: 'GND'}, {id: 'VCC'}, {id: 'SCL'}, {id: 'SDA'}]
+                },
+                { 
+                    id: 'r1', 
+                    type: 'openhw-resistor', 
+                    attrs: { value: '4700' },
+                    pins: [{id: 'p1'}, {id: 'p2'}]
+                },
+                { 
+                    id: 'r2', 
+                    type: 'openhw-resistor', 
+                    attrs: { value: '4700' },
+                    pins: [{id: 'p1'}, {id: 'p2'}]
+                }
+            ],
+            connections: [
+                { from: 'uno1.A4', to: 'oled.SDA' },
+                { from: 'uno1.A5', to: 'oled.SCL' },
+                { from: 'uno1.A4', to: 'r1.p1' },
+                { from: 'r1.p2', to: 'uno1.5V' },
+                { from: 'uno1.A5', to: 'r2.p1' },
+                { from: 'r2.p2', to: 'uno1.5V' },
+                { from: 'uno1.GND', to: 'oled.GND' },
+                { from: 'uno1.5V', to: 'oled.VCC' }
+            ]
+        }
+    }
 ];

@@ -1,0 +1,27 @@
+{
+    "type": "wokwi-power-supply",
+    "label": "Power Supply",
+    "description": "Provides a stable regulated DC voltage to the circuit. Configurable output (3.3 V / 5 V / custom). Use as a standalone power source without the Arduino.",
+    "group": "Basic",
+    "w": 84.7,
+    "h": 84.7,
+    "attrs": {
+        "voltage": "5.0"
+    },
+    "pins": [
+        {
+            "id": "5V",
+            "x": 84.7,
+            "y": 23.3,
+            "type": "power",
+            "description": "Power"
+        },
+        {
+            "id": "GND",
+            "x": 84.7,
+            "y": 67.6,
+            "type": "power",
+            "description": "Ground"
+        }
+    ]
+}

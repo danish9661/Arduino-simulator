@@ -238,7 +238,7 @@ async function listComponentCatalog() {
     if (!entry.isDirectory()) continue;
     const type = String(entry.name || '').trim();
     if (!type) continue;
-    if (/(wokwi-arduino|wokwi-esp32|wokwi-stm32|wokwi-raspberry-pi-pico)/i.test(type)) continue;
+    if (/(openhw-arduino|openhw-esp32|openhw-stm32|openhw-raspberry-pi-pico)/i.test(type)) continue;
 
     const manifestPath = path.join(emulatorComponentsRoot, type, 'manifest.json');
     try {
@@ -269,7 +269,7 @@ function readTelemetryComponents(payload) {
 async function runSingleCase(client, component, envConfig) {
   const initPayload = await callTool(client, 'project_init', {
     name: `pico-${envConfig.key}-${component.type}-${Date.now()}`,
-    board: 'wokwi-raspberry-pi-pico',
+    board: 'openhw-raspberry-pi-pico',
     ...(token ? { token } : {}),
   });
   const projectFile = await resolveProjectPathFromMcp(initPayload.file);

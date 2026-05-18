@@ -3,9 +3,10 @@ import * as emulatorComponents from '../components/index.js'; // Note typescript
 import { inferValidationRemediation } from '../components/component-schema.js';
 
 export class FullCircuitValidator {
-    constructor(projectData = {}) {
+    constructor(projectData = {}, options = {}) {
         this.components = Array.isArray(projectData.components) ? projectData.components : [];
         this.connections = Array.isArray(projectData.connections) ? projectData.connections : [];
+        this.registry = options.registry || null;
         this.graph = this.buildGraph(this.connections);
         this.resetValidationState();
         this.lastRunMeta = {
@@ -30,12 +31,19 @@ export class FullCircuitValidator {
 
         this.componentSpecs = {
             'wokwi-resistor': { maxPowerW: 0.25 },
+            'openhw-resistor': { maxPowerW: 0.25 },
             'wokwi-potentiometer': { maxPowerW: 0.25, totalResistance: 10000 },
+            'openhw-potentiometer': { maxPowerW: 0.25, totalResistance: 10000 },
             'wokwi-slide-potentiometer': { maxPowerW: 0.25, totalResistance: 10000 },
+            'openhw-slide-potentiometer': { maxPowerW: 0.25, totalResistance: 10000 },
             'wokwi-led': { forwardVoltage: 2.0, maxCurrentA: 0.02, reverseBreakdownVoltage: 5.0 },
+            'openhw-led': { forwardVoltage: 2.0, maxCurrentA: 0.02, reverseBreakdownVoltage: 5.0 },
             'wokwi-buzzer': { typicalCurrentA: 0.03 },
+            'openhw-buzzer': { typicalCurrentA: 0.03 },
             'wokwi-motor': { typicalCurrentA: 0.25 },
+            'openhw-motor': { typicalCurrentA: 0.25 },
             'wokwi-servo': { typicalCurrentA: 0.5 },
+            'openhw-servo': { typicalCurrentA: 0.5 },
         };
     }
 
@@ -48,12 +56,16 @@ export class FullCircuitValidator {
             graph.get(nodeA).push(nodeB);
             graph.get(nodeB).push(nodeA);
         };
-        connections.forEach(conn => addEdge(conn.from, conn.to));
+        connections.forEach(conn => {
+            const from = String(conn.from || '').replace(':', '.');
+            const to = String(conn.to || '').replace(':', '.');
+            addEdge(from, to);
+        });
         return graph;
     }
 
     getComponent(nodeId) {
-        const [compId] = nodeId.split(".");
+        const [compId] = String(nodeId || '').split(/[\.:]/);
         return this.components.find(c => c.id === compId);
     }
 
@@ -190,7 +202,7 @@ export class FullCircuitValidator {
     }
 
     getComponentIdFromNode(nodeId) {
-        return String(nodeId || '').split('.')[0] || '';
+        return String(nodeId || '').split(/[\.:]/)[0] || '';
     }
 
     getDirtyComponentIds(previousFingerprint, nextFingerprint) {
@@ -313,13 +325,15 @@ export class FullCircuitValidator {
             return null;
         }
 
+        let result = null;
+
         if (typeof entry === 'string') {
             const parsed = this.parseLegacyErrorString(entry);
             const severity = this.normalizeSeverity(parsed.severity || defaults.severity || defaults.type || 'error');
             const compIds = this.normalizeCompIds(parsed.compIds.length ? parsed.compIds : defaults.compIds);
             const inferred = inferValidationRemediation(parsed, null);
 
-            return {
+            result = {
                 id: defaults.id || defaults.ruleId || null,
                 ruleId: defaults.ruleId || defaults.id || null,
                 severity,
@@ -334,9 +348,7 @@ export class FullCircuitValidator {
                 confidence: this.inferIssueConfidence({ ...parsed, ...defaults }, severity),
                 details: defaults.details || null,
             };
-        }
-
-        if (typeof entry === 'object') {
+        } else if (typeof entry === 'object') {
             const compIds = this.normalizeCompIds(
                 entry.compIds || entry.compId || defaults.compIds || defaults.componentId
             );
@@ -346,7 +358,7 @@ export class FullCircuitValidator {
             const message = String(entry.message || entry.text || defaults.message || '').trim();
             const inferred = inferValidationRemediation({ ...entry, message }, null);
 
-            return {
+            result = {
                 id: entry.id || defaults.id || defaults.ruleId || null,
                 ruleId: entry.ruleId || defaults.ruleId || entry.id || null,
                 severity,
@@ -365,7 +377,16 @@ export class FullCircuitValidator {
             };
         }
 
-        return null;
+        if (result) {
+            if (result.message) {
+                result.message = result.message.replace(/^[🔥⚠️👻💡🔴🟡]\s*/u, '');
+            }
+            if (result.remediation) {
+                result.remediation = result.remediation.replace(/^[🔥⚠️👻💡🔴🟡]\s*/u, '');
+            }
+        }
+
+        return result;
     }
 
     recordError(entry, defaults = {}) {
@@ -394,7 +415,7 @@ export class FullCircuitValidator {
     }
 
     getNodeParts(nodeId) {
-        const [componentId, pinId] = String(nodeId || '').split('.');
+        const [componentId, pinId] = String(nodeId || '').split(/[\.:]/);
         return { componentId, pinId };
     }
 
@@ -418,15 +439,36 @@ export class FullCircuitValidator {
         return ['5v', '3v3', '3.3v', 'vcc', 'vin', '12v'].includes(normalized);
     }
 
+    hasResistivePathToSupply(startNode) {
+        const sources = this.collectVoltageSources(startNode);
+        // A valid pull-up/down path must either:
+        // 1. Go through a resistor (resistance > 0) and reach a supply (voltage > 0).
+        // 2. Be directly connected to a REAL supply node (resistance 0, but isSupplyNode is true).
+        return sources.some(s => {
+            if (s.voltage <= 0) return false;
+            if (s.resistance > 0) return true;
+            return this.isSupplyNode(s.nodeId);
+        });
+    }
+
     getComponentAttrNumber(component, attrName, fallbackValue = 0) {
         const raw = component?.attrs?.[attrName] ?? component?.[attrName];
         const parsed = Number(raw);
         return Number.isFinite(parsed) ? parsed : fallbackValue;
     }
 
+    getComponentPins(component) {
+        if (!component) return [];
+        let pins = component.pins || component.manifest?.pins;
+        if (!pins) {
+            const def = this.getComponentDefinition(component);
+            pins = def?.pins || def?.manifest?.pins;
+        }
+        return (pins || []).map(p => p.id);
+    }
+
     getTwoTerminalPins(component) {
-        const pins = component?.pins || component?.manifest?.pins || [];
-        return pins.map(p => p.id);
+        return this.getComponentPins(component);
     }
 
     getOtherTerminalNode(component, nodeId) {
@@ -472,14 +514,14 @@ export class FullCircuitValidator {
         const pinVoltage = this.getPinNumericVoltageLabel(pinId);
         if (pinVoltage !== null) return pinVoltage;
 
-        if (this.isType(component, 'wokwi-arduino-uno', 'mcu_uno')) {
+        if (this.isType(component, 'wokwi-arduino-uno', 'openhw-arduino-uno', 'mcu_uno')) {
             const pin = String(pinId || '').toUpperCase();
             if (/^(D?\d+|A\d+)$/.test(pin)) return 5.0; // Assume logic high for safety check
             if (pin === '5V' || pin === 'VCC') return 5.0;
             if (pin === '3V3') return 3.3;
         }
 
-        if (this.isType(component, 'wokwi-power-supply')) {
+        if (this.isType(component, 'wokwi-power-supply', 'openhw-power-supply')) {
             const configured = this.getComponentAttrNumber(component, 'voltage', 5.0);
             const normalizedPin = String(pinId || '').toLowerCase();
             if (normalizedPin === '5v' || normalizedPin === 'vcc') return configured;
@@ -493,29 +535,33 @@ export class FullCircuitValidator {
         return this.isType(
             component,
             'wokwi-resistor',
+            'openhw-resistor',
             'resistor',
             'wokwi-potentiometer',
+            'openhw-potentiometer',
             'wokwi-slide-potentiometer',
+            'openhw-slide-potentiometer',
             'potentiometer',
             'switch',
-            'wokwi-pushbutton'
+            'wokwi-pushbutton',
+            'openhw-pushbutton'
         );
     }
 
     getTraversalResistance(component) {
         if (!component) return 0;
 
-        if (this.isType(component, 'wokwi-resistor', 'resistor')) {
+        if (this.isType(component, 'wokwi-resistor', 'openhw-resistor', 'resistor')) {
             return Math.max(0, this.getComponentAttrNumber(component, 'value', 220));
         }
 
-        if (this.isType(component, 'wokwi-potentiometer', 'wokwi-slide-potentiometer', 'potentiometer')) {
+        if (this.isType(component, 'wokwi-potentiometer', 'openhw-potentiometer', 'wokwi-slide-potentiometer', 'openhw-slide-potentiometer', 'potentiometer')) {
             const normalizedType = this.normalizeType(component.type);
             const specResistance = this.componentSpecs[normalizedType]?.totalResistance || 10000;
             return Math.max(0, this.getComponentAttrNumber(component, 'value', specResistance));
         }
 
-        if (this.isType(component, 'switch', 'wokwi-pushbutton')) {
+        if (this.isType(component, 'switch', 'wokwi-pushbutton', 'openhw-pushbutton')) {
             return 0;
         }
 
@@ -553,32 +599,30 @@ export class FullCircuitValidator {
 
             const neighbors = this.getNeighbors(current.nodeId);
             for (const neighbor of neighbors) {
-                const nextNode = neighbor;
-                const nextResistance = current.resistance;
-                const previousResistance = bestResistance.get(nextNode);
-
-                if (previousResistance === undefined || nextResistance + epsilon < previousResistance) {
-                    bestResistance.set(nextNode, nextResistance);
-                    queue.push({ nodeId: nextNode, resistance: nextResistance });
-                }
-
                 const neighborComponent = this.getComponent(neighbor);
-                if (!this.isResistiveTraversalComponent(neighborComponent)) {
-                    continue;
+                const isResistive = this.isResistiveTraversalComponent(neighborComponent);
+                
+                // Normal node-to-node connection
+                const nextResistance = current.resistance;
+                const previousResistance = bestResistance.get(neighbor);
+                if (previousResistance === undefined || nextResistance + epsilon < previousResistance) {
+                    bestResistance.set(neighbor, nextResistance);
+                    queue.push({ nodeId: neighbor, resistance: nextResistance });
                 }
 
-                const otherTerminalNode = this.getOtherTerminalNode(neighborComponent, neighbor);
-                if (!otherTerminalNode) {
-                    continue;
-                }
+                if (isResistive) {
+                    const otherTerminalNode = this.getOtherTerminalNode(neighborComponent, neighbor);
+                    if (otherTerminalNode) {
+                        const addedResistance = this.getTraversalResistance(neighborComponent);
+                        const terminalResistance = current.resistance + addedResistance;
+                        const terminalBest = bestResistance.get(otherTerminalNode);
+                        
 
-                const addedResistance = this.getTraversalResistance(neighborComponent);
-                const terminalResistance = current.resistance + addedResistance;
-                const terminalBest = bestResistance.get(otherTerminalNode);
-
-                if (terminalBest === undefined || terminalResistance + epsilon < terminalBest) {
-                    bestResistance.set(otherTerminalNode, terminalResistance);
-                    queue.push({ nodeId: otherTerminalNode, resistance: terminalResistance });
+                        if (terminalBest === undefined || terminalResistance + epsilon < terminalBest) {
+                            bestResistance.set(otherTerminalNode, terminalResistance);
+                            queue.push({ nodeId: otherTerminalNode, resistance: terminalResistance });
+                        }
+                    }
                 }
             }
         }
@@ -639,7 +683,7 @@ export class FullCircuitValidator {
         const { componentId, pinId } = this.getNodeParts(nodeId);
         const component = this.getComponentById(componentId);
         if (!component) return false;
-        if (this.isType(component, 'wokwi-arduino-uno', 'mcu_uno')) {
+        if (this.isType(component, 'wokwi-arduino-uno', 'openhw-arduino-uno', 'mcu_uno')) {
             const pin = String(pinId || '').toUpperCase();
             const isPin = /^(D?\d+|A\d+)$/.test(pin);
             return isPin;
@@ -718,16 +762,16 @@ export class FullCircuitValidator {
 
         this.components.forEach(comp => {
             let current = 0;
-            if (this.isType(comp, 'wokwi-led')) current = 0.02;
-            if (this.isType(comp, 'wokwi-motor', 'wokwi-servo')) current = 0.2;
-            if (this.isType(comp, 'wokwi-neopixel')) current = (comp.attrs?.pixels || 16) * 0.02;
+            if (this.isType(comp, 'wokwi-led', 'openhw-led')) current = 0.02;
+            if (this.isType(comp, 'wokwi-motor', 'openhw-motor', 'wokwi-servo', 'openhw-servo')) current = 0.2;
+            if (this.isType(comp, 'wokwi-neopixel', 'openhw-neopixel')) current = (comp.attrs?.pixels || 16) * 0.02;
             
             if (current > 0) {
                 stats.totalCurrent += current;
                 stats.components.push({ id: comp.id, current: current * 1000 }); // mA
 
                 // Thermal Analysis
-                const voltage = this.isType(comp, 'wokwi-led') ? 2.0 : 5.0;
+                const voltage = this.isType(comp, 'wokwi-led', 'openhw-led') ? 2.0 : 5.0;
                 const powerWatts = voltage * current;
                 stats.thermal[comp.id] = {
                     power: powerWatts,
@@ -747,6 +791,7 @@ export class FullCircuitValidator {
     }
 
     getComponentRegistry() {
+        if (this.registry) return this.registry;
         const defaultRegistry = emulatorComponents['default'];
         const namedRegistry = emulatorComponents['registry'];
         const registry = defaultRegistry || namedRegistry || emulatorComponents;
@@ -923,6 +968,7 @@ export class FullCircuitValidator {
             runtimePhase: String(options.runtimePhase || 'compile-time'),
             runtimeState: options.runtimeState && typeof options.runtimeState === 'object' ? options.runtimeState : null,
             includeTemporalValidation: options.includeTemporalValidation === true,
+            debug: options.debug === true || options.verbose === true,
         };
     }
 
@@ -1184,6 +1230,8 @@ export class FullCircuitValidator {
     runValidation(options = {}) {
         this.resetValidationState();
         const validationOptions = this.getDefaultValidationOptions(options);
+        this.options = validationOptions; // Store for access in other methods
+
         const fingerprint = this.computeCircuitFingerprint();
         const cacheKey = validationOptions.cacheKey || `${fingerprint}|${validationOptions.profileName}|${validationOptions.minimumSeverity}|${validationOptions.includeExpensive}`;
         const incrementalStore = this.getIncrementalStore();
@@ -1288,8 +1336,12 @@ export class FullCircuitValidator {
             }, validationOptions.cacheMaxEntries);
         }
 
-        if (passed) {
+        if (this.errors.length === 0) {
             console.log("\n✅ ALL CHECKS PASSED: Circuit is safe for code execution.");
+            return true;
+        } else if (passed) {
+            console.log(`\n⚠️ VALIDATION PASSED WITH ${this.errors.length} WARNINGS:`);
+            this.errors.forEach(err => console.log(err));
             return true;
         } else {
             console.log("\n🛑 VALIDATION FAILED:");

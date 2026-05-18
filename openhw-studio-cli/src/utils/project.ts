@@ -94,6 +94,18 @@ function ensureBoardFiles(project: OpenHwProject): void {
     const boardKind = normalizeBoardKind(boardComp.type);
     const boardId = boardComp.id;
 
+    // Check if the board already has any custom code files in the project path
+    const hasAnyCodeFiles = project.projectFiles.some(
+      (f) =>
+        f.boardId === boardId ||
+        (String(f.path || '').startsWith(`project/${boardId}/`) &&
+          /\.(ino|py|cpp|c|h|hpp)$/i.test(f.path))
+    );
+
+    if (hasAnyCodeFiles) {
+      continue;
+    }
+
     const desiredFiles: Array<{ path: string; content: string }> =
       boardKind === 'rp2040'
         ? [
@@ -316,7 +328,7 @@ export async function extractProjectFromPng(pngPath: string): Promise<OpenHwProj
 
 function nextComponentId(project: OpenHwProject, type: string): string {
   const base = String(type || 'comp')
-    .replace(/^wokwi-/, '')
+    .replace(/^openhw-/, '')
     .replace(/[^a-zA-Z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .toLowerCase() || 'comp';

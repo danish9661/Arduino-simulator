@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: "OpenHW Studio"
-  text: "Documentation Portal"
+  text: "Documentation "
   tagline: "Advanced hardware simulation, autograding, and telemetric analysis."
   image:
     src: /logo-Photoroom.png

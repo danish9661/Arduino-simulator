@@ -1,3 +1,5 @@
+﻿<div v-pre>
+
 # Complete Deployment Guide for OpenHW Studio
 
 This is your ultimate, step-by-step guide to taking your project from GitHub to your live Ubuntu server. Follow these steps in exact order.
@@ -289,3 +291,6 @@ VITE_DOCS_URL=https://openhw-studio.fossee.in/docs/
 
 
 
+
+
+</div>

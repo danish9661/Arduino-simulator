@@ -1,0 +1,40 @@
+{
+    "type": "wokwi-potentiometer",
+    "label": "Rotary Potentiometer",
+    "description": "Rotary potentiometer (variable resistor). Outputs an analog voltage proportional to the knob's rotation angle. Use with analogRead() on an Arduino analog pin.",
+    "group": "Sensors",
+    "w": 121,
+    "h": 121,
+    "attrs": {
+        "value": "50"
+    },
+    "telemetry": {
+        "template": "value=${state.value}",
+        "criticalKeys": [
+            "state.value"
+        ]
+    },
+    "pins": [
+        {
+            "id": "1",
+            "x": 46.8,
+            "y": 109.7,
+            "type": "power",
+            "description": "GND"
+        },
+        {
+            "id": "2",
+            "x": 77.6,
+            "y": 109.7,
+            "type": "power",
+            "description": "VCC"
+        },
+        {
+            "id": "SIG",
+            "x": 61.8,
+            "y": 109.7,
+            "type": "analog",
+            "description": "SIG"
+        }
+    ]
+}

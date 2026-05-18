@@ -1,0 +1,36 @@
+{
+    "type": "wokwi-stepper-motor",
+    "label": "Stepper Motor (Bipolar)",
+    "group": "Actuators",
+    "w": 74.7,
+    "h": 74.7,
+    "attrs": {
+        "step_angle": "1.8"
+    },
+    "pins": [
+        {
+            "id": "A+",
+            "x": 14.9,
+            "y": 74.7,
+            "type": "digital"
+        },
+        {
+            "id": "A-",
+            "x": 29.9,
+            "y": 74.7,
+            "type": "digital"
+        },
+        {
+            "id": "B+",
+            "x": 44.8,
+            "y": 74.7,
+            "type": "digital"
+        },
+        {
+            "id": "B-",
+            "x": 60.7,
+            "y": 74.7,
+            "type": "digital"
+        }
+    ]
+}

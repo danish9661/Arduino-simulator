@@ -1,0 +1,79 @@
+{
+    "label": "MAX7219 Dot Matrix",
+    "type": "wokwi-max7219",
+    "group": "Outputs",
+    "w": 179.7,
+    "h": 119.8,
+    "attrs": {
+        "color": "red"
+    },
+    "telemetry": {
+        "template": "intensity=${state.intensity}, isShutdown=${state.shutdown}, decodeMode=${state.decodeMode}",
+        "criticalKeys": [
+            "state.intensity",
+            "state.shutdown"
+        ]
+    },
+    "pins": [
+        {
+            "id": "VCC",
+            "x": 0,
+            "y": 29.9,
+            "type": "power"
+        },
+        {
+            "id": "GND",
+            "x": 0,
+            "y": 44.9,
+            "type": "power"
+        },
+        {
+            "id": "DIN",
+            "x": 0,
+            "y": 59.9,
+            "type": "input"
+        },
+        {
+            "id": "CS",
+            "x": 0,
+            "y": 75.2,
+            "type": "input"
+        },
+        {
+            "id": "CLK",
+            "x": 0,
+            "y": 89.8,
+            "type": "input"
+        },
+        {
+            "id": "VCC_OUT",
+            "x": 179.7,
+            "y": 29.9,
+            "type": "power"
+        },
+        {
+            "id": "GND_OUT",
+            "x": 179.7,
+            "y": 44.9,
+            "type": "power"
+        },
+        {
+            "id": "DOUT",
+            "x": 179.7,
+            "y": 59.9,
+            "type": "output"
+        },
+        {
+            "id": "CS_OUT",
+            "x": 179.7,
+            "y": 74.9,
+            "type": "output"
+        },
+        {
+            "id": "CLK_OUT",
+            "x": 179.7,
+            "y": 89.8,
+            "type": "output"
+        }
+    ]
+}

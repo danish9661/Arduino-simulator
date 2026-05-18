@@ -1,0 +1,443 @@
+{
+  "generatedAt": "2026-05-18T05:46:31.348Z",
+  "elapsedMs": 2418,
+  "faults": 0,
+  "serialChars": 0,
+  "boards": [
+    {
+      "id": "uno1",
+      "type": "openhw-arduino-uno",
+      "serialChars": 0,
+      "faultCount": 0
+    }
+  ],
+  "components": [
+    {
+      "id": "btn1",
+      "type": "openhw-pushbutton",
+      "label": "Push Button",
+      "group": "Basic",
+      "role": "input",
+      "status": "ok",
+      "updates": 10,
+      "changedKeys": [
+        "analogVoltages",
+        "color",
+        "i2cTraffic",
+        "i2sTraffic",
+        "key",
+        "oneWireTraffic",
+        "pins",
+        "pinToggles",
+        "pioTraffic",
+        "pressed",
+        "pwmTraffic",
+        "serialBytes",
+        "spiTraffic"
+      ],
+      "outputSummary": "pressed=true",
+      "telemetrySummary": "pressed=true",
+      "telemetryData": {
+        "_component": {
+          "role": "input",
+          "updates": 10,
+          "changedKeys": 13,
+          "stateKeys": 13,
+          "hasRuntimeState": true
+        },
+        "_fallbackGenerated": true,
+        "_health": {
+          "icon": "🟢",
+          "status": "ok"
+        }
+      },
+      "notes": [],
+      "lastState": {
+        "pressed": true,
+        "color": "red",
+        "key": "1",
+        "pins": {
+          "1r": false,
+          "1l": false,
+          "2l": false,
+          "2r": false
+        },
+        "pinToggles": {
+          "2r": 999,
+          "2l": 999,
+          "1l": 999,
+          "1r": 999
+        },
+        "analogVoltages": {
+          "1": 0,
+          "2": 0,
+          "1r": 0,
+          "1l": 0,
+          "2r": 0,
+          "2l": 0
+        },
+        "i2cTraffic": [],
+        "spiTraffic": [],
+        "serialBytes": 0,
+        "pwmTraffic": 0,
+        "oneWireTraffic": 0,
+        "pioTraffic": 0,
+        "i2sTraffic": 0
+      }
+    },
+    {
+      "id": "btn2",
+      "type": "openhw-pushbutton",
+      "label": "Push Button",
+      "group": "Basic",
+      "role": "input",
+      "status": "warn",
+      "updates": 0,
+      "changedKeys": [],
+      "outputSummary": "pressed=",
+      "telemetrySummary": "pressed=",
+      "telemetryData": {
+        "_component": {
+          "role": "input",
+          "updates": 0,
+          "changedKeys": 0,
+          "stateKeys": 0,
+          "hasRuntimeState": false
+        },
+        "_fallbackGenerated": true,
+        "_health": {
+          "icon": "🟡",
+          "status": "warn"
+        }
+      },
+      "notes": [
+        "Critical telemetry key missing: state.pressed",
+        "Interactive input component did not receive/emit state changes."
+      ],
+      "lastState": {}
+    },
+    {
+      "id": "btn3",
+      "type": "openhw-pushbutton",
+      "label": "Push Button",
+      "group": "Basic",
+      "role": "input",
+      "status": "warn",
+      "updates": 0,
+      "changedKeys": [],
+      "outputSummary": "pressed=",
+      "telemetrySummary": "pressed=",
+      "telemetryData": {
+        "_component": {
+          "role": "input",
+          "updates": 0,
+          "changedKeys": 0,
+          "stateKeys": 0,
+          "hasRuntimeState": false
+        },
+        "_fallbackGenerated": true,
+        "_health": {
+          "icon": "🟡",
+          "status": "warn"
+        }
+      },
+      "notes": [
+        "Critical telemetry key missing: state.pressed",
+        "Interactive input component did not receive/emit state changes."
+      ],
+      "lastState": {}
+    },
+    {
+      "id": "btn4",
+      "type": "openhw-pushbutton",
+      "label": "Push Button",
+      "group": "Basic",
+      "role": "input",
+      "status": "warn",
+      "updates": 0,
+      "changedKeys": [],
+      "outputSummary": "pressed=",
+      "telemetrySummary": "pressed=",
+      "telemetryData": {
+        "_component": {
+          "role": "input",
+          "updates": 0,
+          "changedKeys": 0,
+          "stateKeys": 0,
+          "hasRuntimeState": false
+        },
+        "_fallbackGenerated": true,
+        "_health": {
+          "icon": "🟡",
+          "status": "warn"
+        }
+      },
+      "notes": [
+        "Critical telemetry key missing: state.pressed",
+        "Interactive input component did not receive/emit state changes."
+      ],
+      "lastState": {}
+    },
+    {
+      "id": "btn5",
+      "type": "openhw-pushbutton",
+      "label": "Push Button",
+      "group": "Basic",
+      "role": "input",
+      "status": "warn",
+      "updates": 0,
+      "changedKeys": [],
+      "outputSummary": "pressed=",
+      "telemetrySummary": "pressed=",
+      "telemetryData": {
+        "_component": {
+          "role": "input",
+          "updates": 0,
+          "changedKeys": 0,
+          "stateKeys": 0,
+          "hasRuntimeState": false
+        },
+        "_fallbackGenerated": true,
+        "_health": {
+          "icon": "🟡",
+          "status": "warn"
+        }
+      },
+      "notes": [
+        "Critical telemetry key missing: state.pressed",
+        "Interactive input component did not receive/emit state changes."
+      ],
+      "lastState": {}
+    },
+    {
+      "id": "btn6",
+      "type": "openhw-pushbutton",
+      "label": "Push Button",
+      "group": "Basic",
+      "role": "input",
+      "status": "warn",
+      "updates": 0,
+      "changedKeys": [],
+      "outputSummary": "pressed=",
+      "telemetrySummary": "pressed=",
+      "telemetryData": {
+        "_component": {
+          "role": "input",
+          "updates": 0,
+          "changedKeys": 0,
+          "stateKeys": 0,
+          "hasRuntimeState": false
+        },
+        "_fallbackGenerated": true,
+        "_health": {
+          "icon": "🟡",
+          "status": "warn"
+        }
+      },
+      "notes": [
+        "Critical telemetry key missing: state.pressed",
+        "Interactive input component did not receive/emit state changes."
+      ],
+      "lastState": {}
+    },
+    {
+      "id": "btn7",
+      "type": "openhw-pushbutton",
+      "label": "Push Button",
+      "group": "Basic",
+      "role": "input",
+      "status": "warn",
+      "updates": 0,
+      "changedKeys": [],
+      "outputSummary": "pressed=",
+      "telemetrySummary": "pressed=",
+      "telemetryData": {
+        "_component": {
+          "role": "input",
+          "updates": 0,
+          "changedKeys": 0,
+          "stateKeys": 0,
+          "hasRuntimeState": false
+        },
+        "_fallbackGenerated": true,
+        "_health": {
+          "icon": "🟡",
+          "status": "warn"
+        }
+      },
+      "notes": [
+        "Critical telemetry key missing: state.pressed",
+        "Interactive input component did not receive/emit state changes."
+      ],
+      "lastState": {}
+    },
+    {
+      "id": "btn8",
+      "type": "openhw-pushbutton",
+      "label": "Push Button",
+      "group": "Basic",
+      "role": "input",
+      "status": "warn",
+      "updates": 0,
+      "changedKeys": [],
+      "outputSummary": "pressed=",
+      "telemetrySummary": "pressed=",
+      "telemetryData": {
+        "_component": {
+          "role": "input",
+          "updates": 0,
+          "changedKeys": 0,
+          "stateKeys": 0,
+          "hasRuntimeState": false
+        },
+        "_fallbackGenerated": true,
+        "_health": {
+          "icon": "🟡",
+          "status": "warn"
+        }
+      },
+      "notes": [
+        "Critical telemetry key missing: state.pressed",
+        "Interactive input component did not receive/emit state changes."
+      ],
+      "lastState": {}
+    },
+    {
+      "id": "buzzer",
+      "type": "openhw-buzzer",
+      "label": "Buzzer",
+      "group": "Outputs",
+      "role": "output",
+      "status": "warn",
+      "updates": 0,
+      "changedKeys": [],
+      "outputSummary": "No observable output state",
+      "telemetrySummary": "No observable output state",
+      "telemetryData": {
+        "_component": {
+          "role": "output",
+          "updates": 0,
+          "changedKeys": 0,
+          "stateKeys": 0,
+          "hasRuntimeState": false
+        },
+        "_fallbackGenerated": true,
+        "_health": {
+          "icon": "🟡",
+          "status": "warn"
+        }
+      },
+      "notes": [
+        "No output-state updates observed during run."
+      ],
+      "lastState": {}
+    },
+    {
+      "id": "uno1",
+      "type": "openhw-arduino-uno",
+      "label": "Arduino Uno",
+      "group": "Boards",
+      "role": "board",
+      "status": "ok",
+      "updates": 10,
+      "changedKeys": [
+        "analogVoltages",
+        "i2cTraffic",
+        "i2sTraffic",
+        "oneWireTraffic",
+        "pin13Active",
+        "pins",
+        "pinToggles",
+        "pioTraffic",
+        "pwmTraffic",
+        "rxActive",
+        "serialBytes",
+        "spiTraffic",
+        "txActive"
+      ],
+      "outputSummary": "State keys: txActive, rxActive, pin13Active, pins, pinToggles, analogVoltages, i2cTraffic, spiTraffic",
+      "telemetrySummary": "State keys: txActive, rxActive, pin13Active, pins, pinToggles, analogVoltages, i2cTraffic, spiTraffic",
+      "telemetryData": {
+        "_component": {
+          "role": "board",
+          "updates": 10,
+          "changedKeys": 13,
+          "stateKeys": 13,
+          "hasRuntimeState": true
+        },
+        "_fallbackGenerated": true,
+        "_health": {
+          "icon": "🟢",
+          "status": "ok"
+        }
+      },
+      "notes": [],
+      "lastState": {
+        "txActive": true,
+        "rxActive": true,
+        "pin13Active": false,
+        "pins": {
+          "4": true,
+          "5": true,
+          "6": true,
+          "7": true,
+          "8": false,
+          "9": true,
+          "10": true,
+          "11": true,
+          "12": false,
+          "5V": true,
+          "vin": true,
+          "VIN": true,
+          "3V3": true
+        },
+        "pinToggles": {
+          "8": 1187,
+          "12": 999
+        },
+        "analogVoltages": {
+          "0": 0,
+          "1": 0,
+          "2": 0,
+          "3": 0,
+          "4": 5,
+          "5": 5,
+          "6": 5,
+          "7": 5,
+          "8": 0,
+          "9": 5,
+          "10": 5,
+          "11": 5,
+          "12": 0,
+          "13": 0,
+          "A0": 0,
+          "A1": 0,
+          "A2": 0,
+          "A3": 0,
+          "A4": 0,
+          "A5": 0,
+          "vin": 5,
+          "VIN": 5,
+          "gnd_1": 0,
+          "gnd_2": 0,
+          "gnd_3": 0,
+          "GND": 0,
+          "5V": 5,
+          "3v3": 0,
+          "3V3": 3.3,
+          "rst": 0,
+          "RST": 0,
+          "ioref": 0,
+          "IOREF": 0
+        },
+        "i2cTraffic": [],
+        "spiTraffic": [],
+        "serialBytes": 0,
+        "pwmTraffic": 0,
+        "oneWireTraffic": 0,
+        "pioTraffic": 0,
+        "i2sTraffic": 0
+      }
+    }
+  ]
+}

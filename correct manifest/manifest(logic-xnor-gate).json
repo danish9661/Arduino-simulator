@@ -1,0 +1,32 @@
+{
+    "type": "logic-xnor-gate",
+    "label": "XNOR Gate",
+    "description": "Logical XNOR gate. Outputs high when both inputs are equal.",
+    "group": "Logic",
+    "w": 92.8,
+    "h": 66.3,
+    "attrs": {},
+    "pins": [
+        {
+            "id": "IN1",
+            "x": 0,
+            "y": 18.9,
+            "type": "digital",
+            "description": "Input 1"
+        },
+        {
+            "id": "IN2",
+            "x": 0,
+            "y": 48.4,
+            "type": "digital",
+            "description": "Input 2"
+        },
+        {
+            "id": "OUT",
+            "x": 90.8,
+            "y": 33.1,
+            "type": "digital",
+            "description": "Output"
+        }
+    ]
+}

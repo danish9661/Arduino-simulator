@@ -27,9 +27,9 @@ function setupPicoPico() {
 
   console.log('--- Setting up Pico-Pico UART Test ---');
   run(runCli + ` project init ${proj} --name "PICO-PICO-UART" --board pi_pico`);
-  run(runCli + ` project add-component ${proj} --type wokwi-raspberry-pi-pico --id board2`);
-  run(runCli + ` project add-component ${proj} --type wokwi-pushbutton --id btn1`);
-  run(runCli + ` project add-component ${proj} --type wokwi-led --id led1 --attrs-json "{\\"color\\": \\"red\\"}"`);
+  run(runCli + ` project add-component ${proj} --type openhw-raspberry-pi-pico --id board2`);
+  run(runCli + ` project add-component ${proj} --type openhw-pushbutton --id btn1`);
+  run(runCli + ` project add-component ${proj} --type openhw-led --id led1 --attrs-json "{\\"color\\": \\"red\\"}"`);
 
   // UART connections
   run(runCli + ` project connect ${proj} --from board1:GP0 --to board2:GP1`); // TX1 -> RX2
@@ -86,9 +86,9 @@ function setupUnoPico() {
 
   console.log('--- Setting up Uno-Pico UART Test ---');
   run(runCli + ` project init ${proj} --name "UNO-PICO-UART" --board arduino_uno`);
-  run(runCli + ` project add-component ${proj} --type wokwi-raspberry-pi-pico --id board2`);
-  run(runCli + ` project add-component ${proj} --type wokwi-pushbutton --id btn1`);
-  run(runCli + ` project add-component ${proj} --type wokwi-led --id led1 --attrs-json "{\\"color\\": \\"green\\"}"`);
+  run(runCli + ` project add-component ${proj} --type openhw-raspberry-pi-pico --id board2`);
+  run(runCli + ` project add-component ${proj} --type openhw-pushbutton --id btn1`);
+  run(runCli + ` project add-component ${proj} --type openhw-led --id led1 --attrs-json "{\\"color\\": \\"green\\"}"`);
 
   // UART connections: Uno D1 (TX) -> Pico GP1 (RX)
   run(runCli + ` project connect ${proj} --from board1:1 --to board2:GP1`);
