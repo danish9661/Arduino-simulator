@@ -1108,6 +1108,9 @@ function normalizeImportedCircuitData(rawComponents, rawConnections) {
         waypoints: Array.isArray(wire.waypoints)
           ? wire.waypoints.map(normalizeWaypoint).filter(Boolean)
           : [],
+        routingInstructions: Array.isArray(wire.routingInstructions)
+          ? wire.routingInstructions
+          : (Array.isArray(wire.waypoints) ? wire.waypoints : []),
         isBelow: wire.isBelow === true,
         fromLabel: String(wire.fromLabel || endpointLabel(from) || ''),
         toLabel: String(wire.toLabel || endpointLabel(to) || ''),
@@ -1476,7 +1479,7 @@ function getPinCategory(pId, pDesc, compType) {
 
 // ─── Memoized Wire Component ────────────────────────────────────────────────
 const CanvasWire = React.memo(({ wire, p1, p2, e1, e2, isSelected, onSelect, onMouseDownSegment, onTouchStartSegment, wirepointsEnabled, theme, offset = 0 }) => {
-  const wirePath = useMemo(() => buildWirePath(p1, e1, e2, p2, wire.waypoints, wire.path, offset), [p1, e1, e2, p2, wire.waypoints, wire.path, offset]);
+  const wirePath = useMemo(() => buildWirePath(p1, e1, e2, p2, wire.waypoints, wire.path, offset, wire.routingInstructions), [p1, e1, e2, p2, wire.waypoints, wire.path, offset, wire.routingInstructions]);
 
   return (
     <g style={{ cursor: 'pointer' }} onClick={onSelect} onDoubleClick={e => e.stopPropagation()}>
@@ -4203,18 +4206,19 @@ useEffect(() => {
     const distTop = localY;
     const distBottom = (Number(bounds.h) || comp.h || 0) - localY;
     let exitDx = 0, exitDy = 0;
+    const MIN_EXIT_STUB = 20;
     if (exitSide === 'left') {
-      exitDx = -(distLeft + bodyEdgeGap);
-      exitDy = laneOffset;
+      exitDx = -(Math.max(distLeft + bodyEdgeGap, MIN_EXIT_STUB));
+      exitDy = 0;
     } else if (exitSide === 'right') {
-      exitDx = distRight + bodyEdgeGap;
-      exitDy = laneOffset;
+      exitDx = Math.max(distRight + bodyEdgeGap, MIN_EXIT_STUB);
+      exitDy = 0;
     } else if (exitSide === 'top') {
-      exitDx = laneOffset;
-      exitDy = -(distTop + bodyEdgeGap);
+      exitDx = 0;
+      exitDy = -(Math.max(distTop + bodyEdgeGap, MIN_EXIT_STUB));
     } else {
-      exitDx = laneOffset;
-      exitDy = distBottom + bodyEdgeGap;
+      exitDx = 0;
+      exitDy = Math.max(distBottom + bodyEdgeGap, MIN_EXIT_STUB);
     }
     // Rotate exit direction with the component
     const rotation = comp.rotation || 0;
@@ -6945,6 +6949,12 @@ useEffect(() => {
 
       worker.onmessage = async (event) => {
         const msg = event.data;
+        if (msg.type === 'error') {
+          appendConsoleEntry('error', `[SIM] ${msg.message || 'Runner error'}`, 'simulator');
+          logSerial(`Runner error: ${msg.message || 'Unknown error'}`, 'var(--red)');
+          handleStop();
+          return;
+        }
         if (msg.type === 'debug' && msg.category === 'rp2040-runtime') {
           const incomingBoardId = String(msg.boardId || '').trim();
           const hasKnownBoard = incomingBoardId && boardComponents.some((b) => b.id === incomingBoardId);

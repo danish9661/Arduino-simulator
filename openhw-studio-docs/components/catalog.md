@@ -209,6 +209,22 @@ Sensors translate environmental conditions into analog voltages or digital signa
 * **Description**: Rotational input device returning gray-code pulse transitions indicating direction and speed of rotation. Includes a push button.
 * **Pins**: `CLK`, `DT`, `SW` (Switch), `VCC`, `GND`.
 
+### DS18B20 1-Wire Temperature Sensor (`openhw-ds18b20`)
+* **Description**: Maxim 1-Wire programmable digital temperature sensor ($9$ to $12$-bit resolution).
+* **Pins**: `GND`, `DQ` (Data), `VDD` (3.3V or 5V).
+* **Validation Checks**: Warns if data pin `DQ` lacks a pull-up resistor or is wired to an incompatible voltage rail.
+
+### IR Receiver (`openhw-ir-receiver`)
+* **Description**: 38 kHz infrared demodulator module (VS1838B compatible) supporting NEC protocol decoding.
+* **Pins**: `OUT` (Demodulated signal), `GND`, `VCC` (3.3V or 5V).
+
+### MFRC522 RFID Reader (`openhw-mfrc522`)
+* **Description**: SPI-based 13.56 MHz contactless smart card reader supporting Mifare Classic 1K tags/fobs.
+* **Pins**: `3V3` (3.3V ONLY), `RST`, `GND`, `IRQ`, `MISO`, `MOSI`, `SCK`, `SDA` (CS/SS).
+* **Validation Checks**:
+  * **Rule `mfrc522-voltage-check`**: Critical error if powered by 5V instead of 3.3V.
+  * **Rule `mfrc522-spi-check`**: Warns if any required SPI pins are unconnected.
+
 ---
 
 ## 7. Storage, Expansion & Logic ICs

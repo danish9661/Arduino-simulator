@@ -55,6 +55,34 @@ function chooseNearestEdge(pin, bounds) {
   return 'left';
 }
 
+function getNearestEdgeInfo(pin, bounds) {
+  const bx = Number(bounds?.x) || 0;
+  const by = Number(bounds?.y) || 0;
+  const bw = Number(bounds?.w) || 0;
+  const bh = Number(bounds?.h) || 0;
+  const localX = (Number(pin.x) || 0) - bx;
+  const localY = (Number(pin.y) || 0) - by;
+  const dTop = localY;
+  const dBottom = bh - localY;
+  const dLeft = localX;
+  const dRight = bw - localX;
+  const minDist = Math.min(dTop, dBottom, dLeft, dRight);
+  let side = 'left';
+  if (minDist === dTop) side = 'top';
+  else if (minDist === dBottom) side = 'bottom';
+  else if (minDist === dRight) side = 'right';
+  return { side, minDist, dTop, dBottom, dLeft, dRight, localX, localY };
+}
+
+function getSideDistance(pin, bounds, side) {
+  const info = getNearestEdgeInfo(pin, bounds);
+  if (side === 'top') return info.dTop;
+  if (side === 'bottom') return info.dBottom;
+  if (side === 'left') return info.dLeft;
+  if (side === 'right') return info.dRight;
+  return info.minDist;
+}
+
 function buildExitLookup(compType, pins, bounds) {
   const compW = Number(bounds?.w) || 0;
   const compH = Number(bounds?.h) || 0;
@@ -94,6 +122,9 @@ function buildExitLookup(compType, pins, bounds) {
     return lookup;
   }
 
+  // Nearest-edge is now a fallback only. Grouping gets first chance to decide.
+  const sizeMin = Math.max(1, Math.min(compW || 0, compH || 0));
+  const nearestThreshold = Math.max(4, Math.round(sizeMin * 0.035));
   const tolerance = Math.max(2, Math.min(compW || 0, compH || 0) * 0.015);
   const rowGroups = buildAxisGroups(unresolved, 'y', tolerance);
   const colGroups = buildAxisGroups(unresolved, 'x', tolerance);
@@ -109,14 +140,14 @@ function buildExitLookup(compType, pins, bounds) {
   for (const group of rowGroups) {
     const side = group.center <= compH / 2 ? 'top' : 'bottom';
     for (const pin of group.pins) {
-      addCandidate(pin, side, group.pins.length * 100 + Math.abs(group.center - (compH / 2)));
+      addCandidate(pin, side, getSideDistance(pin, bounds, side) + group.pins.length * 0.01);
     }
   }
 
   for (const group of colGroups) {
     const side = group.center <= compW / 2 ? 'left' : 'right';
     for (const pin of group.pins) {
-      addCandidate(pin, side, group.pins.length * 100 + Math.abs(group.center - (compW / 2)));
+      addCandidate(pin, side, getSideDistance(pin, bounds, side) + group.pins.length * 0.01);
     }
   }
 
@@ -125,6 +156,12 @@ function buildExitLookup(compType, pins, bounds) {
     if (pinCandidates.length > 0) {
       pinCandidates.sort((a, b) => a.score - b.score);
       lookup.set(pin.normalizedId, pinCandidates[0].side);
+      continue;
+    }
+    const near = getNearestEdgeInfo(pin, bounds);
+    if (near.minDist <= nearestThreshold) {
+      lookup.set(pin.normalizedId, near.side);
+      try { console.debug('[pinExit] nearest-edge fallback', pin.normalizedId, near); } catch (e) {}
       continue;
     }
     lookup.set(pin.normalizedId, chooseNearestEdge(pin, bounds));

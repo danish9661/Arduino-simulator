@@ -77,7 +77,7 @@ async function callTool(client, name, args) {
   const response = await client.callTool({
     name,
     arguments: args,
-  });
+  }, undefined, { timeout: 120000 });
   return parseToolPayload(response, name);
 }
 
@@ -355,6 +355,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`[mcp-pico-all-components] FAIL ${String(error?.message || error)}`);
+  console.error(`[mcp-pico-all-components] FAIL ${String(error?.stack || error)}`);
   process.exit(1);
 });

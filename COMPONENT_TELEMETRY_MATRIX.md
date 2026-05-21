@@ -29,7 +29,7 @@
 | Neopixel Matrix | LED Matrix | ✅ Yes | pixels (RGB array), brightness, count |
 | Neopixel Ring | LED Ring | ✅ Yes | pixels (RGB array), brightness, count |
 
-#### 🎛️ Actuators & Motors (7)
+#### 🎛️ Actuators, Motors & Audio (12)
 | Component | Type | Custom Telemetry | Key Metrics |
 |-----------|------|-----------------|------------|
 | Servo Motor | Actuator | ✅ Yes | angle, pulseWidthMs, speed, moving |
@@ -37,6 +37,11 @@
 | Stepper Motor | Actuator | ✅ Yes | angle |
 | A4988 Stepper Driver | Driver | ✅ Yes | active, stepCount |
 | Buzzer (Piezo) | Audio | ✅ Yes | playing, frequency, volume, muted |
+| PCM5102 I2S DAC | Audio | ✅ Yes | lastLeftSample, lastRightSample, peakAmplitude |
+| MAX98357 I2S Amp | Audio | ✅ Yes | lastLeftSample, lastRightSample, peakAmplitude |
+| INMP441 I2S Mic | Audio | ✅ Yes | peakAmplitude, liveMicEnabled, bufferIndex |
+| SPH0645 I2S Mic | Audio | ✅ Yes | peakAmplitude, liveMicEnabled, bufferIndex |
+| 5W Speaker | Audio | ✅ Yes | audioChunk |
 | Relay Module | Actuator | ✅ Yes | active |
 | Motor Driver (L293D) | Driver | ✅ Yes | active |
 
@@ -71,6 +76,8 @@
 | Capacitive Touch | Sensor | ✅ Yes | touched, proximity |
 | Light Sensor (TSL2561) | Sensor | ✅ Yes | lux, infrared, visible |
 | Gas Sensor (MQ-2) | Sensor | ✅ Yes | ppm, resistance |
+| nRF24L01+ | Peripheral | ✅ Yes | power, mode, frequency, rxQueueSize, txQueueSize, statusReg |
+| CC1101 | Peripheral | ✅ Yes | state, frequency, modulation, rxQueueSize, txFifoSize, interruptPin |
 
 #### 🧮 Logic & ICs (6)
 | Component | Type | Custom Telemetry | Key Metrics |

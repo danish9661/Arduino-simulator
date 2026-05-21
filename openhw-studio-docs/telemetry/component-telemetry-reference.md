@@ -77,6 +77,9 @@ To give you complete bandwidth control, you can filter this data using the **Sel
 | `openhw-stepper-motor`<br>`wokwi-stepper-motor` | `angle` | Tracks the precise rotational angle of the bipolar stepper motor shaft. |
 | `openhw-a4988`<br>`wokwi-a4988` | `active`, `stepCount` | Tracks the A4988 stepper driver active enable state and accumulated step pulses. |
 | `openhw-buzzer`<br>`wokwi-buzzer` | `playing`, `isBuzzing`, `frequency`, `volume`, `muted` | Tracks active piezo buzzer tone generation, output frequency in Hz, volume, and mute status. |
+| `openhw-pcm5102`<br>`openhw-max98357` | `lastLeftSample`, `lastRightSample`, `peakAmplitude` | Tracks I2S decoded PCM samples and the visual peak amplitude. |
+| `openhw-inmp441`<br>`openhw-sph0645` | `peakAmplitude`, `liveMicEnabled`, `bufferIndex` | Tracks the live Web Audio microphone status and captured amplitude levels. |
+| `openhw-5w-speaker` | `audioChunk` | Tracks the Web Audio PCM chunks streamed from a connected DAC or amplifier. |
 | `openhw-relay-module`<br>`wokwi-relay` | `active` | Tracks the electromechanical relay coil state (energized/active vs de-energized). |
 | `openhw-motor-driver`<br>`openhw-l293d` | `active` | Tracks the dual H-bridge motor driver enable and channel switching states. |
 
@@ -114,6 +117,12 @@ To give you complete bandwidth control, you can filter this data using the **Sel
 | `openhw-soil-moisture-sensor`<br>`wokwi-soil-moisture-sensor`| `moisture` | Tracks simulated volumetric water content percentage (0-100%). |
 | `openhw-ntc-thermistor`<br>`wokwi-ntc-temperature-sensor`| `temperature`, `resistance`, `voltage` | Tracks simulated temperature in °C, NTC thermistor resistance, and analog voltage output. |
 | `openhw-sd-card`<br>`wokwi-sd-card` | `cardInserted`, `status` | Tracks SPI SD card insertion state, initialization status, and active SPI command responses. |
+| `openhw-ds18b20`<br>`wokwi-ds18b20` | `temperature`, `powered`, `resolution` | Tracks 1-Wire temperature in °C, power connection status, and configured ADC bit resolution. |
+| `openhw-ir-receiver`<br>`wokwi-ir-receiver` | `protocol`, `lastCode`, `demodulatedSignal`, `powered` | Tracks decoded IR protocol name, last received hex command code, live demodulated pin state, and power status. |
+| `openhw-mfrc522`<br>`wokwi-mfrc522` | `powered`, `cardPresent`, `cardUID` | Tracks 3.3V power connection status, RFID card presence latching, and active 4-byte card UID string. |
+| `openhw-nrf24l01` | `power`, `mode`, `frequency`, `rxQueueSize`, `txQueueSize`, `statusReg` | Tracks transceiver power state, TX/RX mode, active frequency, queue sizes, and internal status register. |
+| `openhw-cc1101` | `state`, `frequency`, `modulation`, `rxQueueSize`, `txFifoSize`, `interruptPin` | Tracks state machine state, frequency, modulation format, FIFO buffer sizes, and the interrupt pin state. |
+
 
 ---
 

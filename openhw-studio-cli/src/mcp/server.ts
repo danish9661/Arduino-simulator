@@ -1022,13 +1022,14 @@ export async function runMcpServer(config: McpServerConfig): Promise<void> {
       all_boards,
       token,
     }) => {
-      assertToken(config, token);
+      try {
+        assertToken(config, token);
 
-      const { project, projectFile } = await requireActiveProject(session);
-      const durationMs = Number.isFinite(Number(ms)) ? Math.max(0, Math.floor(Number(ms))) : 1000;
-      const includeTelemetry = !!include_telemetry;
-      const includeTrace = !!include_trace;
-      const includeConsole = !!include_console;
+        const { project, projectFile } = await requireActiveProject(session);
+        const durationMs = Number.isFinite(Number(ms)) ? Math.max(0, Math.floor(Number(ms))) : 1000;
+        const includeTelemetry = !!include_telemetry;
+        const includeTrace = !!include_trace;
+        const includeConsole = !!include_console;
 
       const runOptions: SimulationRunOptions = {
         backendUrl: config.backendUrl,
@@ -1091,6 +1092,10 @@ export async function runMcpServer(config: McpServerConfig): Promise<void> {
       }
 
       return makeToolResult(payload);
+      } catch (err: any) {
+        console.error('[SIM EXECUTE UNHANDLED EXCEPTION]', err.stack || err);
+        throw err;
+      }
     }
   );
 

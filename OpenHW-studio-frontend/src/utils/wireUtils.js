@@ -1,7 +1,7 @@
 // ─── RENDER ROUNDED PATH FROM POINT ARRAY ─────────────────────────────────
 export function renderRoundedPath(pts) {
   if (!pts || pts.length < 2) return '';
-  const r = 10;
+  const r = 6;
   let d = `M ${pts[0].x} ${pts[0].y}`;
   for (let i = 1; i < pts.length - 1; i++) {
     const prev = pts[i - 1], curr = pts[i], next = pts[i + 1];

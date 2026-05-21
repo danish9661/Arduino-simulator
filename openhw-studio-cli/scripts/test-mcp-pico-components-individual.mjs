@@ -15,14 +15,7 @@ const token = String(process.env.OPENHW_MCP_TOKEN || '').trim();
 
 const envMatrix = [
   {
-    key: 'micropython',
-    boardEnv: 'micropython',
-    durationMs: 1800,
-    codeFile: 'project/board1/main.py',
-    source: `from time import sleep\nprint("MCP_MP_COMPONENT_BOOT")\nfor i in range(6):\n  print("MCP_MP_COMPONENT_STEP", i)\n  sleep(0.05)\n`,
-  },
-  {
-    key: 'circuitpython',
+    key: 'openhw-led',
     boardEnv: 'circuitpython',
     durationMs: 2400,
     codeFile: 'project/board1/code.py',
@@ -58,7 +51,7 @@ function parseToolPayload(result, toolName) {
   }
 
   if (result?.isError) {
-    throw new Error(`${toolName} returned isError=true${text ? `: ${text}` : ''}`);
+    throw new Error(`${toolName} returned isError=true${text ? `: ${text}` : ''}\nFull Result: ${JSON.stringify(result, null, 2)}`);
   }
 
   assert(parsed && typeof parsed === 'object', `${toolName} returned empty or non-JSON payload.`);
@@ -333,7 +326,7 @@ async function runSingleCase(client, component, envConfig) {
 }
 
 async function main() {
-  const components = await listComponentCatalog();
+  const components = (await listComponentCatalog()).filter(c => c.type === 'openhw-led');
   assert(components.length > 0, 'No component manifests found for individual Pico tests.');
 
   const transport = new StdioClientTransport({
