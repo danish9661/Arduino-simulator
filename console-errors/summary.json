@@ -1,0 +1,94 @@
+{
+  "generatedAt": "2026-05-22T05:41:42.607Z",
+  "totalRoutesTested": 12,
+  "routesWithErrors": 3,
+  "routesWithNetworkErrors": 3,
+  "totalConsoleErrors": 35,
+  "totalNetworkErrors": 25,
+  "routeDetails": [
+    {
+      "name": "Adventure Map",
+      "path": "/adventure",
+      "errors": 0,
+      "warnings": 2,
+      "networkErrors": 0
+    },
+    {
+      "name": "Classroom Sign In",
+      "path": "/classroom/signin",
+      "errors": 0,
+      "warnings": 2,
+      "networkErrors": 0
+    },
+    {
+      "name": "Classroom Sign Up",
+      "path": "/classroom/signup",
+      "errors": 0,
+      "warnings": 2,
+      "networkErrors": 0
+    },
+    {
+      "name": "Component Editor",
+      "path": "/component-editor",
+      "errors": 0,
+      "warnings": 2,
+      "networkErrors": 0
+    },
+    {
+      "name": "Components",
+      "path": "/components",
+      "errors": 0,
+      "warnings": 2,
+      "networkErrors": 0
+    },
+    {
+      "name": "Gamification Simulator",
+      "path": "/gamification-simulator",
+      "errors": 9,
+      "warnings": 10,
+      "networkErrors": 7
+    },
+    {
+      "name": "Landing Page",
+      "path": "/",
+      "errors": 0,
+      "warnings": 2,
+      "networkErrors": 0
+    },
+    {
+      "name": "Login",
+      "path": "/login",
+      "errors": 0,
+      "warnings": 2,
+      "networkErrors": 0
+    },
+    {
+      "name": "Mobile Simulator",
+      "path": "/mobile-simulator",
+      "errors": 13,
+      "warnings": 10,
+      "networkErrors": 9
+    },
+    {
+      "name": "Projects Gallery",
+      "path": "/projects",
+      "errors": 0,
+      "warnings": 2,
+      "networkErrors": 0
+    },
+    {
+      "name": "Role Selection",
+      "path": "/select-role",
+      "errors": 0,
+      "warnings": 2,
+      "networkErrors": 0
+    },
+    {
+      "name": "Simulator",
+      "path": "/simulator",
+      "errors": 13,
+      "warnings": 10,
+      "networkErrors": 9
+    }
+  ]
+}

@@ -1,0 +1,530 @@
+{
+  "route": "/mobile-simulator",
+  "name": "Mobile Simulator",
+  "timestamp": "2026-05-22T05:41:30.202Z",
+  "summary": {
+    "totalMessages": 28,
+    "errors": 13,
+    "warnings": 10,
+    "networkErrors": 9
+  },
+  "details": {
+    "consoleMessages": [
+      {
+        "type": "debug",
+        "message": "[vite] connecting...",
+        "location": {
+          "url": "http://localhost:5173/@vite/client",
+          "lineNumber": 788,
+          "columnNumber": 8
+        },
+        "timestamp": "2026-05-22T05:41:22.216Z"
+      },
+      {
+        "type": "debug",
+        "message": "[vite] connected.",
+        "location": {
+          "url": "http://localhost:5173/@vite/client",
+          "lineNumber": 911,
+          "columnNumber": 14
+        },
+        "timestamp": "2026-05-22T05:41:22.244Z"
+      },
+      {
+        "type": "info",
+        "message": "%cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold",
+        "location": {
+          "url": "http://localhost:5173/node_modules/.vite/deps/chunk-FD5SMSK5.js?v=49720982",
+          "lineNumber": 21608,
+          "columnNumber": 24
+        },
+        "timestamp": "2026-05-22T05:41:22.933Z"
+      },
+      {
+        "type": "warning",
+        "message": "⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.",
+        "location": {
+          "url": "http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=49720982",
+          "lineNumber": 4435,
+          "columnNumber": 12
+        },
+        "timestamp": "2026-05-22T05:41:23.226Z"
+      },
+      {
+        "type": "warning",
+        "message": "⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.",
+        "location": {
+          "url": "http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=49720982",
+          "lineNumber": 4435,
+          "columnNumber": 12
+        },
+        "timestamp": "2026-05-22T05:41:23.227Z"
+      },
+      {
+        "type": "warning",
+        "message": "The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://developer.chrome.com/blog/autoplay/#web_audio",
+        "location": {
+          "url": "http://localhost:5173/@fs/home/runner/work/OpenHW-studio-frontend/OpenHW-studio-frontend/openhw-studio-emulator/src/components/openhw-buzzer/ui.tsx",
+          "lineNumber": 28,
+          "columnNumber": 0
+        },
+        "timestamp": "2026-05-22T05:41:23.746Z"
+      },
+      {
+        "type": "warning",
+        "message": "The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://developer.chrome.com/blog/autoplay/#web_audio",
+        "location": {
+          "url": "http://localhost:5173/@fs/home/runner/work/OpenHW-studio-frontend/OpenHW-studio-frontend/openhw-studio-emulator/src/components/openhw-buzzer/ui.tsx",
+          "lineNumber": 38,
+          "columnNumber": 0
+        },
+        "timestamp": "2026-05-22T05:41:23.747Z"
+      },
+      {
+        "type": "log",
+        "message": "[SimulatorService] Auth Tokens - Admin: false User: false",
+        "location": {
+          "url": "http://localhost:5173/src/pages/simulationpage/SimulationConsole.jsx",
+          "lineNumber": 147,
+          "columnNumber": 6
+        },
+        "timestamp": "2026-05-22T05:41:23.755Z"
+      },
+      {
+        "type": "warning",
+        "message": "The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://developer.chrome.com/blog/autoplay/#web_audio",
+        "location": {
+          "url": "http://localhost:5173/@fs/home/runner/work/OpenHW-studio-frontend/OpenHW-studio-frontend/openhw-studio-emulator/src/components/openhw-buzzer/ui.tsx",
+          "lineNumber": 28,
+          "columnNumber": 0
+        },
+        "timestamp": "2026-05-22T05:41:23.760Z"
+      },
+      {
+        "type": "warning",
+        "message": "The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://developer.chrome.com/blog/autoplay/#web_audio",
+        "location": {
+          "url": "http://localhost:5173/@fs/home/runner/work/OpenHW-studio-frontend/OpenHW-studio-frontend/openhw-studio-emulator/src/components/openhw-buzzer/ui.tsx",
+          "lineNumber": 38,
+          "columnNumber": 0
+        },
+        "timestamp": "2026-05-22T05:41:23.760Z"
+      },
+      {
+        "type": "log",
+        "message": "[SimulatorService] Auth Tokens - Admin: false User: false",
+        "location": {
+          "url": "http://localhost:5173/src/pages/simulationpage/SimulationConsole.jsx",
+          "lineNumber": 147,
+          "columnNumber": 6
+        },
+        "timestamp": "2026-05-22T05:41:23.762Z"
+      },
+      {
+        "type": "error",
+        "message": "Failed to fetch installed libraries AxiosError: Network Error\n    at XMLHttpRequest.handleError (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:1777:19)\n    at Axios.request (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:2398:41)\n    at async fetchInstalledLibraries (http://localhost:5173/src/services/simulatorService.js:67:22)\n    at async loadLibraries (http://localhost:5173/src/pages/simulationpage/SimulatorPage.jsx:1228:25)",
+        "location": {
+          "url": "http://localhost:5173/src/pages/simulationpage/SimulationConsole.jsx",
+          "lineNumber": 155,
+          "columnNumber": 6
+        },
+        "timestamp": "2026-05-22T05:41:24.055Z"
+      },
+      {
+        "type": "error",
+        "message": "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+        "location": {
+          "url": "http://localhost:5001/api/lib-list",
+          "lineNumber": 0,
+          "columnNumber": 0
+        },
+        "timestamp": "2026-05-22T05:41:24.055Z"
+      },
+      {
+        "type": "error",
+        "message": "[SimulatorPage] Failed to fetch permanently installed components: AxiosError: Network Error\n    at XMLHttpRequest.handleError (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:1777:19)\n    at Axios.request (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:2398:41)\n    at async fetchPublicInstalledComponents (http://localhost:5173/src/services/simulatorService.js:120:22)\n    at async http://localhost:5173/src/pages/simulationpage/SimulatorPage.jsx:1933:32",
+        "location": {
+          "url": "http://localhost:5173/src/pages/simulationpage/SimulationConsole.jsx",
+          "lineNumber": 155,
+          "columnNumber": 6
+        },
+        "timestamp": "2026-05-22T05:41:24.055Z"
+      },
+      {
+        "type": "error",
+        "message": "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+        "location": {
+          "url": "http://localhost:5001/api/components/public-installed",
+          "lineNumber": 0,
+          "columnNumber": 0
+        },
+        "timestamp": "2026-05-22T05:41:24.055Z"
+      },
+      {
+        "type": "warning",
+        "message": "[SimulatorPage] Component sync skipped: Network Error",
+        "location": {
+          "url": "http://localhost:5173/src/pages/simulationpage/SimulationConsole.jsx",
+          "lineNumber": 151,
+          "columnNumber": 6
+        },
+        "timestamp": "2026-05-22T05:41:24.057Z"
+      },
+      {
+        "type": "error",
+        "message": "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+        "location": {
+          "url": "http://localhost:5001/api/admin/components/backup",
+          "lineNumber": 0,
+          "columnNumber": 0
+        },
+        "timestamp": "2026-05-22T05:41:24.057Z"
+      },
+      {
+        "type": "warning",
+        "message": "[HardwarePorts] list failed: AxiosError: Network Error\n    at XMLHttpRequest.handleError (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:1777:19)\n    at Axios.request (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:2398:41)\n    at async listHardwarePorts (http://localhost:5173/src/services/simulatorService.js:56:22)\n    at async http://localhost:5173/src/pages/simulationpage/useHardwareFlashing.js:33:21",
+        "location": {
+          "url": "http://localhost:5173/src/pages/simulationpage/SimulationConsole.jsx",
+          "lineNumber": 151,
+          "columnNumber": 6
+        },
+        "timestamp": "2026-05-22T05:41:24.057Z"
+      },
+      {
+        "type": "error",
+        "message": "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+        "location": {
+          "url": "http://localhost:5001/api/compile/ports?showAll=false",
+          "lineNumber": 0,
+          "columnNumber": 0
+        },
+        "timestamp": "2026-05-22T05:41:24.057Z"
+      },
+      {
+        "type": "error",
+        "message": "Failed to fetch installed libraries AxiosError: Network Error\n    at XMLHttpRequest.handleError (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:1777:19)\n    at Axios.request (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:2398:41)\n    at async fetchInstalledLibraries (http://localhost:5173/src/services/simulatorService.js:67:22)\n    at async loadLibraries (http://localhost:5173/src/pages/simulationpage/SimulatorPage.jsx:1228:25)",
+        "location": {
+          "url": "http://localhost:5173/src/pages/simulationpage/SimulationConsole.jsx",
+          "lineNumber": 155,
+          "columnNumber": 6
+        },
+        "timestamp": "2026-05-22T05:41:24.057Z"
+      },
+      {
+        "type": "error",
+        "message": "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+        "location": {
+          "url": "http://localhost:5001/api/lib-list",
+          "lineNumber": 0,
+          "columnNumber": 0
+        },
+        "timestamp": "2026-05-22T05:41:24.057Z"
+      },
+      {
+        "type": "error",
+        "message": "[SimulatorPage] Failed to fetch permanently installed components: AxiosError: Network Error\n    at XMLHttpRequest.handleError (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:1777:19)\n    at Axios.request (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:2398:41)\n    at async fetchPublicInstalledComponents (http://localhost:5173/src/services/simulatorService.js:120:22)\n    at async http://localhost:5173/src/pages/simulationpage/SimulatorPage.jsx:1933:32",
+        "location": {
+          "url": "http://localhost:5173/src/pages/simulationpage/SimulationConsole.jsx",
+          "lineNumber": 155,
+          "columnNumber": 6
+        },
+        "timestamp": "2026-05-22T05:41:24.057Z"
+      },
+      {
+        "type": "error",
+        "message": "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+        "location": {
+          "url": "http://localhost:5001/api/components/public-installed",
+          "lineNumber": 0,
+          "columnNumber": 0
+        },
+        "timestamp": "2026-05-22T05:41:24.057Z"
+      },
+      {
+        "type": "warning",
+        "message": "[SimulatorPage] Component sync skipped: Network Error",
+        "location": {
+          "url": "http://localhost:5173/src/pages/simulationpage/SimulatorPage.jsx",
+          "lineNumber": 2147,
+          "columnNumber": 16
+        },
+        "timestamp": "2026-05-22T05:41:24.068Z"
+      },
+      {
+        "type": "error",
+        "message": "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+        "location": {
+          "url": "http://localhost:5001/api/admin/components/backup",
+          "lineNumber": 0,
+          "columnNumber": 0
+        },
+        "timestamp": "2026-05-22T05:41:24.068Z"
+      },
+      {
+        "type": "warning",
+        "message": "[HardwarePorts] list failed: AxiosError: Network Error\n    at XMLHttpRequest.handleError (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:1777:19)\n    at Axios.request (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:2398:41)\n    at async listHardwarePorts (http://localhost:5173/src/services/simulatorService.js:56:22)\n    at async http://localhost:5173/src/pages/simulationpage/useHardwareFlashing.js:33:21",
+        "location": {
+          "url": "http://localhost:5173/src/pages/simulationpage/useHardwareFlashing.js",
+          "lineNumber": 38,
+          "columnNumber": 14
+        },
+        "timestamp": "2026-05-22T05:41:24.068Z"
+      },
+      {
+        "type": "error",
+        "message": "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+        "location": {
+          "url": "http://localhost:5001/api/compile/ports?showAll=false",
+          "lineNumber": 0,
+          "columnNumber": 0
+        },
+        "timestamp": "2026-05-22T05:41:24.069Z"
+      },
+      {
+        "type": "error",
+        "message": "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+        "location": {
+          "url": "http://localhost:5001/api/components/version",
+          "lineNumber": 0,
+          "columnNumber": 0
+        },
+        "timestamp": "2026-05-22T05:41:24.088Z"
+      }
+    ],
+    "consoleErrors": [
+      {
+        "message": "Failed to fetch installed libraries AxiosError: Network Error\n    at XMLHttpRequest.handleError (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:1777:19)\n    at Axios.request (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:2398:41)\n    at async fetchInstalledLibraries (http://localhost:5173/src/services/simulatorService.js:67:22)\n    at async loadLibraries (http://localhost:5173/src/pages/simulationpage/SimulatorPage.jsx:1228:25)",
+        "location": {
+          "url": "http://localhost:5173/src/pages/simulationpage/SimulationConsole.jsx",
+          "lineNumber": 155,
+          "columnNumber": 6
+        }
+      },
+      {
+        "message": "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+        "location": {
+          "url": "http://localhost:5001/api/lib-list",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      },
+      {
+        "message": "[SimulatorPage] Failed to fetch permanently installed components: AxiosError: Network Error\n    at XMLHttpRequest.handleError (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:1777:19)\n    at Axios.request (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:2398:41)\n    at async fetchPublicInstalledComponents (http://localhost:5173/src/services/simulatorService.js:120:22)\n    at async http://localhost:5173/src/pages/simulationpage/SimulatorPage.jsx:1933:32",
+        "location": {
+          "url": "http://localhost:5173/src/pages/simulationpage/SimulationConsole.jsx",
+          "lineNumber": 155,
+          "columnNumber": 6
+        }
+      },
+      {
+        "message": "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+        "location": {
+          "url": "http://localhost:5001/api/components/public-installed",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      },
+      {
+        "message": "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+        "location": {
+          "url": "http://localhost:5001/api/admin/components/backup",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      },
+      {
+        "message": "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+        "location": {
+          "url": "http://localhost:5001/api/compile/ports?showAll=false",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      },
+      {
+        "message": "Failed to fetch installed libraries AxiosError: Network Error\n    at XMLHttpRequest.handleError (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:1777:19)\n    at Axios.request (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:2398:41)\n    at async fetchInstalledLibraries (http://localhost:5173/src/services/simulatorService.js:67:22)\n    at async loadLibraries (http://localhost:5173/src/pages/simulationpage/SimulatorPage.jsx:1228:25)",
+        "location": {
+          "url": "http://localhost:5173/src/pages/simulationpage/SimulationConsole.jsx",
+          "lineNumber": 155,
+          "columnNumber": 6
+        }
+      },
+      {
+        "message": "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+        "location": {
+          "url": "http://localhost:5001/api/lib-list",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      },
+      {
+        "message": "[SimulatorPage] Failed to fetch permanently installed components: AxiosError: Network Error\n    at XMLHttpRequest.handleError (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:1777:19)\n    at Axios.request (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:2398:41)\n    at async fetchPublicInstalledComponents (http://localhost:5173/src/services/simulatorService.js:120:22)\n    at async http://localhost:5173/src/pages/simulationpage/SimulatorPage.jsx:1933:32",
+        "location": {
+          "url": "http://localhost:5173/src/pages/simulationpage/SimulationConsole.jsx",
+          "lineNumber": 155,
+          "columnNumber": 6
+        }
+      },
+      {
+        "message": "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+        "location": {
+          "url": "http://localhost:5001/api/components/public-installed",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      },
+      {
+        "message": "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+        "location": {
+          "url": "http://localhost:5001/api/admin/components/backup",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      },
+      {
+        "message": "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+        "location": {
+          "url": "http://localhost:5001/api/compile/ports?showAll=false",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      },
+      {
+        "message": "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+        "location": {
+          "url": "http://localhost:5001/api/components/version",
+          "lineNumber": 0,
+          "columnNumber": 0
+        }
+      }
+    ],
+    "consoleWarnings": [
+      {
+        "message": "⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.",
+        "location": {
+          "url": "http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=49720982",
+          "lineNumber": 4435,
+          "columnNumber": 12
+        }
+      },
+      {
+        "message": "⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.",
+        "location": {
+          "url": "http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=49720982",
+          "lineNumber": 4435,
+          "columnNumber": 12
+        }
+      },
+      {
+        "message": "The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://developer.chrome.com/blog/autoplay/#web_audio",
+        "location": {
+          "url": "http://localhost:5173/@fs/home/runner/work/OpenHW-studio-frontend/OpenHW-studio-frontend/openhw-studio-emulator/src/components/openhw-buzzer/ui.tsx",
+          "lineNumber": 28,
+          "columnNumber": 0
+        }
+      },
+      {
+        "message": "The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://developer.chrome.com/blog/autoplay/#web_audio",
+        "location": {
+          "url": "http://localhost:5173/@fs/home/runner/work/OpenHW-studio-frontend/OpenHW-studio-frontend/openhw-studio-emulator/src/components/openhw-buzzer/ui.tsx",
+          "lineNumber": 38,
+          "columnNumber": 0
+        }
+      },
+      {
+        "message": "The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://developer.chrome.com/blog/autoplay/#web_audio",
+        "location": {
+          "url": "http://localhost:5173/@fs/home/runner/work/OpenHW-studio-frontend/OpenHW-studio-frontend/openhw-studio-emulator/src/components/openhw-buzzer/ui.tsx",
+          "lineNumber": 28,
+          "columnNumber": 0
+        }
+      },
+      {
+        "message": "The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://developer.chrome.com/blog/autoplay/#web_audio",
+        "location": {
+          "url": "http://localhost:5173/@fs/home/runner/work/OpenHW-studio-frontend/OpenHW-studio-frontend/openhw-studio-emulator/src/components/openhw-buzzer/ui.tsx",
+          "lineNumber": 38,
+          "columnNumber": 0
+        }
+      },
+      {
+        "message": "[SimulatorPage] Component sync skipped: Network Error",
+        "location": {
+          "url": "http://localhost:5173/src/pages/simulationpage/SimulationConsole.jsx",
+          "lineNumber": 151,
+          "columnNumber": 6
+        }
+      },
+      {
+        "message": "[HardwarePorts] list failed: AxiosError: Network Error\n    at XMLHttpRequest.handleError (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:1777:19)\n    at Axios.request (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:2398:41)\n    at async listHardwarePorts (http://localhost:5173/src/services/simulatorService.js:56:22)\n    at async http://localhost:5173/src/pages/simulationpage/useHardwareFlashing.js:33:21",
+        "location": {
+          "url": "http://localhost:5173/src/pages/simulationpage/SimulationConsole.jsx",
+          "lineNumber": 151,
+          "columnNumber": 6
+        }
+      },
+      {
+        "message": "[SimulatorPage] Component sync skipped: Network Error",
+        "location": {
+          "url": "http://localhost:5173/src/pages/simulationpage/SimulatorPage.jsx",
+          "lineNumber": 2147,
+          "columnNumber": 16
+        }
+      },
+      {
+        "message": "[HardwarePorts] list failed: AxiosError: Network Error\n    at XMLHttpRequest.handleError (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:1777:19)\n    at Axios.request (http://localhost:5173/node_modules/.vite/deps/axios.js?v=49720982:2398:41)\n    at async listHardwarePorts (http://localhost:5173/src/services/simulatorService.js:56:22)\n    at async http://localhost:5173/src/pages/simulationpage/useHardwareFlashing.js:33:21",
+        "location": {
+          "url": "http://localhost:5173/src/pages/simulationpage/useHardwareFlashing.js",
+          "lineNumber": 38,
+          "columnNumber": 14
+        }
+      }
+    ],
+    "networkErrors": [
+      {
+        "url": "http://localhost:5001/api/lib-list",
+        "method": "GET",
+        "error": "net::ERR_CONNECTION_REFUSED"
+      },
+      {
+        "url": "http://localhost:5001/api/components/public-installed",
+        "method": "GET",
+        "error": "net::ERR_CONNECTION_REFUSED"
+      },
+      {
+        "url": "http://localhost:5001/api/admin/components/backup",
+        "method": "GET",
+        "error": "net::ERR_CONNECTION_REFUSED"
+      },
+      {
+        "url": "http://localhost:5001/api/compile/ports?showAll=false",
+        "method": "GET",
+        "error": "net::ERR_CONNECTION_REFUSED"
+      },
+      {
+        "url": "http://localhost:5001/api/lib-list",
+        "method": "GET",
+        "error": "net::ERR_CONNECTION_REFUSED"
+      },
+      {
+        "url": "http://localhost:5001/api/components/public-installed",
+        "method": "GET",
+        "error": "net::ERR_CONNECTION_REFUSED"
+      },
+      {
+        "url": "http://localhost:5001/api/admin/components/backup",
+        "method": "GET",
+        "error": "net::ERR_CONNECTION_REFUSED"
+      },
+      {
+        "url": "http://localhost:5001/api/compile/ports?showAll=false",
+        "method": "GET",
+        "error": "net::ERR_CONNECTION_REFUSED"
+      },
+      {
+        "url": "http://localhost:5001/api/components/version",
+        "method": "GET",
+        "error": "net::ERR_CONNECTION_REFUSED"
+      }
+    ]
+  }
+}

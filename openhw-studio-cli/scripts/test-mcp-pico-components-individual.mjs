@@ -326,7 +326,7 @@ async function runSingleCase(client, component, envConfig) {
 }
 
 async function main() {
-  const components = (await listComponentCatalog()).filter(c => c.type === 'openhw-led');
+  const components = await listComponentCatalog();
   assert(components.length > 0, 'No component manifests found for individual Pico tests.');
 
   const transport = new StdioClientTransport({

@@ -1,0 +1,343 @@
+{
+  "generatedAt": "2026-05-21T17:37:02.784Z",
+  "elapsedMs": 2654,
+  "faults": 0,
+  "serialChars": 0,
+  "boards": [
+    {
+      "id": "uno1",
+      "type": "openhw-arduino-uno",
+      "serialChars": 0,
+      "faultCount": 0
+    }
+  ],
+  "components": [
+    {
+      "id": "a4988_stepper_motor_1",
+      "type": "openhw-a4988",
+      "label": "A4988",
+      "group": "Actuators",
+      "role": "output",
+      "status": "ok",
+      "updates": 5,
+      "changedKeys": [
+        "active",
+        "analogVoltages",
+        "i2cTraffic",
+        "i2sTraffic",
+        "oneWireTraffic",
+        "pins",
+        "pinToggles",
+        "pioTraffic",
+        "pwmTraffic",
+        "serialBytes",
+        "spiTraffic"
+      ],
+      "outputSummary": "State keys: active, pins, pinToggles, analogVoltages, i2cTraffic, spiTraffic, serialBytes, pwmTraffic",
+      "telemetrySummary": "State keys: active, pins, pinToggles, analogVoltages, i2cTraffic, spiTraffic, serialBytes, pwmTraffic",
+      "telemetryData": {
+        "_component": {
+          "role": "output",
+          "updates": 5,
+          "changedKeys": 11,
+          "stateKeys": 11,
+          "hasRuntimeState": true
+        },
+        "_fallbackGenerated": true,
+        "_health": {
+          "icon": "🟢",
+          "status": "ok"
+        }
+      },
+      "notes": [],
+      "lastState": {
+        "active": true,
+        "pins": {
+          "VDD": true,
+          "RESET": true,
+          "SLEEP": true,
+          "1A": true,
+          "2A": true,
+          "VMOT": true,
+          "DIR": true,
+          "STEP": false,
+          "1B": false,
+          "2B": false
+        },
+        "pinToggles": {
+          "1A": 32,
+          "STEP": 127,
+          "2A": 32,
+          "1B": 31,
+          "2B": 31
+        },
+        "analogVoltages": {
+          "ENABLE": 0,
+          "MS1": 0,
+          "MS2": 0,
+          "MS3": 0,
+          "RESET": 5,
+          "SLEEP": 5,
+          "STEP": 0,
+          "DIR": 5,
+          "VMOT": 12,
+          "GND_MOT": 0,
+          "2B": 0,
+          "2A": 5,
+          "1A": 5,
+          "1B": 0,
+          "VDD": 5,
+          "GND_LOGIC": 0
+        },
+        "i2cTraffic": [],
+        "spiTraffic": [],
+        "serialBytes": 0,
+        "pwmTraffic": 0,
+        "oneWireTraffic": 0,
+        "pioTraffic": 0,
+        "i2sTraffic": 0
+      }
+    },
+    {
+      "id": "power-supply_stepper_motor_1",
+      "type": "openhw-power-supply",
+      "label": "Power Supply",
+      "group": "Basic",
+      "role": "input",
+      "status": "ok",
+      "updates": 1,
+      "changedKeys": [
+        "analogVoltages",
+        "i2cTraffic",
+        "i2sTraffic",
+        "oneWireTraffic",
+        "pins",
+        "pinToggles",
+        "pioTraffic",
+        "pwmTraffic",
+        "serialBytes",
+        "spiTraffic",
+        "voltage"
+      ],
+      "outputSummary": "State keys: voltage, pins, pinToggles, analogVoltages, i2cTraffic, spiTraffic, serialBytes, pwmTraffic",
+      "telemetrySummary": "State keys: voltage, pins, pinToggles, analogVoltages, i2cTraffic, spiTraffic, serialBytes, pwmTraffic",
+      "telemetryData": {
+        "_component": {
+          "role": "input",
+          "updates": 1,
+          "changedKeys": 11,
+          "stateKeys": 11,
+          "hasRuntimeState": true
+        },
+        "_fallbackGenerated": true,
+        "_health": {
+          "icon": "🟢",
+          "status": "ok"
+        }
+      },
+      "notes": [],
+      "lastState": {
+        "voltage": "12.0",
+        "pins": {},
+        "pinToggles": {},
+        "analogVoltages": {
+          "GND": 0,
+          "5V": 12,
+          "VCC": 0
+        },
+        "i2cTraffic": [],
+        "spiTraffic": [],
+        "serialBytes": 0,
+        "pwmTraffic": 0,
+        "oneWireTraffic": 0,
+        "pioTraffic": 0,
+        "i2sTraffic": 0
+      }
+    },
+    {
+      "id": "stepper_motor_1",
+      "type": "openhw-stepper-motor",
+      "label": "Stepper Motor (Bipolar)",
+      "group": "Actuators",
+      "role": "output",
+      "status": "ok",
+      "updates": 5,
+      "changedKeys": [
+        "analogVoltages",
+        "i2cTraffic",
+        "i2sTraffic",
+        "oneWireTraffic",
+        "pins",
+        "pinToggles",
+        "pioTraffic",
+        "pwmTraffic",
+        "serialBytes",
+        "spiTraffic",
+        "step_angle",
+        "targetBoard"
+      ],
+      "outputSummary": "Motor/Servo speed=0",
+      "telemetrySummary": "Motor/Servo speed=0",
+      "telemetryData": {
+        "_component": {
+          "role": "output",
+          "updates": 5,
+          "changedKeys": 12,
+          "stateKeys": 12,
+          "hasRuntimeState": true
+        },
+        "_fallbackGenerated": true,
+        "_health": {
+          "icon": "🟢",
+          "status": "ok"
+        }
+      },
+      "notes": [],
+      "lastState": {
+        "step_angle": "1.8",
+        "targetBoard": "uno1",
+        "pins": {
+          "A+": true,
+          "A-": true,
+          "B+": false,
+          "B-": false
+        },
+        "pinToggles": {
+          "A+": 32,
+          "A-": 32,
+          "B+": 31,
+          "B-": 31
+        },
+        "analogVoltages": {
+          "A+": 5,
+          "A-": 5,
+          "B+": 0,
+          "B-": 0
+        },
+        "i2cTraffic": [],
+        "spiTraffic": [],
+        "serialBytes": 0,
+        "pwmTraffic": 0,
+        "oneWireTraffic": 0,
+        "pioTraffic": 0,
+        "i2sTraffic": 0
+      }
+    },
+    {
+      "id": "uno1",
+      "type": "openhw-arduino-uno",
+      "label": "Arduino Uno",
+      "group": "Boards",
+      "role": "board",
+      "status": "ok",
+      "updates": 5,
+      "changedKeys": [
+        "analogVoltages",
+        "i2cTraffic",
+        "i2sTraffic",
+        "oneWireTraffic",
+        "pin13Active",
+        "pins",
+        "pinToggles",
+        "pioTraffic",
+        "pwmTraffic",
+        "rxActive",
+        "serialBytes",
+        "spiTraffic",
+        "txActive"
+      ],
+      "outputSummary": "State keys: txActive, rxActive, pin13Active, pins, pinToggles, analogVoltages, i2cTraffic, spiTraffic",
+      "telemetrySummary": "State keys: txActive, rxActive, pin13Active, pins, pinToggles, analogVoltages, i2cTraffic, spiTraffic",
+      "telemetryData": {
+        "_component": {
+          "role": "board",
+          "updates": 5,
+          "changedKeys": 13,
+          "stateKeys": 13,
+          "hasRuntimeState": true
+        },
+        "_fallbackGenerated": true,
+        "_health": {
+          "icon": "🟢",
+          "status": "ok"
+        }
+      },
+      "notes": [],
+      "lastState": {
+        "txActive": true,
+        "rxActive": true,
+        "pin13Active": true,
+        "pins": {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true,
+          "7": true,
+          "8": false,
+          "9": true,
+          "11": true,
+          "12": true,
+          "13": true,
+          "5V": true,
+          "vin": true,
+          "VIN": true,
+          "3V3": true,
+          "A0": true,
+          "A1": true,
+          "A2": true,
+          "A3": true,
+          "A4": true,
+          "A5": true
+        },
+        "pinToggles": {
+          "8": 127
+        },
+        "analogVoltages": {
+          "0": 5,
+          "1": 5,
+          "2": 5,
+          "3": 5,
+          "4": 5,
+          "5": 5,
+          "6": 5,
+          "7": 5,
+          "8": 0,
+          "9": 5,
+          "10": 0,
+          "11": 5,
+          "12": 5,
+          "13": 5,
+          "A0": 5,
+          "A1": 5,
+          "A2": 5,
+          "A3": 5,
+          "A4": 5,
+          "A5": 5,
+          "vin": 5,
+          "VIN": 5,
+          "gnd_1": 0,
+          "gnd_2": 0,
+          "gnd_3": 0,
+          "GND": 0,
+          "5V": 5,
+          "3v3": 0,
+          "3V3": 3.3,
+          "rst": 0,
+          "RST": 0,
+          "ioref": 0,
+          "IOREF": 0
+        },
+        "i2cTraffic": [],
+        "spiTraffic": [],
+        "serialBytes": 0,
+        "pwmTraffic": 0,
+        "oneWireTraffic": 0,
+        "pioTraffic": 0,
+        "i2sTraffic": 0
+      }
+    }
+  ]
+}

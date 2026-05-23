@@ -1,0 +1,85 @@
+{
+  "route": "/components",
+  "name": "Components",
+  "timestamp": "2026-05-22T05:41:09.745Z",
+  "summary": {
+    "totalMessages": 5,
+    "errors": 0,
+    "warnings": 2,
+    "networkErrors": 0
+  },
+  "details": {
+    "consoleMessages": [
+      {
+        "type": "debug",
+        "message": "[vite] connecting...",
+        "location": {
+          "url": "http://localhost:5173/@vite/client",
+          "lineNumber": 788,
+          "columnNumber": 8
+        },
+        "timestamp": "2026-05-22T05:41:05.702Z"
+      },
+      {
+        "type": "debug",
+        "message": "[vite] connected.",
+        "location": {
+          "url": "http://localhost:5173/@vite/client",
+          "lineNumber": 911,
+          "columnNumber": 14
+        },
+        "timestamp": "2026-05-22T05:41:05.719Z"
+      },
+      {
+        "type": "info",
+        "message": "%cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold",
+        "location": {
+          "url": "http://localhost:5173/node_modules/.vite/deps/chunk-FD5SMSK5.js?v=49720982",
+          "lineNumber": 21608,
+          "columnNumber": 24
+        },
+        "timestamp": "2026-05-22T05:41:06.416Z"
+      },
+      {
+        "type": "warning",
+        "message": "⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.",
+        "location": {
+          "url": "http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=49720982",
+          "lineNumber": 4435,
+          "columnNumber": 12
+        },
+        "timestamp": "2026-05-22T05:41:06.753Z"
+      },
+      {
+        "type": "warning",
+        "message": "⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.",
+        "location": {
+          "url": "http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=49720982",
+          "lineNumber": 4435,
+          "columnNumber": 12
+        },
+        "timestamp": "2026-05-22T05:41:06.753Z"
+      }
+    ],
+    "consoleErrors": [],
+    "consoleWarnings": [
+      {
+        "message": "⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.",
+        "location": {
+          "url": "http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=49720982",
+          "lineNumber": 4435,
+          "columnNumber": 12
+        }
+      },
+      {
+        "message": "⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.",
+        "location": {
+          "url": "http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=49720982",
+          "lineNumber": 4435,
+          "columnNumber": 12
+        }
+      }
+    ],
+    "networkErrors": []
+  }
+}
