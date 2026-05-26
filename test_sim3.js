@@ -1,0 +1,2 @@
+const fs = require('fs'); const preamble = '#define setup _sim_user_setup\n#define loop  _sim_user_loop\n\n'; const suffix = '\n#undef setup\n#undef loop\n#include \
+SimulatorBridge.h\\n\nvoid setup() {\n    _simBridgeInit_Early();\n    _sim_user_setup();\n    _simBridgeInit_Late();\n    if (!_sim_ready_sent) sim_ready();\n}\n\nvoid loop() {\n    _sim_user_loop();\n}\n'; const finalCode = preamble + '' + suffix; fs.writeFileSync('test_sim3/test_sim3.ino', finalCode, 'utf8'); fs.writeFileSync('test_sim3/SimulatorBridge.h', '', 'utf8');

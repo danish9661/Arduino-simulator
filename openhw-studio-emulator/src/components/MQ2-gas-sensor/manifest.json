@@ -1,0 +1,33 @@
+{
+    "type": "openhw-mq2-gas-sensor",
+    "label": "MQ-2 Gas Sensor",
+    "description": "Analog/Digital Gas Sensor Module — detects LPG, smoke, alcohol, propane, hydrogen, methane and carbon monoxide.",
+    "group": "Sensors",
+    "width": 138,
+    "height": 63,
+    "w": 138,
+    "h": 63,
+    "attrs": {
+        "threshold": 300
+    },
+    "pins": [
+        { "id": "VCC", "label": "VCC", "x": 135, "y": 46, "type": "power" },
+        { "id": "GND", "label": "GND", "x": 135, "y": 36, "type": "power" },
+        { "id": "DO",  "label": "D0",  "x": 135, "y": 26, "type": "digital" },
+        { "id": "AO",  "label": "A0",  "x": 135, "y": 17, "type": "analog" }
+    ],
+    "autocoding": {
+        "arduino": {
+            "setup": "Serial.begin(115200);\npinMode(${DO}, INPUT);\nSerial.println(\"MQ-2 Gas Sensor ready.\");",
+            "loop": "int analogVal = analogRead(${AO});\nint digitalVal = digitalRead(${DO});\nSerial.print(\"MQ-2 AO: \");\nSerial.print(analogVal);\nSerial.print(\"  DO: \");\nSerial.println(digitalVal == LOW ? \"GAS DETECTED\" : \"Clear\");\ndelay(1000);"
+        }
+    },
+    "autowiring": {
+        "connections": [
+            { "from": "VCC", "to": "arduino:5V" },
+            { "from": "GND", "to": "arduino:GND" },
+            { "from": "DO",  "to": "arduino:2|3|4|5|6|7" },
+            { "from": "AO",  "to": "arduino:A0|A1|A2|A3|A4|A5" }
+        ]
+    }
+}

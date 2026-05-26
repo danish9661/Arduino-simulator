@@ -312,6 +312,8 @@ impl Engine {
 
     pub fn resolve_bus_pair(&mut self, board_id: &str, bus_type: &str, plan: &mut AutonomousPlan) -> Option<(String, String, String, i32)> {
         let is_pico = self.components.get(board_id)?.kind.contains("pico");
+        let is_esp32 = self.components.get(board_id)?.kind.contains("esp32");
+        let is_mega = self.components.get(board_id)?.kind.contains("mega");
         
         if bus_type == "i2c" {
             let pairs = if is_pico {
@@ -319,11 +321,16 @@ impl Engine {
                     ("GP4", "GP5", "", 0), ("GP0", "GP1", "", 0), ("GP8", "GP9", "", 0), ("GP12", "GP13", "", 0), ("GP20", "GP21", "", 0),
                     ("GP6", "GP7", "", 1), ("GP2", "GP3", "", 1), ("GP10", "GP11", "", 1), ("GP14", "GP15", "", 1), ("GP26", "GP27", "", 1),
                 ]
+            } else if is_esp32 {
+                vec![("21", "22", "", 0)]
+            } else if is_mega {
+                vec![("20", "21", "", 0), ("SDA", "SCL", "", 0)]
             } else {
                 vec![("A4", "A5", "", 0)]
             };
             for (p1, p2, p3, idx) in pairs {
-                if !self.is_pin_taken(board_id, p1, plan) && !self.is_pin_taken(board_id, p2, plan) {
+                if self.pin_exists(board_id, p1) && self.pin_exists(board_id, p2) && (p3.is_empty() || self.pin_exists(board_id, p3)) &&
+                   !self.is_pin_taken(board_id, p1, plan) && !self.is_pin_taken(board_id, p2, plan) {
                     return Some((p1.to_string(), p2.to_string(), p3.to_string(), idx));
                 }
             }
@@ -334,11 +341,16 @@ impl Engine {
                     ("GP22", "GP23", "GP20", 0), ("GP26", "GP27", "GP24", 0),
                     ("GP14", "GP15", "GP12", 1), ("GP10", "GP11", "GP8", 1), ("GP2", "GP3", "GP0", 1), ("GP6", "GP7", "GP4", 1),
                 ]
+            } else if is_esp32 {
+                vec![("18", "23", "19", 0), ("14", "13", "12", 1)]
+            } else if is_mega {
+                vec![("52", "51", "50", 0), ("SCK", "MOSI", "MISO", 0)]
             } else {
-                vec![("13", "11", "12", 0)] // Uno SPI: 13=SCK, 11=MOSI, 12=MISO
+                vec![("13", "11", "12", 0)] // Uno/Nano SPI
             };
             for (sck, mosi, miso, idx) in groups {
-                if !self.is_pin_taken(board_id, sck, plan) && !self.is_pin_taken(board_id, mosi, plan) && !self.is_pin_taken(board_id, miso, plan) {
+                if self.pin_exists(board_id, sck) && self.pin_exists(board_id, mosi) && self.pin_exists(board_id, miso) &&
+                   !self.is_pin_taken(board_id, sck, plan) && !self.is_pin_taken(board_id, mosi, plan) && !self.is_pin_taken(board_id, miso, plan) {
                     return Some((sck.to_string(), mosi.to_string(), miso.to_string(), idx));
                 }
             }
@@ -380,18 +392,20 @@ impl Engine {
             }
         } else if is_esp32 {
             match preferred.to_uppercase().as_str() {
-                "SDA" | "A4" => preferred_cleaned = "GPIO21".to_string(),
-                "SCL" | "A5" => preferred_cleaned = "GPIO22".to_string(),
-                "PWM" | "6"  => preferred_cleaned = "GPIO18".to_string(),
-                "A0" => preferred_cleaned = "GPIO36".to_string(),
+                "SDA" | "A4" => preferred_cleaned = "21".to_string(),
+                "SCL" | "A5" => preferred_cleaned = "22".to_string(),
+                "PWM" | "6"  => preferred_cleaned = "18".to_string(),
+                "A0" => preferred_cleaned = "36".to_string(),
                 _ if preferred.chars().all(|c| c.is_numeric()) => {
-                    preferred_cleaned = format!("GPIO{}", preferred);
+                    preferred_cleaned = preferred.to_string();
                 }
                 _ => {}
             }
         }
 
-        if !is_taken(&preferred_cleaned) {
+        let preferred_exists = board.pins.iter().any(|p| p.id == preferred_cleaned);
+
+        if preferred_exists && !is_taken(&preferred_cleaned) {
             self.occupied_pins.entry(board_id.to_string()).or_default().push(preferred_cleaned.clone());
             return Some(preferred_cleaned);
         }
@@ -500,6 +514,72 @@ impl Engine {
             None => return,
         };
         let is_pico = board.kind.contains("pico") || board.kind.contains("rp2040");
+        let is_esp32 = board.kind.contains("esp32");
+
+        let board_has_5v = self.pin_exists(board_id, "5V") || self.pin_exists(board_id, "VBUS");
+        let mut fallback_use_external_psu = false;
+        let mut fallback_psu_id = "powersupply".to_string();
+
+        if !board_has_5v {
+            for pin in manifest_pins {
+                let pn = pin.id.to_lowercase();
+                if pn == "vcc" || pn == "5v" || pn == "vdd" {
+                    fallback_use_external_psu = true;
+                    break;
+                }
+            }
+        }
+
+        if fallback_use_external_psu {
+            let has_psu = plan.added_components.iter().any(|c| {
+                if !c.kind.contains("power-supply") { return false; }
+                if let Some(attrs) = &c.attrs {
+                    if let Some(volts) = attrs.get("voltage") {
+                        if volts.as_str() == Some("5.0") || volts.as_f64() == Some(5.0) {
+                            return true;
+                        }
+                    }
+                }
+                false
+            });
+            if !has_psu {
+                let bb = self.find_breadboard();
+                let bb_x = bb.map(|b| b.x).unwrap_or(comp.x + 100.0);
+                let bb_y = bb.map(|b| b.y).unwrap_or(comp.y - 100.0);
+                let raw_x = bb_x - 100.0;
+                let raw_y = bb_y + 100.0;
+                let (ps_x, ps_y) = self.free_helper_position(raw_x, raw_y, 60.0, 60.0, None);
+                
+                plan.added_components.push(NewComponentPlan {
+                    id: "powersupply".to_string(), kind: "openhw-power-supply".to_string(),
+                    label: Some("Power Supply".to_string()),
+                    x: ps_x, y: ps_y, w: Some(60.0), h: Some(60.0),
+                    attrs: Some(serde_json::json!({ "voltage": "5.0" })),
+                });
+                let target_gnd = if is_esp32 { "GND.1" } else { "GND" };
+                plan.added_wires.push(WirePlan {
+                    id: format!("w_ps_gnd_{}", comp.id),
+                    from: "powersupply:GND".to_string(),
+                    to: format!("{}:{}", board_id, target_gnd),
+                    color: "black".to_string(), path: None, is_socket: false, is_hidden: false,
+                    lane: 0,
+                });
+            } else {
+                if let Some(added_psu) = plan.added_components.iter().find(|c| {
+                    if !c.kind.contains("power-supply") { return false; }
+                    if let Some(attrs) = &c.attrs {
+                        if let Some(volts) = attrs.get("voltage") {
+                            if volts.as_str() == Some("5.0") || volts.as_f64() == Some(5.0) {
+                                return true;
+                            }
+                        }
+                    }
+                    false
+                }) {
+                    fallback_psu_id = added_psu.id.clone();
+                }
+            }
+        }
 
         let mut i2c_done = false;
         let mut fallback_i2c_bus: Option<(String, String, String, i32)> = None;
@@ -511,19 +591,38 @@ impl Engine {
             let t   = idx;
 
             if pn == "vcc" || pn == "v+" || pn == "5v" || pn == "3v3" || pn == "vdd" || pn == "vin" {
-                let target_v = if is_pico { "VBUS" } else { "5V" };
+                let target_v = if fallback_use_external_psu && (pn == "vcc" || pn == "5v" || pn == "vdd") {
+                    format!("{}:5V", fallback_psu_id)
+                } else if is_pico {
+                    format!("{}:VBUS", board_id).to_string()
+                } else if is_esp32 {
+                    format!("{}:VIN", board_id).to_string()
+                } else {
+                    format!("{}:5V", board_id).to_string()
+                };
+                let to_target = if target_v.contains(':') { target_v } else { format!("{}:{}", board_id, target_v) };
+
                 plan.added_wires.push(WirePlan {
                     id: format!("w_fallback_vcc_{}_{}", comp.id, t),
                     from: format!("{}:{}", comp.id, pin.id),
-                    to: format!("{}:{}", board_id, target_v),
+                    to: to_target,
                     color: "red".to_string(), path: None, is_socket: false, is_hidden: false,
                     lane: (idx % 7) as i32,
                 });
             } else if pn == "gnd" || pn == "vss" || pn == "0v" || pt == "power" {
+                let target_gnd = if fallback_use_external_psu {
+                    format!("{}:GND", fallback_psu_id)
+                } else if is_esp32 {
+                    format!("{}:GND.1", board_id).to_string()
+                } else {
+                    format!("{}:GND", board_id).to_string()
+                };
+                let to_target = if target_gnd.contains(':') { target_gnd } else { format!("{}:{}", board_id, target_gnd) };
+
                 plan.added_wires.push(WirePlan {
                     id: format!("w_fallback_gnd_{}_{}", comp.id, t),
                     from: format!("{}:{}", comp.id, pin.id),
-                    to: format!("{}:GND", board_id),
+                    to: to_target,
                     color: "black".to_string(), path: None, is_socket: false, is_hidden: false,
                     lane: (idx % 7) as i32,
                 });
@@ -713,8 +812,74 @@ pub fn generate_autonomous_setup(
     let mut resolved_pins: HashMap<String, String> = HashMap::new();
     let mut i2c_injected = false;
 
+    let is_esp32 = engine.components.get(&board_id).map(|c| c.kind.contains("esp32")).unwrap_or(false);
+    let board_has_5v = engine.pin_exists(&board_id, "5V") || engine.pin_exists(&board_id, "VBUS");
+    let mut use_external_psu = false;
+    let mut psu_id = "powersupply".to_string();
+
     if let Some(autowiring) = &manifest.autowiring {
-        // ── External Power Supply Injection ──
+        if !board_has_5v {
+            for conn in &autowiring.connections {
+                let to_upper = conn.to.to_uppercase();
+                if to_upper.contains("5V") || to_upper.contains("VCC") {
+                    use_external_psu = true;
+                    break;
+                }
+            }
+        }
+
+        if use_external_psu {
+            let has_psu = plan.added_components.iter().any(|c| {
+                if !c.kind.contains("power-supply") { return false; }
+                if let Some(attrs) = &c.attrs {
+                    if let Some(volts) = attrs.get("voltage") {
+                        if volts.as_str() == Some("5.0") || volts.as_f64() == Some(5.0) {
+                            return true;
+                        }
+                    }
+                }
+                false
+            });
+            if !has_psu {
+                let bb_x = current_bb_comp.as_ref().map(|b| b.x).unwrap_or(new_comp.x + 100.0);
+                let bb_y = current_bb_comp.as_ref().map(|b| b.y).unwrap_or(new_comp.y - 100.0);
+                let raw_x = bb_x - 100.0;
+                let raw_y = bb_y + 100.0;
+                let (ps_x, ps_y) = engine.free_helper_position(raw_x, raw_y, 60.0, 60.0, None);
+                
+                plan.added_components.push(NewComponentPlan {
+                    id: "powersupply".to_string(), kind: "openhw-power-supply".to_string(),
+                    label: Some("Power Supply".to_string()),
+                    x: ps_x, y: ps_y, w: Some(60.0), h: Some(60.0),
+                    attrs: Some(serde_json::json!({ "voltage": "5.0" })),
+                });
+                let target_gnd = if is_esp32 { "GND.1" } else { "GND" };
+                plan.added_wires.push(WirePlan {
+                    id: format!("w_ps_gnd_{}", main_id),
+                    from: "powersupply:GND".to_string(),
+                    to: format!("{}:{}", board_id, target_gnd),
+                    color: "black".to_string(), path: None, is_socket: false, is_hidden: false,
+                    lane: { let l = lane_counter; lane_counter += 1; l % 7 },
+                });
+                plan.reasoning.push("Injected 5V power supply for 5V compatible component.".to_string());
+            } else {
+                if let Some(added_psu) = plan.added_components.iter().find(|c| {
+                    if !c.kind.contains("power-supply") { return false; }
+                    if let Some(attrs) = &c.attrs {
+                        if let Some(volts) = attrs.get("voltage") {
+                            if volts.as_str() == Some("5.0") || volts.as_f64() == Some(5.0) {
+                                return true;
+                            }
+                        }
+                    }
+                    false
+                }) {
+                    psu_id = added_psu.id.clone();
+                }
+            }
+        }
+
+        // ── External Power Supply Injection (Manifest Flag) ──
         if autowiring.external_power.unwrap_or(false) {
             let bb_x = current_bb_comp.as_ref().map(|b| b.x).unwrap_or(100.0);
             let bb_y = current_bb_comp.as_ref().map(|b| b.y).unwrap_or(100.0);
@@ -899,9 +1064,15 @@ pub fn generate_autonomous_setup(
                 let is_pico = engine.components.get(&board_id).map(|c| c.kind.contains("pico")).unwrap_or(false);
 
                 if preferred.to_lowercase() == "gnd" {
-                    target = format!("{}:GND", board_id);
+                    if use_external_psu {
+                        target = format!("{}:GND", psu_id);
+                    } else {
+                        target = format!("{}:GND", board_id);
+                    }
                 } else if preferred == "5V" || preferred == "VCC" {
-                    if is_pico {
+                    if use_external_psu {
+                        target = format!("{}:5V", psu_id);
+                    } else if is_pico {
                         target = format!("{}:VBUS", board_id);
                     } else {
                         target = format!("{}:5V", board_id);
@@ -941,11 +1112,19 @@ pub fn generate_autonomous_setup(
                     }
                 } else {
                     // ── I2C/Bus Awareness for Explicit Manifests ──
-                    let bus_type = if conn.from.to_uppercase().contains("SDA") || conn.from.to_uppercase().contains("SCL") || preferred.to_uppercase().contains("SDA") || preferred.to_uppercase().contains("SCL") {
+                    let from_up = conn.from.to_uppercase();
+                    let pref_up = preferred.to_uppercase();
+                    let is_spi_pin = |s: &str| {
+                        s.contains("MOSI") || s.contains("MISO") || s.contains("SCK") ||
+                        s.contains("SCLK") || s.contains("CLK") || s.contains("DIN") ||
+                        s.contains("DOUT") || s.contains("SDI") || s.contains("SDO")
+                    };
+
+                    let bus_type = if from_up.contains("SDA") || from_up.contains("SCL") || pref_up.contains("SDA") || pref_up.contains("SCL") {
                         Some("i2c")
-                    } else if conn.from.to_uppercase().contains("MOSI") || conn.from.to_uppercase().contains("SCK") || conn.from.to_uppercase().contains("MISO") {
+                    } else if is_spi_pin(&from_up) || is_spi_pin(&pref_up) {
                         Some("spi")
-                    } else if conn.from.to_uppercase().contains("TX") || conn.from.to_uppercase().contains("RX") {
+                    } else if from_up.contains("TX") || from_up.contains("RX") || pref_up.contains("TX") || pref_up.contains("RX") {
                         Some("uart")
                     } else {
                         None
@@ -1271,7 +1450,7 @@ pub fn generate_code_for_component(
                         &pin_id[1..]
                     } else if pin_id.starts_with("GPIO") {
                         &pin_id[4..]
-                    } else if pin_id.starts_with("GP") {
+                    } else if pin_id.starts_with("GP") && pin_id.len() > 2 && pin_id[2..].chars().all(char::is_numeric) {
                         &pin_id[2..]
                     } else {
                         pin_id
@@ -1367,7 +1546,7 @@ pub fn generate_code_for_component(
                             &pin_id[1..]
                         } else if pin_id.starts_with("GPIO") {
                             &pin_id[4..]
-                        } else if pin_id.starts_with("GP") {
+                        } else if pin_id.starts_with("GP") && pin_id.len() > 2 && pin_id[2..].chars().all(char::is_numeric) {
                             &pin_id[2..]
                         } else {
                             pin_id

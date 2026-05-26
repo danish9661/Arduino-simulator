@@ -49,6 +49,7 @@ import {
 } from './projectUtils';
 import { importWokwiProjectZip } from './wokwiImportUtils';
 import { snapToGrid, resolveAllWiresWaypoints } from './utils/snappingUtils';
+import { resolveUiExport } from './utils/simulatorUtils';
 import { useAutowiring } from '../../hooks/useAutowiring';
 import { Btn } from './Btn';
 import { RightPanel } from './RightPanel';
@@ -60,6 +61,7 @@ import { simplifyOrthogonalPath } from './utils/wireHitDetection';
 import { useEditorStore } from './store/useEditorStore';
 import { useWebSerialHardware } from './webSerialHardware';
 import { useHardwareFlashing } from './useHardwareFlashing';
+import { useEsp32Engine } from './hooks/useEsp32Engine.js';
 import { SimulationConsolePanel, TerminalIcon, useSimulationConsole } from './SimulationConsole';
 import QuickAddPortal from './QuickAddPortal';
 import TourGuide from './components/TourGuide';
@@ -71,6 +73,7 @@ import { ComponentTelemetrySelectModal } from './components/ComponentTelemetrySe
 
 import { ComponentContextMenu, ComponentRenamePanel, ComponentValuePanel } from './ComponentContextMenu';
 import { CanvasSceneLayer } from './components/CanvasSceneLayer';
+import { DisplayRenderProvider } from './context/DisplayRenderContext';
 import { CreateComponentModal } from './components/CreateComponentModal';
 import { ComponentInspectorPanel } from './components/ComponentInspectorPanel';
 import { GamificationGuidePanel } from './components/GamificationGuidePanel';
@@ -83,6 +86,7 @@ import { F1MenuOverlay } from './components/F1MenuOverlay';
 import AutofixPreviewPanel from '../../components/AutofixPreviewPanel.jsx';
 
 import * as EmulatorComponents from "@openhw/emulator";
+
 const {
   FullCircuitValidator,
   analyzeCodeHardwareSync,
@@ -120,7 +124,9 @@ import {
   buildUiSourceFromRegistry,
   buildLogicSourceFromRegistry,
   buildValidationSourceFromRegistry,
-  buildIndexSourceFromRegistry
+  buildIndexSourceFromRegistry,
+  normalizeGroupName,
+  sortCatalog
 } from './utils/componentRegistry';
 
 import {
@@ -193,6 +199,13 @@ function assertSafeDynamicModule(code, label) {
   if (UNSAFE_DYNAMIC_CODE_PATTERN.test(String(code || ''))) {
     throw new Error(`${label} uses blocked browser APIs in sandbox mode`);
   }
+}
+
+function isRp2040CoreMissingError(err) {
+  const msg = String(err?.message || err || '').toLowerCase();
+  return msg.includes("platform 'rp2040:rp2040' not found")
+    || msg.includes('platform rp2040:rp2040 is not found')
+    || msg.includes('platform not installed');
 }
 
 // Tracks component types that were dynamically injected from the backend (not built-in).
@@ -666,6 +679,8 @@ export function SimulatorPage({ gamificationMode = false }) {
   const [showValidation, setShowValidation] = useState(true)
   const [validationToast, setValidationToast] = useState(null)
   const [isRunning, setIsRunning] = useState(false)
+  const [pinStates, setPinStates] = useState({})
+  const [oopStates, setOopStates] = useState({});
 
   // Inject safety pulse animation
   useEffect(() => {
@@ -695,9 +710,9 @@ export function SimulatorPage({ gamificationMode = false }) {
     return () => document.head.removeChild(style);
   }, []);
   const [isCompiling, setIsCompiling] = useState(false)
+  const [isBooting, setIsBooting] = useState(false) // TODO: Declare booting state tracking
   const [isPaused, setIsPaused] = useState(false)
   const [protocolLogs, setProtocolLogs] = useState([])
-  const [activeConsoleTab, setActiveConsoleTab] = useState('console')
   const [healthScore, setHealthScore] = useState(100)
   const protocolAnalyzerRef = useRef(new SharedProtocolAnalyzer());
   const pendingProtocolLogsRef = useRef([]);
@@ -743,6 +758,10 @@ export function SimulatorPage({ gamificationMode = false }) {
   const renderAnalogByBoardRef = useRef({});
   const renderComponentsByBoardRef = useRef({});
   const renderNeopixelsByBoardRef = useRef({});
+  /** Dedicated OffscreenCanvas Render Worker — owns all display canvas contexts. */
+  const renderWorkerRef = useRef(null);
+  /** State mirror of renderWorkerRef so Provider re-renders when worker starts/stops. */
+  const [renderWorker, setRenderWorker] = useState(null);
 
   const {
     consoleEntries,
@@ -938,7 +957,36 @@ export function SimulatorPage({ gamificationMode = false }) {
     }
   }, [showFirmwareUploadDialog, firmwareUploadTarget, firmwareBoardOptions]);
 
-  const workerRef = useRef(null)
+  const getBoardMainCode = useCallback((boardId) => {
+    const preferred = `project/${boardId}/${boardId}.ino`;
+    const prefFile = projectFileMap.get(preferred);
+    if (prefFile && prefFile.content && !isFileDisabled(prefFile.path)) return prefFile.content;
+
+    const ino = (projectFiles || []).find(
+
+      (f) => f.path.startsWith(`project/${boardId}/`) && fileExt(f.path) === '.ino' && !isFileDisabled(f.path)
+    );
+    if (ino?.content) return ino.content;
+
+    return '';
+  }, [projectFileMap, projectFiles]);
+
+  const getBoardCompileFiles = useCallback((boardId, preferredMainPath = '') => {
+    // Virtualize project files to include current editor changes
+    const virtualProjectFiles = (projectFiles || []).map(f => ({
+      ...f,
+      content: f.id === activeCodeFileId ? code : (f.content || '')
+    }));
+
+    return getBoardCompileFilesShared({ projectFiles: virtualProjectFiles }, boardId);
+  }, [projectFiles, activeCodeFileId, code]);
+
+  const logSerial = (msg, color = 'var(--text)') => {
+    // In a real implementation this would push to a serial console state array
+    console.log(`[SIM]`, msg);
+  };
+
+
   const lastCompiledRef = useRef(null)
   const micropythonUf2PayloadRef = useRef(null)
   const circuitPythonUf2PayloadRef = useRef(null)
@@ -947,7 +995,6 @@ export function SimulatorPage({ gamificationMode = false }) {
   const rp2040GdbLastLogRef = useRef(new Map())
   const rp2040UartMicroPythonBoardsRef = useRef(new Set())
   const rp2040UartSilentWarnedBoardsRef = useRef(new Set())
-  const runStartGuardRef = useRef(false)
   const runComponentUpdateCountsRef = useRef({})
   const runPinTransitionCountsRef = useRef({})
   const runLagTelemetryLastStateRef = useRef(new Map())
@@ -1065,6 +1112,8 @@ export function SimulatorPage({ gamificationMode = false }) {
           event: event
         });
       }
+
+      if (handleEsp32Interaction(comp, event)) return;
     };
 
     return attrs;
@@ -1094,6 +1143,38 @@ export function SimulatorPage({ gamificationMode = false }) {
     liveOopStatesRef.current = {};
     prevIds.forEach(notifyLiveOopStateListeners);
   }, [notifyLiveOopStateListeners]);
+
+  const workerRef = useRef(null)
+  const pushSerialRxChunkRef = useRef(null);
+  const runStartGuardRef = useRef(false)
+  const {
+    handleEsp32Interaction,
+    startEsp32Session,
+    stopEsp32Session,
+    esp32Socket
+  } = useEsp32Engine({
+    workerRef,
+    components,
+    wires,
+    setOopStates,
+    pinStates,
+    setPinStates,
+    pushSerialRxChunkRef,
+    logSerial,
+    setIsRunning,
+    setIsCompiling,
+    setIsBooting, // TODO: Pass booting state setter to ESP32 engine
+    runStartGuardRef,
+    appendConsoleEntry,
+    getBoardCompileFiles,
+    getBoardMainCode,
+    code,
+    useBlocklyCode,
+    blocklyGeneratedCode,
+    isRunning,
+    getLiveOopStateSnapshot,
+    updateLiveOopStates
+  });
   const applyLiveNeopixelData = useCallback((neopixelState) => {
     liveNeopixelDataRef.current = neopixelState || {};
     if (!liveNeopixelDataRef.current || Object.keys(liveNeopixelDataRef.current).length === 0) return;
@@ -1153,6 +1234,8 @@ export function SimulatorPage({ gamificationMode = false }) {
     telemetrySampleInterval,
     selectedTelemetryComponentIds,
     setSelectedTelemetryComponentIds,
+    isBooting,
+    isCompiling,
   });
 
   const handleTelemetryStateMessageRef = useRef(handleTelemetryStateMessage);
@@ -1285,7 +1368,7 @@ export function SimulatorPage({ gamificationMode = false }) {
         delete newCatItem.pins;
         delete newCatItem.group;
 
-        const groupName = normalizeGroupName(manifest.group);
+        const groupName = (GROUP_MAPPING[manifest.group] || manifest.group || 'Misc');
         let group = LOCAL_CATALOG.find(g => g.group === groupName);
         if (!group) {
           group = { group: groupName, items: [] };
@@ -2132,6 +2215,11 @@ export function SimulatorPage({ gamificationMode = false }) {
         worstFrameMs = frameDeltaMs;
       }
 
+      if (workerRef.current) {
+        workerRef.current.postMessage({ type: 'FLUSH_VISUALS' });
+      }
+
+
       const windowMs = now - frameStart;
       if (windowMs >= 1000) {
         const fps = (frameCount * 1000) / windowMs;
@@ -2161,6 +2249,10 @@ export function SimulatorPage({ gamificationMode = false }) {
 
           appendConsoleEntry(fps < 45 || worstFrameMs > 24 ? 'warn' : 'info', line, 'debug');
           runFpsTelemetryLastLogRef.current.set('browser', signature);
+        }
+
+        if (workerRef.current) {
+          workerRef.current.postMessage({ type: 'REAL_METRICS', canvasFps: fps, uiMainThreadBlockedTimeMs: worstFrameMs });
         }
 
         frameStart = now;
@@ -2246,7 +2338,7 @@ export function SimulatorPage({ gamificationMode = false }) {
             delete newCatItem.pins;
             delete newCatItem.group;
 
-            const groupName = normalizeGroupName(manifest.group);
+            const groupName = (GROUP_MAPPING[manifest.group] || manifest.group || 'Misc');
             let group = LOCAL_CATALOG.find(g => g.group === groupName);
             if (!group) {
               group = { group: groupName, items: [] };
@@ -2336,7 +2428,7 @@ export function SimulatorPage({ gamificationMode = false }) {
         delete newCatItem.pins;
         delete newCatItem.group;
 
-        const groupName = normalizeGroupName(manifest.group);
+        const groupName = (GROUP_MAPPING[manifest.group] || manifest.group || 'Misc');
         let group = LOCAL_CATALOG.find(g => g.group === groupName);
         if (!group) {
           group = { group: groupName, items: [] };
@@ -2421,7 +2513,7 @@ export function SimulatorPage({ gamificationMode = false }) {
             delete newCatItem.pins;
             delete newCatItem.group;
 
-            const groupName = normalizeGroupName(manifest.group);
+            const groupName = (GROUP_MAPPING[manifest.group] || manifest.group || 'Misc');
             let group = LOCAL_CATALOG.find(g => g.group === groupName);
             if (!group) {
               group = { group: groupName, items: [] };
@@ -3361,7 +3453,7 @@ export function SimulatorPage({ gamificationMode = false }) {
 
     try {
       console.debug('[getPinExitPoint]', { compId: comp.id, pinId: pin.id, bounds, localX, localY, dir, laneOffset, exitX, exitY });
-    } catch (e) {}
+    } catch (e) { }
     return {
       x: exitX,
       y: exitY,
@@ -3390,7 +3482,7 @@ export function SimulatorPage({ gamificationMode = false }) {
         console.groupEnd();
       });
     };
-  } catch (e) {}
+  } catch (e) { }
 
   const getPinPosWithGhosts = useCallback((compId, pinId) => {
     let comp = componentsMap.get(compId);
@@ -3961,7 +4053,7 @@ export function SimulatorPage({ gamificationMode = false }) {
         const my = (e.clientY - rect.top - canvasOffsetRef.current.y) / canvasZoomRef.current;
         const ddx = mx - sd.startMouseCanvas.x;
         const ddy = my - sd.startMouseCanvas.y;
-        
+
         if (Math.abs(ddx) >= 1 || Math.abs(ddy) >= 1) {
           sd.hasMoved = true;
           const newPts = sd.startPts.map(pt => ({ ...pt }));
@@ -3983,9 +4075,9 @@ export function SimulatorPage({ gamificationMode = false }) {
               newPts[segIdx + 1] = { ...newPts[segIdx + 1], x: newX };
             }
           }
-          wireUpdate = { 
-            wireId: sd.wireId, 
-            cornerWaypoints: newPts.slice(1, -1).map(pt => ({ x: pt.x, y: pt.y, _corner: true })) 
+          wireUpdate = {
+            wireId: sd.wireId,
+            cornerWaypoints: newPts.slice(1, -1).map(pt => ({ x: pt.x, y: pt.y, _corner: true }))
           };
         }
       } else if (isPanningRef.current && !isCanvasLockedRef.current) {
@@ -4633,32 +4725,32 @@ export function SimulatorPage({ gamificationMode = false }) {
     const filename = getDefaultMainFileName(boardKind, comp.id, {
       rp2040Mode: comp.attrs?.env || 'native'
     });
-    
+
     // Try to find existing file by boardId or filename or just the first code file
     let targetFile = projectFiles.find(f => f.boardId === comp.id || f.id === filename || f.name === filename);
     if (!targetFile) {
-        // Fallback: if there's only one code file, just use it
-        const codeFiles = projectFiles.filter(f => f.kind === 'code' || /\.(ino|py|c|cpp)$/i.test(f.name));
-        if (codeFiles.length > 0) {
-            targetFile = codeFiles[0];
-            console.log('[handleOpenCode] Fallback to first code file:', targetFile.id);
-        } else {
-            console.log('[handleOpenCode] File not found, creating new file:', filename);
-            // Create the file
-            targetFile = {
-                id: filename,
-                path: filename,
-                name: filename,
-                kind: 'code',
-                boardId: comp.id,
-                boardKind: boardKind,
-                content: createDefaultMainCode(boardKind, comp.id, { rp2040Mode: comp.attrs?.env || 'native' }),
-                dirty: false
-            };
-            setProjectFiles(prev => [...prev, targetFile]);
-        }
+      // Fallback: if there's only one code file, just use it
+      const codeFiles = projectFiles.filter(f => f.kind === 'code' || /\.(ino|py|c|cpp)$/i.test(f.name));
+      if (codeFiles.length > 0) {
+        targetFile = codeFiles[0];
+        console.log('[handleOpenCode] Fallback to first code file:', targetFile.id);
+      } else {
+        console.log('[handleOpenCode] File not found, creating new file:', filename);
+        // Create the file
+        targetFile = {
+          id: filename,
+          path: filename,
+          name: filename,
+          kind: 'code',
+          boardId: comp.id,
+          boardKind: boardKind,
+          content: createDefaultMainCode(boardKind, comp.id, { rp2040Mode: comp.attrs?.env || 'native' }),
+          dirty: false
+        };
+        setProjectFiles(prev => [...prev, targetFile]);
+      }
     } else {
-        console.log('[handleOpenCode] Found existing file:', targetFile.id);
+      console.log('[handleOpenCode] Found existing file:', targetFile.id);
     }
 
     if (!openCodeTabs.includes(targetFile.id)) {
@@ -4674,8 +4766,8 @@ export function SimulatorPage({ gamificationMode = false }) {
     console.log('[handleAutoCode] Triggered for component:', compId);
     const comp = components.find(c => c.id === compId);
     if (!comp) {
-        console.error('[handleAutoCode] Component not found in state:', compId);
-        return;
+      console.error('[handleAutoCode] Component not found in state:', compId);
+      return;
     }
 
     // Find the board it is connected to (Recursive Tracing)
@@ -4691,7 +4783,7 @@ export function SimulatorPage({ gamificationMode = false }) {
       for (const w of wires) {
         const fromParts = w.from.split(':');
         const toParts = w.to.split(':');
-        
+
         let neighborId = null;
         if (fromParts[0] === currentId) neighborId = toParts[0];
         else if (toParts[0] === currentId) neighborId = fromParts[0];
@@ -4714,7 +4806,7 @@ export function SimulatorPage({ gamificationMode = false }) {
 
     console.log('[handleAutoCode] Target board found:', targetBoardId);
     const manifest = COMPONENT_REGISTRY[comp.type]?.manifest || {};
-    
+
     // Call the worker
     console.log('[handleAutoCode] Sending request to worker...');
     const worker = new Worker(new URL('../../workers/autowiring.worker.ts', import.meta.url), { type: 'module' });
@@ -4744,29 +4836,30 @@ export function SimulatorPage({ gamificationMode = false }) {
           setProjectFiles(prev => {
             let targetFile = prev.find(f => f.boardId === targetBoardId || f.id === filename || f.name === filename);
             if (!targetFile) {
-                const codeFiles = prev.filter(f => f.kind === 'code' || /\.(ino|py|c|cpp)$/i.test(f.name));
-                if (codeFiles.length > 0) {
-                    targetFile = codeFiles[0];
-                } else {
-                    console.log('[handleAutoCode] Creating new file for injection:', filename);
-                    targetFile = {
-                        id: filename,
-                        path: filename,
-                        name: filename,
-                        kind: 'code',
-                        boardId: targetBoardId,
-                        boardKind: boardKind,
-                        content: createDefaultMainCode(boardKind, targetBoardId, { rp2040Mode: boardComp.attrs?.env || 'native' }),
-                        dirty: false
-                    };
-                    prev = [...prev, targetFile];
-                }
+              const codeFiles = prev.filter(f => f.kind === 'code' || /\.(ino|py|c|cpp)$/i.test(f.name));
+              if (codeFiles.length > 0) {
+                targetFile = codeFiles[0];
+              } else {
+                console.log('[handleAutoCode] Creating new file for injection:', filename);
+                targetFile = {
+                  id: filename,
+                  path: filename,
+                  name: filename,
+                  kind: 'code',
+                  boardId: targetBoardId,
+                  boardKind: boardKind,
+                  content: createDefaultMainCode(boardKind, targetBoardId, { rp2040Mode: boardComp.attrs?.env || 'native' }),
+                  dirty: false
+                };
+                prev = [...prev, targetFile];
+              }
             }
 
             console.log('[handleAutoCode] Injecting code into file:', targetFile.id);
             return prev.map(f => {
               if (f.id === targetFile.id) {
-                const newContent = mergeCodeSnippet(f.content, snippet, compId);
+                const currentContent = (activeCodeFileId === f.id || activeCodeFileId === f.name) ? currentCodeRef.current : f.content;
+                const newContent = mergeCodeSnippet(currentContent, snippet, compId);
                 // Also update live code if it's the active file
                 if (activeCodeFileId === targetFile.id) {
                   setCode(newContent);
@@ -4776,33 +4869,33 @@ export function SimulatorPage({ gamificationMode = false }) {
               return f;
             });
           });
-          
+
           setOpenCodeTabs(prevTabs => {
             // Re-find the target file ID since state update is asynchronous
-            const targetFile = projectFiles.find(f => f.boardId === targetBoardId || f.id === filename || f.name === filename) 
-                               || projectFiles.filter(f => f.kind === 'code' || /\.(ino|py|c|cpp)$/i.test(f.name))[0]
-                               || { id: filename };
+            const targetFile = projectFiles.find(f => f.boardId === targetBoardId || f.id === filename || f.name === filename)
+              || projectFiles.filter(f => f.kind === 'code' || /\.(ino|py|c|cpp)$/i.test(f.name))[0]
+              || { id: filename };
             if (!prevTabs.includes(targetFile.id)) {
               return [...prevTabs, targetFile.id];
             }
             return prevTabs;
           });
-          
+
           // Re-find to set active
           setTimeout(() => {
-              const latestFiles = projectFiles; // this closure might be stale, but activeCodeFileId handles it gracefully if missing
-              setActiveCodeFileId(prev => {
-                   const file = (projectFiles || []).find(f => f.boardId === targetBoardId || f.id === filename || f.name === filename) 
-                               || (projectFiles || []).filter(f => f.kind === 'code' || /\.(ino|py|c|cpp)$/i.test(f.name))[0]
-                               || { id: filename };
-                   return file.id;
-              });
-              setCodeTab('code');
-              setIsPanelOpen(true);
-              setShowCodeExplorer(true);
+            const latestFiles = projectFiles; // this closure might be stale, but activeCodeFileId handles it gracefully if missing
+            setActiveCodeFileId(prev => {
+              const file = (projectFiles || []).find(f => f.boardId === targetBoardId || f.id === filename || f.name === filename)
+                || (projectFiles || []).filter(f => f.kind === 'code' || /\.(ino|py|c|cpp)$/i.test(f.name))[0]
+                || { id: filename };
+              return file.id;
+            });
+            setCodeTab('code');
+            setIsPanelOpen(true);
+            setShowCodeExplorer(true);
           }, 0);
         } else {
-            console.warn('[handleAutoCode] Worker returned empty snippet.');
+          console.warn('[handleAutoCode] Worker returned empty snippet.');
         }
       }
       worker.terminate();
@@ -4877,28 +4970,9 @@ export function SimulatorPage({ gamificationMode = false }) {
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }, [projectFileMap]);
 
-  const getBoardMainCode = useCallback((boardId) => {
-    const preferred = `project/${boardId}/${boardId}.ino`;
-    const prefFile = projectFileMap.get(preferred);
-    if (prefFile && prefFile.content && !isFileDisabled(prefFile.path)) return prefFile.content;
+  
 
-    const ino = (projectFiles || []).find(
-      (f) => f.path.startsWith(`project/${boardId}/`) && fileExt(f.path) === '.ino' && !isFileDisabled(f.path)
-    );
-    if (ino?.content) return ino.content;
-
-    return '';
-  }, [projectFileMap, projectFiles]);
-
-  const getBoardCompileFiles = useCallback((boardId, preferredMainPath = '') => {
-    // Virtualize project files to include current editor changes
-    const virtualProjectFiles = (projectFiles || []).map(f => ({
-      ...f,
-      content: f.id === activeCodeFileId ? code : (f.content || '')
-    }));
-
-    return getBoardCompileFilesShared({ projectFiles: virtualProjectFiles }, boardId);
-  }, [projectFiles, activeCodeFileId, code]);
+  
 
   const getBoardFirmwareAssets = useCallback((boardId) => {
     const boardFiles = projectFiles
@@ -5742,7 +5816,7 @@ export function SimulatorPage({ gamificationMode = false }) {
     try {
       const result = await importWokwiProjectZip(file, components, wires);
       if (!result) return;
-      
+
       const newId = generateProjectId();
       currentProjectIdRef.current = newId;
       setCurrentProjectId(newId);
@@ -5841,10 +5915,7 @@ export function SimulatorPage({ gamificationMode = false }) {
 
 
   // ─── Simulator Run & Stop Logic ─────────────────────────────────────────────
-  const logSerial = (msg, color = 'var(--text)') => {
-    // In a real implementation this would push to a serial console state array
-    console.log(`[SIM]`, msg);
-  };
+  
 
   const logCompileSummary = useCallback((compiledResult, boardComp, boardKind) => {
     const summaryLines = extractCompileSummaryLines(compiledResult?.stdout || '');
@@ -6187,6 +6258,10 @@ export function SimulatorPage({ gamificationMode = false }) {
   }, [appendSerialRxChunk]);
 
   useEffect(() => {
+    pushSerialRxChunkRef.current = pushSerialRxChunk;
+  }, [pushSerialRxChunk]);
+
+  useEffect(() => {
     if (serialPaused) return;
     const queue = serialPausedQueueRef.current;
     if (!queue.length) return;
@@ -6366,7 +6441,6 @@ export function SimulatorPage({ gamificationMode = false }) {
       runFpsTelemetryLastLogRef.current.clear();
       runLastBoardPinsRef.current = new Map();
 
-      setIsRunning(true);
       setIsCompiling(true);
       setRunStartedAtMs(Date.now());
       setRunDurationSec(0);
@@ -6383,11 +6457,19 @@ export function SimulatorPage({ gamificationMode = false }) {
       const boardRuntimeEnvMap = {};
       const boardBaudMap = {};
       const programmableBoards = components.filter(c => /(arduino|esp32|stm32|rp2040|pico)/i.test(c.type));
+
+      const isBackendProxy = await startEsp32Session(programmableBoards);
       const singleProgrammableBoardId = programmableBoards.length === 1 ? programmableBoards[0]?.id : '';
       const boardsWithoutCompilableSketch = [];
       let result = null;
 
-      if (programmableBoards.length > 0) {
+      if (isBackendProxy) {
+        result = {
+          hex: '',
+          components: components,
+          connections: wires,
+        };
+      } else if (programmableBoards.length > 0) {
         for (const boardComp of programmableBoards) {
           const kind = normalizeBoardKind(boardComp.type);
           const targetFqbn = resolveBoardFqbnForComponent(boardComp, kind);
@@ -6578,7 +6660,9 @@ export function SimulatorPage({ gamificationMode = false }) {
                 });
                 setCachedHex(cacheSource, cacheKeyBoard, compiled);
               } catch (compileErr) {
-                if (isRp2040CoreMissingError(compileErr)) {
+                const errStr = String(compileErr?.message || compileErr || '').toLowerCase();
+                const isRpCoreMissing = errStr.includes("platform 'rp2040:rp2040' not found") || errStr.includes('platform rp2040:rp2040 is not found') || errStr.includes('platform not installed');
+                if (isRpCoreMissing) {
                   appendConsoleEntry('error', `RP2040 core is not installed for ${boardComp.id}. Native .ino mode cannot run without Arduino-Pico core.`, 'simulator');
                 }
                 throw compileErr;
@@ -6666,11 +6750,35 @@ export function SimulatorPage({ gamificationMode = false }) {
 
       lastCompiledRef.current = { code, board, result };
       setIsCompiling(false);
-      logSerial('Compiled! Connecting to emulator...');
+      if (!isBackendProxy) {
+        setIsRunning(true);
+        setIsBooting(true);
+      }
+      logSerial(isBackendProxy ? 'Backend connected! Starting physics worker...' : 'Compiled! Connecting to emulator...');
 
-      // Load Web Worker
+      // ── Render Worker: create before sim worker so port is ready ──────────
+      const renderWorker = new Worker(
+        new URL('../../worker/display.render.worker.ts', import.meta.url),
+        { type: 'module' }
+      );
+      renderWorkerRef.current = renderWorker;
+      setRenderWorker(renderWorker); // Triggers Provider re-render so display UIs receive the worker
+      if (typeof window !== 'undefined') {
+        window.__displayRenderWorker = renderWorker;
+        window.dispatchEvent(new CustomEvent('display-render-worker-changed', { detail: renderWorker }));
+      }
+
+      // Set up a MessageChannel so the Simulation Worker can post display frames
+      // directly to the Render Worker — zero-copy, no main-thread involvement.
+      const { port1: simPort, port2: renderPort } = new MessageChannel();
+      // Give port1 to the Render Worker (it listens for DISPLAY_FRAME here)
+      renderWorker.postMessage({ type: 'SET_SIM_PORT', port: renderPort }, [renderPort]);
+
+      // Load Simulation Web Worker
       const worker = new Worker(new URL('../../worker/simulation.worker.ts', import.meta.url), { type: 'module' });
       workerRef.current = worker;
+      // Give port2 to the Simulation Worker (it sends DISPLAY_FRAME here)
+      worker.postMessage({ type: 'SET_RENDER_PORT', port: simPort }, [simPort]);
 
       worker.onmessage = async (event) => {
         const msg = event.data;
@@ -6689,6 +6797,12 @@ export function SimulatorPage({ gamificationMode = false }) {
             message: msg.message
           });
           return;
+        }
+
+        if (msg.type === 'state' || (msg.type === 'debug' && msg.category === 'rp2040-runtime')) {
+          if (!isBackendProxy) {
+            setIsBooting(false);
+          }
         }
 
         if (msg.type === 'debug' && msg.category === 'rp2040-runtime') {
@@ -6908,6 +7022,65 @@ export function SimulatorPage({ gamificationMode = false }) {
           }
           return;
         }
+        if (msg.type === 'debug' && msg.category === 'rp2040-spi') {
+          const incomingBoardId = String(msg.boardId || '').trim();
+          const hasKnownBoard = incomingBoardId && boardComponents.some((b) => b.id === incomingBoardId);
+          const singleBoardFallback = boardComponents.length === 1 ? boardComponents[0]?.id : '';
+          const resolvedBoardId = hasKnownBoard
+            ? incomingBoardId
+            : (singleBoardFallback || incomingBoardId || 'default');
+
+          const spi = msg.spi && typeof msg.spi === 'object' ? msg.spi : {};
+          const reason = String(msg.reason || 'spi');
+          const bus = String(spi.bus || 'spi?');
+          const byte = Number(spi.byte ?? Number.NaN);
+          const byteIndex = Number(spi.byteIndex ?? Number.NaN);
+          const frameBytes = Number(spi.frameBytes ?? Number.NaN);
+          const deviceCount = Number(spi.deviceCount || 0);
+          const txBytes = Number(spi.txBytes || 0);
+          const txTransactions = Number(spi.txTransactions || 0);
+          const deviceIds = Array.isArray(spi.deviceIds) ? spi.deviceIds.join(',') : '';
+          const framePreview = Array.isArray(spi.framePreview) ? spi.framePreview.slice(0, 8).map((v) => `0x${Number(v).toString(16).padStart(2, '0')}`).join(',') : '';
+          const command = Number.isFinite(Number(spi.command)) ? `cmd=0x${Number(spi.command).toString(16).padStart(2, '0')}` : '';
+          const powerOn = spi.powerOn === undefined ? '' : `powerOn=${spi.powerOn ? 1 : 0}`;
+          const writeCount = Number.isFinite(Number(spi.writeCount)) ? `writeCount=${Number(spi.writeCount)}` : '';
+          const fill = Number.isFinite(Number(spi.vramFillPercentage)) ? `fill=${Number(spi.vramFillPercentage)}` : '';
+          const role = spi.role ? `role=${String(spi.role)}` : '';
+          const boardPin = spi.boardPin ? `boardPin=${String(spi.boardPin)}` : '';
+          const componentPin = spi.componentPin ? `pin=${String(spi.componentPin)}` : '';
+          const isHigh = spi.isHigh === undefined ? '' : `isHigh=${spi.isHigh ? 1 : 0}`;
+          const voltage = Number.isFinite(Number(spi.voltage)) ? `voltage=${Number(spi.voltage).toFixed(1)}` : '';
+          const buses = Array.isArray(spi.buses) ? `buses=${spi.buses.join(',')}` : '';
+
+          const line = [
+            `RP2040 SPI ${resolvedBoardId}`,
+            `reason=${reason}`,
+            `bus=${bus}`,
+            Number.isFinite(byte) ? `byte=0x${byte.toString(16).padStart(2, '0')}` : '',
+            Number.isFinite(byteIndex) ? `index=${byteIndex}` : '',
+            Number.isFinite(frameBytes) ? `frameBytes=${frameBytes}` : '',
+            `devices=${deviceCount}`,
+            `txBytes=${txBytes}`,
+            `txFrames=${txTransactions}`,
+            command,
+            powerOn,
+            writeCount,
+            fill,
+            role,
+            boardPin,
+            componentPin,
+            isHigh,
+            voltage,
+            buses,
+            framePreview ? `preview=${framePreview}` : '',
+            deviceIds ? `ids=${deviceIds}` : '',
+          ].filter(Boolean).join(' | ');
+
+          if (rp2040DebugTelemetryEnabled) {
+            appendConsoleEntry('info', line, 'debug');
+          }
+          return;
+        }
         if (msg.type === 'sync_heartbeat') {
           if (!rp2040DebugTelemetryEnabled) {
             return;
@@ -6946,7 +7119,7 @@ export function SimulatorPage({ gamificationMode = false }) {
               neopixels,
             };
           }
-          
+
           workerRef.current?.postMessage({
             type: 'RENDER_REPORT',
             boardId,
@@ -7115,6 +7288,14 @@ export function SimulatorPage({ gamificationMode = false }) {
             runLagTelemetryLastLogRef.current.set(boardIdKey, { ts: nowMs });
           }
         }
+        if (msg.type === 'backendGpioSync') {
+          if (esp32Socket && typeof esp32Socket.sendGpio === 'function') {
+            esp32Socket.sendGpio(msg.pin, msg.value ? 1 : 0);
+          }
+        }
+        if (msg.type === 'debug_telemetry') {
+          appendConsoleEntry('info', msg.message, 'simulator');
+        }
         if (msg.type === 'serial') {
           const incomingBoardId = String(msg.boardId || '').trim();
           const hasKnownBoard = incomingBoardId && boardComponents.some((b) => b.id === incomingBoardId);
@@ -7134,17 +7315,17 @@ export function SimulatorPage({ gamificationMode = false }) {
           const log = protocolAnalyzerRef.current.processSPI(msg);
           pendingProtocolLogsRef.current.push(log.message);
         }
-        
+
         if ((msg.type === 'protocol:i2c' || msg.type === 'protocol:spi') && !protocolLogsTimerRef.current) {
           protocolLogsTimerRef.current = setTimeout(() => {
             protocolLogsTimerRef.current = null;
             const pending = pendingProtocolLogsRef.current;
             if (pending.length === 0) return;
             pendingProtocolLogsRef.current = [];
-            
+
             // Limit batch to prevent dropping frames
             const batch = pending.length > 200 ? pending.slice(-200) : pending;
-            
+
             // Use standard state setting (startTransition might be undefined if not imported, React 18 auto-batches timeouts anyway)
             setProtocolLogs(prev => {
               const next = [...prev, ...batch];
@@ -7201,7 +7382,7 @@ export function SimulatorPage({ gamificationMode = false }) {
         debugRp2040: rp2040DebugTelemetryEnabled,
         debugSyncHeartbeat: rp2040DebugTelemetryEnabled,
         speed: simulationSpeed,
-        telemetryEnabled: componentTelemetryEnabled,
+        telemetryEnabled: componentTelemetryEnabled && !isBooting && !isCompiling,
         telemetryMode: telemetryMode,
         watchedParamsMap: telemetryWatchedParamsMap,
         deepSilicon: deepSiliconDebuggingEnabled,
@@ -7216,6 +7397,7 @@ export function SimulatorPage({ gamificationMode = false }) {
       rp2040UartSilentWarnedBoardsRef.current.clear();
       setIsRunning(false);
       setIsCompiling(false);
+      setIsBooting(false); // TODO: Reset booting state on error
       setRunStartedAtMs(null);
       setRunDurationSec(0);
       appendConsoleEntry('error', `Run failed: ${err?.message || 'Unknown error'}`, 'simulator');
@@ -7227,6 +7409,7 @@ export function SimulatorPage({ gamificationMode = false }) {
   const handleStop = () => {
     const wasRunning = isRunning;
     runStartGuardRef.current = false;
+    stopEsp32Session();
     rp2040GdbLastLogRef.current.clear();
     rp2040WirelessLastLogRef.current.clear();
     rp2040UartMicroPythonBoardsRef.current.clear();
@@ -7293,8 +7476,20 @@ export function SimulatorPage({ gamificationMode = false }) {
       workerRef.current.terminate();
       workerRef.current = null;
     }
+    // Terminate the Render Worker and tell it to release all canvas resources.
+    if (renderWorkerRef.current) {
+      renderWorkerRef.current.postMessage({ type: 'DISPLAY_CLEAR_ALL' });
+      renderWorkerRef.current.terminate();
+      renderWorkerRef.current = null;
+      setRenderWorker(null); // Clear Provider so display UIs see null worker
+      if (typeof window !== 'undefined') {
+        window.__displayRenderWorker = null;
+        window.dispatchEvent(new CustomEvent('display-render-worker-changed', { detail: null }));
+      }
+    }
     setIsRunning(false);
     setIsCompiling(false);
+    setIsBooting(false); // TODO: Reset booting state on stop
     setIsPaused(false);
     setRunStartedAtMs(null);
     setRunDurationSec(0);
@@ -7315,8 +7510,33 @@ export function SimulatorPage({ gamificationMode = false }) {
     appendConsoleEntry('info', 'Simulation stopped.', 'simulator');
   };
 
+  const bootStartedAtRef = useRef(null);
+
+  // Track when boot starts
   useEffect(() => {
-    if (!isRunning || !runStartedAtMs) return;
+    if (isBooting && !isRunning) {
+      if (!bootStartedAtRef.current) {
+        bootStartedAtRef.current = Date.now();
+      }
+    }
+  }, [isBooting, isRunning]);
+
+  // Reset run start time when simulation actually starts running
+  useEffect(() => {
+    if (isRunning && !isCompiling && !isBooting) {
+      let startTime = Date.now();
+      if (bootStartedAtRef.current) {
+        const bootDuration = Date.now() - bootStartedAtRef.current;
+        startTime -= bootDuration;
+      }
+      setRunStartedAtMs(startTime);
+    } else if (!isRunning) {
+      bootStartedAtRef.current = null;
+    }
+  }, [isRunning, isCompiling, isBooting]);
+
+  useEffect(() => {
+    if (!isRunning || !runStartedAtMs || isCompiling || isBooting) return;
 
     const updateElapsed = () => {
       setRunDurationSec(Math.max(0, (Date.now() - runStartedAtMs) / 1000));
@@ -7325,7 +7545,7 @@ export function SimulatorPage({ gamificationMode = false }) {
     updateElapsed();
     const timer = setInterval(updateElapsed, 250);
     return () => clearInterval(timer);
-  }, [isRunning, runStartedAtMs]);
+  }, [isRunning, runStartedAtMs, isCompiling, isBooting]);
 
   useEffect(() => {
     if (!hardwareStatus) return;
@@ -7485,7 +7705,7 @@ export function SimulatorPage({ gamificationMode = false }) {
         if (tp) { minX = Math.min(minX, tp.x); minY = Math.min(minY, tp.y); maxX = Math.max(maxX, tp.x); maxY = Math.max(maxY, tp.y); }
       });
       if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 800; maxY = 600; }
-      
+
       // DIAGNOSTIC LOG: See the calculated bounds
       console.log('[PNG Export] Raw Bounds:', { minX, minY, maxX, maxY });
 
@@ -7537,7 +7757,7 @@ export function SimulatorPage({ gamificationMode = false }) {
       // 2. Capture the canvas
       const t_start = performance.now();
       console.log('[PNG Export] signature:', signature);
-      
+
       const MAX_EXPORT_DIM = 4000;
       const actualW = Math.min(bboxW, MAX_EXPORT_DIM);
       const actualH = Math.min(bboxH, MAX_EXPORT_DIM);
@@ -7559,7 +7779,7 @@ export function SimulatorPage({ gamificationMode = false }) {
           if (el.shadowRoot) deepTag(el.shadowRoot);
         });
       };
-      
+
       deepTag(zoomWrapper);
       const shadowHostEls = Array.from(elementMap.values()).filter(el => !!el.shadowRoot);
       console.log(`[PNG Export] Mapped ${tagCount} elements in ${Math.round(performance.now() - t_tag_start)}ms`);
@@ -7602,10 +7822,10 @@ export function SimulatorPage({ gamificationMode = false }) {
         // 3. Clone and Inject
         const circuitClone = idoc.importNode(zoomWrapper, true);
         idoc.body.appendChild(circuitClone);
-        
+
         // 4. Filtered Style Teleportation (Live HTML Mode)
         console.log(`[PNG Export] Teleporting styles for ${tagCount} elements...`);
-        
+
         // 4a. Inline Shadow DOM Content as Live HTML
         let inlinedCount = 0;
         shadowHostEls.forEach((liveEl) => {
@@ -7622,7 +7842,7 @@ export function SimulatorPage({ gamificationMode = false }) {
               clonedHost.appendChild(styleEl);
             });
           }
-          
+
           // Inline the actual graphics/nodes
           for (let i = 0; i < liveEl.shadowRoot.childNodes.length; i++) {
             clonedHost.appendChild(idoc.importNode(liveEl.shadowRoot.childNodes[i], true));
@@ -7632,10 +7852,10 @@ export function SimulatorPage({ gamificationMode = false }) {
 
         // 4b. Total Parity Style Teleportation
         console.log(`[PNG Export] Teleporting styles for ${tagCount} nodes...`);
-        
+
         const propsToCopy = [
           'display', 'position', 'left', 'top', 'width', 'height', 'transform', 'transformOrigin',
-          'color', 'fontSize', 'fontWeight', 'fontFamily', 'textAlign', 
+          'color', 'fontSize', 'fontWeight', 'fontFamily', 'textAlign',
           'visibility', 'opacity', 'backgroundColor', 'zIndex',
           'border', 'borderWidth', 'borderStyle', 'borderColor', 'borderRadius',
           'padding', 'margin', 'lineHeight', 'overflow', 'boxSizing',
@@ -7644,7 +7864,7 @@ export function SimulatorPage({ gamificationMode = false }) {
         ];
 
         const svgProps = [
-          'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 
+          'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin',
           'stroke-miterlimit', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-opacity',
           'fill-opacity', 'fill-rule', 'marker-start', 'marker-mid', 'marker-end'
         ];
@@ -7652,11 +7872,11 @@ export function SimulatorPage({ gamificationMode = false }) {
         const clonedNodes = [idoc.body, ...Array.from(idoc.body.querySelectorAll('*'))];
         let styleCount = 0;
         let wireCount = 0;
-        
+
         clonedNodes.forEach(cloned => {
           const dataId = cloned.getAttribute('data-h2c-id');
           if (!dataId) return;
-          
+
           const liveEl = elementMap.get(dataId);
           if (!liveEl) return;
 
@@ -7664,7 +7884,7 @@ export function SimulatorPage({ gamificationMode = false }) {
           if (cloned.tagName === 'path' || cloned.tagName === 'line') wireCount++;
 
           const s = window.getComputedStyle(liveEl);
-          
+
           // Copy Layout and Visual Styles with FORCED priority
           propsToCopy.forEach(p => {
             // SAFETY: Prevent Giant Text bug
@@ -7685,7 +7905,7 @@ export function SimulatorPage({ gamificationMode = false }) {
                 }
               }
             });
-            
+
             // Hardcode width/height attributes to match computed logical size
             const w = s.getPropertyValue('width');
             const h = s.getPropertyValue('height');
@@ -7698,7 +7918,7 @@ export function SimulatorPage({ gamificationMode = false }) {
               cloned.style.setProperty('height', h, 'important');
             }
           }
-          
+
           // Final Safety: Ensure nothing is accidentally hidden
           cloned.style.setProperty('visibility', 'visible', 'important');
           cloned.style.setProperty('opacity', s.opacity || '1', 'important');
@@ -7706,9 +7926,9 @@ export function SimulatorPage({ gamificationMode = false }) {
             cloned.style.setProperty('overflow', 'visible', 'important');
           }
         });
-        
+
         console.log(`[PNG Export] Successfully styled ${styleCount} elements, including ${wireCount} wires`);
-        elementMap.clear(); 
+        elementMap.clear();
 
 
         // Ensure all components are visible
@@ -7732,7 +7952,7 @@ export function SimulatorPage({ gamificationMode = false }) {
           useCORS: true,
           allowTaint: false,
           logging: true,
-          imageTimeout: 10000, 
+          imageTimeout: 10000,
           skipFonts: true,
           width: actualW,
           height: actualH,
@@ -7750,7 +7970,7 @@ export function SimulatorPage({ gamificationMode = false }) {
             });
           }
         });
-        
+
         // Memory Flush: Clear the iframe content immediately to free RAM
         idoc.body.innerHTML = '';
         idoc.head.innerHTML = '';
@@ -8539,7 +8759,7 @@ export function SimulatorPage({ gamificationMode = false }) {
         )}
 
         {/* TOP BAR */}
-        <TopToolbox board={board} setBoard={setBoard} isRunning={isRunning} isPaused={isPaused} handleRun={handleRun} handlePause={handlePause} handleResume={handleResume} handleStop={handleStop} isCompiling={isCompiling} assessmentMode={assessmentMode} assessmentProjectName={assessmentProjectName} isSubmittingAssessment={isSubmittingAssessment} handleAssessmentSubmit={handleAssessmentSubmit} undo={undo} redo={redo} selected={selected} rotateComponent={rotateComponent} theme={theme} toggleTheme={toggleTheme} showViewPanel={showViewPanel} setShowViewPanel={setShowViewPanel} viewPanelSection={viewPanelSection} setViewPanelSection={setViewPanelSection} schematicDataUrl={schematicDataUrl} setSchematicDataUrl={setSchematicDataUrl} schematicLoading={schematicLoading} setSchematicLoading={setSchematicLoading} downloadSchematicPng={downloadSchematicPng} downloadSchematicPdf={downloadSchematicPdf} generateSchematic={generateSchematic} downloadCompCsv={downloadCompCsv} importFileRef={importFileRef} downloadPng={downloadPng} importPng={importPng} downloadSimulationJson={downloadSimulationJson} handleSave={handleSave} isExporting={isExporting} handleShareSimulation={handleShareSimulation} isSharingSimulation={isSharingSimulation} refreshProjectList={refreshProjectList} showProjectsDropdown={showProjectsDropdown} setShowProjectsDropdown={setShowProjectsDropdown} handleNewProject={handleNewProject} handleStartRename={handleStartRename} handleConfirmRename={handleConfirmRename} renamingProjectId={renamingProjectId} setRenamingProjectId={setRenamingProjectId} renameValue={renameValue} setRenameValue={setRenameValue} handleLoadProject={handleLoadProject} handleDeleteProject={handleDeleteProject} handleBackupWorkflow={handleBackupWorkflow} backupRestoreInputRef={backupRestoreInputRef} wokwiImportInputRef={wokwiImportInputRef} handleImportWokwiZip={handleImportWokwiZip} handleRestoreWorkflow={handleRestoreWorkflow} handleSyncToCloud={handleSyncToCloud} user={activeUser} navigate={navigate} isAuthenticated={isAnyAuthenticated} myProjects={myProjects} currentProjectId={currentProjectId} projectName={currentProjectName} formatProjectDate={formatProjectDate} saveHistory={saveHistory} setWires={setWires} setComponents={setComponents} setSelected={setSelected} history={history} components={components} wires={wires} webSerialSupported={webSerialSupported} hardwareBoards={boardComponents} hardwareBoardId={hardwareBoardId} setHardwareBoardId={handleHardwareBoardChange} hardwarePortPath={hardwarePortPath} setHardwarePortPath={setHardwarePortPath} resolvedHardwarePort={resolvedHardwarePort} hardwareAvailablePorts={hardwareAvailablePorts} showAllHardwarePorts={showAllHardwarePorts} setShowAllHardwarePorts={setShowAllHardwarePorts} refreshHardwarePorts={refreshHardwarePorts} isLoadingHardwarePorts={isLoadingHardwarePorts} hardwareBaudRate={hardwareBaudRate} setHardwareBaudRate={setHardwareBaudRate} hardwareResetMethod={hardwareResetMethod} setHardwareResetMethod={setHardwareResetMethod} connectHardwareSerial={connectHardwareSerial} disconnectHardwareSerial={disconnectHardwareSerial} uploadToHardware={handleUploadToHardware} hardwareConnected={hardwareConnected} hardwareConnecting={hardwareConnecting} isUploadingHardware={isUploadingHardware} hardwareStatus={hardwareStatus} editingDisabled={liveEditingDisabled} setShowProjectsSidebar={setShowProjectsSidebar} setProjectsSidebarTab={setProjectsSidebarTab} validationErrors={validationErrors} autofixPlan={autofixPlan} autofixStatus={autofixStatus} autofixLog={autofixLog} onApplyPlan={handleApplyPlan} onRefresh={triggerAutofixAnalysis} autoWiringEnabled={autoWiringEnabled} setAutoWiringEnabled={setAutoWiringEnabled} autoBreadboardEnabled={autoBreadboardEnabled} setAutoBreadboardEnabled={setAutoBreadboardEnabled} autoCodingEnabled={autoCodingEnabled} setAutoCodingEnabled={setAutoCodingEnabled} showAutofix={showAutofix} setShowAutofix={setShowAutofix} showShortcuts={showShortcuts} setShowShortcuts={setShowShortcuts} onStartTour={() => { localStorage.removeItem('openhw-tour-completed'); setShowTour(true); }} />
+        <TopToolbox board={board} setBoard={setBoard} isRunning={isRunning} isPaused={isPaused} handleRun={handleRun} handlePause={handlePause} handleResume={handleResume} handleStop={handleStop} isCompiling={isCompiling} isBooting={isBooting} assessmentMode={assessmentMode} assessmentProjectName={assessmentProjectName} isSubmittingAssessment={isSubmittingAssessment} handleAssessmentSubmit={handleAssessmentSubmit} undo={undo} redo={redo} selected={selected} rotateComponent={rotateComponent} theme={theme} toggleTheme={toggleTheme} showViewPanel={showViewPanel} setShowViewPanel={setShowViewPanel} viewPanelSection={viewPanelSection} setViewPanelSection={setViewPanelSection} schematicDataUrl={schematicDataUrl} setSchematicDataUrl={setSchematicDataUrl} schematicLoading={schematicLoading} setSchematicLoading={setSchematicLoading} downloadSchematicPng={downloadSchematicPng} downloadSchematicPdf={downloadSchematicPdf} generateSchematic={generateSchematic} downloadCompCsv={downloadCompCsv} importFileRef={importFileRef} downloadPng={downloadPng} importPng={importPng} downloadSimulationJson={downloadSimulationJson} handleSave={handleSave} isExporting={isExporting} handleShareSimulation={handleShareSimulation} isSharingSimulation={isSharingSimulation} refreshProjectList={refreshProjectList} showProjectsDropdown={showProjectsDropdown} setShowProjectsDropdown={setShowProjectsDropdown} handleNewProject={handleNewProject} handleStartRename={handleStartRename} handleConfirmRename={handleConfirmRename} renamingProjectId={renamingProjectId} setRenamingProjectId={setRenamingProjectId} renameValue={renameValue} setRenameValue={setRenameValue} handleLoadProject={handleLoadProject} handleDeleteProject={handleDeleteProject} handleBackupWorkflow={handleBackupWorkflow} backupRestoreInputRef={backupRestoreInputRef} wokwiImportInputRef={wokwiImportInputRef} handleImportWokwiZip={handleImportWokwiZip} handleRestoreWorkflow={handleRestoreWorkflow} handleSyncToCloud={handleSyncToCloud} user={activeUser} navigate={navigate} isAuthenticated={isAnyAuthenticated} myProjects={myProjects} currentProjectId={currentProjectId} projectName={currentProjectName} formatProjectDate={formatProjectDate} saveHistory={saveHistory} setWires={setWires} setComponents={setComponents} setSelected={setSelected} history={history} components={components} wires={wires} webSerialSupported={webSerialSupported} hardwareBoards={boardComponents} hardwareBoardId={hardwareBoardId} setHardwareBoardId={handleHardwareBoardChange} hardwarePortPath={hardwarePortPath} setHardwarePortPath={setHardwarePortPath} resolvedHardwarePort={resolvedHardwarePort} hardwareAvailablePorts={hardwareAvailablePorts} showAllHardwarePorts={showAllHardwarePorts} setShowAllHardwarePorts={setShowAllHardwarePorts} refreshHardwarePorts={refreshHardwarePorts} isLoadingHardwarePorts={isLoadingHardwarePorts} hardwareBaudRate={hardwareBaudRate} setHardwareBaudRate={setHardwareBaudRate} hardwareResetMethod={hardwareResetMethod} setHardwareResetMethod={setHardwareResetMethod} connectHardwareSerial={connectHardwareSerial} disconnectHardwareSerial={disconnectHardwareSerial} uploadToHardware={handleUploadToHardware} hardwareConnected={hardwareConnected} hardwareConnecting={hardwareConnecting} isUploadingHardware={isUploadingHardware} hardwareStatus={hardwareStatus} editingDisabled={liveEditingDisabled} setShowProjectsSidebar={setShowProjectsSidebar} setProjectsSidebarTab={setProjectsSidebarTab} validationErrors={validationErrors} autofixPlan={autofixPlan} autofixStatus={autofixStatus} autofixLog={autofixLog} onApplyPlan={handleApplyPlan} onRefresh={triggerAutofixAnalysis} autoWiringEnabled={autoWiringEnabled} setAutoWiringEnabled={setAutoWiringEnabled} autoBreadboardEnabled={autoBreadboardEnabled} setAutoBreadboardEnabled={setAutoBreadboardEnabled} autoCodingEnabled={autoCodingEnabled} setAutoCodingEnabled={setAutoCodingEnabled} showAutofix={showAutofix} setShowAutofix={setShowAutofix} showShortcuts={showShortcuts} setShowShortcuts={setShowShortcuts} onStartTour={() => { localStorage.removeItem('openhw-tour-completed'); setShowTour(true); }} />
 
         <SimulatorStatusBanners
           studentAssignmentMode={studentAssignmentMode}
@@ -8727,60 +8947,62 @@ export function SimulatorPage({ gamificationMode = false }) {
             {/* Zoom Wrapper — scales all circuit content */}
             {/* Fix #4: innerCanvasRef is used to apply CSS transform directly during panning.
                React state (canvasOffset) is only committed once on mouseup. */}
-              <CanvasSceneLayer
-              innerCanvasRef={innerCanvasRef}
-              canvasOffset={canvasOffset}
-              canvasZoom={canvasZoom}
-              showGrid={showGrid}
-              wires={wires}
-              wiresAlwaysOnTop={wiresAlwaysOnTop}
-              selected={selected}
-              components={components}
-              getPinPos={getPinPos}
-              getPinExitPoint={getPinExitPoint}
-              wirepointsEnabled={wirepointsEnabled}
-              respectExitSide={respectExitSide}
-              theme={theme}
-              setSelected={setSelected}
-              canvasRef={canvasRef}
-              setWireClickPos={setWireClickPos}
-              canvasOffsetRef={canvasOffsetRef}
-              canvasZoomRef={canvasZoomRef}
-              setSegDrag={setSegDrag}
-              segDragRef={segDragRef}
-              autofixPlan={autofixPlan}
-              getPinPosWithGhosts={getPinPosWithGhosts}
-              wireStart={wireStart}
-              mousePos={mousePos}
-              multiRoutePath={multiRoutePath}
-              svgRef={svgRef}
-              isRunning={isRunning}
-              isComponentDragging={isComponentDragging}
-              COMPONENT_REGISTRY={COMPONENT_REGISTRY}
-              getComponentStateAttrs={getComponentStateAttrs}
-              updateComponentAttr={updateComponentAttr}
-              wireClickPos={wireClickPos}
-              updateWireColor={updateWireColor}
-              saveHistory={saveHistory}
-              setWires={setWires}
-              deleteWire={deleteWire}
-              PIN_DEFS={PIN_DEFS}
-              errorCompIds={errorCompIds}
-              serialBoardFilter={serialBoardFilter}
-              onCompContextMenu={onCompContextMenu}
-              onCompMouseDown={onCompMouseDown}
-              onCompClick={onCompClick}
-              getLiveOopStateSnapshot={getLiveOopStateSnapshot}
-              subscribeLiveOopState={subscribeLiveOopState}
-              neopixelRefs={neopixelRefs}
-              hoveredPin={hoveredPin}
-              setHoveredPin={setHoveredPin}
-              snappingHoles={snappingHoles}
-              getPinCategory={getPinCategory}
-              hasCategoryIntersection={hasCategoryIntersection}
-              onPinClick={onPinClick}
-              setWireStart={setWireStart}
-            />
+              <DisplayRenderProvider renderWorker={renderWorker}>
+                <CanvasSceneLayer
+                innerCanvasRef={innerCanvasRef}
+                canvasOffset={canvasOffset}
+                canvasZoom={canvasZoom}
+                showGrid={showGrid}
+                wires={wires}
+                wiresAlwaysOnTop={wiresAlwaysOnTop}
+                selected={selected}
+                components={components}
+                getPinPos={getPinPos}
+                getPinExitPoint={getPinExitPoint}
+                wirepointsEnabled={wirepointsEnabled}
+                respectExitSide={respectExitSide}
+                theme={theme}
+                setSelected={setSelected}
+                canvasRef={canvasRef}
+                setWireClickPos={setWireClickPos}
+                canvasOffsetRef={canvasOffsetRef}
+                canvasZoomRef={canvasZoomRef}
+                setSegDrag={setSegDrag}
+                segDragRef={segDragRef}
+                autofixPlan={autofixPlan}
+                getPinPosWithGhosts={getPinPosWithGhosts}
+                wireStart={wireStart}
+                mousePos={mousePos}
+                multiRoutePath={multiRoutePath}
+                svgRef={svgRef}
+                isRunning={isRunning}
+                isComponentDragging={isComponentDragging}
+                COMPONENT_REGISTRY={COMPONENT_REGISTRY}
+                getComponentStateAttrs={getComponentStateAttrs}
+                updateComponentAttr={updateComponentAttr}
+                wireClickPos={wireClickPos}
+                updateWireColor={updateWireColor}
+                saveHistory={saveHistory}
+                setWires={setWires}
+                deleteWire={deleteWire}
+                PIN_DEFS={PIN_DEFS}
+                errorCompIds={errorCompIds}
+                serialBoardFilter={serialBoardFilter}
+                onCompContextMenu={onCompContextMenu}
+                onCompMouseDown={onCompMouseDown}
+                onCompClick={onCompClick}
+                getLiveOopStateSnapshot={getLiveOopStateSnapshot}
+                subscribeLiveOopState={subscribeLiveOopState}
+                neopixelRefs={neopixelRefs}
+                hoveredPin={hoveredPin}
+                setHoveredPin={setHoveredPin}
+                snappingHoles={snappingHoles}
+                getPinCategory={getPinCategory}
+                hasCategoryIntersection={hasCategoryIntersection}
+                onPinClick={onPinClick}
+                setWireStart={setWireStart}
+                />
+              </DisplayRenderProvider>
 
             <SimulatorRuntimePanel
               isRunning={isRunning}
@@ -8819,8 +9041,6 @@ export function SimulatorPage({ gamificationMode = false }) {
               setIsConsoleOpen={setIsConsoleOpen}
               consoleHeight={consoleHeight}
               consoleEntries={consoleEntries}
-              activeConsoleTab={activeConsoleTab}
-              setActiveConsoleTab={setActiveConsoleTab}
               protocolLogs={protocolLogs}
               setProtocolLogs={setProtocolLogs}
               components={components}

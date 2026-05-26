@@ -103,3 +103,17 @@
 *   Resolves the GitHub large file rejection error (`GH001: Large files detected; exceeds GitHub's file size limit of 100.00 MB`).
 *   Maintains working directory integrity and preserves all previous code modifications exactly as intended without data loss.
 
+## Conversation: 5611efe3-5194-42dd-9f1e-e997c60e046a (2026-05-25)
+
+### Modified Files:
+1. **[compileController.js](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/esp32/controller/compileController.js)**:
+   * **SPI Shim Registration**: Added `SimulatorSPI.h` (mapped to `SPI.h`) and `SimulatorSPI.cpp` (mapped to `SPI.cpp`) to the `SHIM_HEADERS` collection. This ensures that any compiled sketch including `<SPI.h>` will compile against our custom simulation shim rather than the core Arduino ESP32 SPI hardware driver.
+2. **[SimulatorSPI.h](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/esp32/utils/SimulatorSPI.h)**:
+   * **New File**: Created a pure-ASCII, sim-compatible SPI header that defines `SPISettings` and `SPIClass` with all standard ESP32 Arduino Core class member function declarations (like `begin`, `end`, `transfer`, `transferBytes`, `write`, `writeBytes`, `writePixels`, `writePattern`).
+3. **[SimulatorSPI.cpp](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/esp32/utils/SimulatorSPI.cpp)**:
+   * **New File**: Implemented `SPIClass` shim logic. For single-byte operations, it outputs `>SPI:xx<` UART frames. For bulk transfers/writes (`writeBytes`, `writePixels`, `transferBytes`), it chunks the input buffer into segments of max 128 bytes (preventing stack overflows in the ESP32 task) and formats them as `>SPIBUF:<hexdata><` frames. All messages are emitted safely via the serial mutex using the non-static `sim_wire_emit` wrapper.
+
+### Reasoning:
+* Fixes the severe host CPU load and user interface lag caused by the real ESP32 core SPI driver busy-waiting on emulated SPI hardware registers in QEMU.
+* Fixes the `Guru Meditation Error: Core / panic'ed (Cache error)` crashes during QEMU simulation of TFT LCDs.
+* Enables display data to actually flow to the frontend (via WebSocket `SPI_BATCH` events) so that the virtual TFT LCD and ePaper displays can render visual screen updates smoothly.

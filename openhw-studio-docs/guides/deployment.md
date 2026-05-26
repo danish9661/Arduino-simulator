@@ -1,4 +1,4 @@
-﻿<div v-pre>
+<div v-pre>
 
 # Complete Deployment Guide for OpenHW Studio
 
@@ -173,20 +173,6 @@ You are ready! Your server is listening for commands from GitHub.
    ```
    *(Also push from your frontend repo if needed)*
 4. Go to the **Actions** tab on your GitHub repositories.
-5. You will see the `deploy.yml` workflow running.
-6. Once the build finishes, it will pause. A yellow banner will appear asking for **Review**.
-7. Click it, approve the deployment, and watch as GitHub pings your VM, your VM pulls the Docker image, and your server goes live!
-
----
-
-## Phase 6: Infrastructure Monitoring & Security
-
-The Admin Dashboard now includes real-time infrastructure monitoring. For this to work securely:
-
-### 1. Docker Socket Security
-The backend container is configured to mount `/var/run/docker.sock`. This allows the dashboard to:
-*   Show real-time CPU/RAM usage of your services.
-*   Allow you to restart services (Frontend, Backend, MongoDB) directly from the UI.
 *   View live system logs.
 
 ### 2. Troubleshooting "N/A" or Disconnected States
