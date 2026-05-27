@@ -314,6 +314,7 @@ impl Engine {
         let is_pico = self.components.get(board_id)?.kind.contains("pico");
         let is_esp32 = self.components.get(board_id)?.kind.contains("esp32");
         let is_mega = self.components.get(board_id)?.kind.contains("mega");
+        let is_stm32 = self.components.get(board_id)?.kind.contains("stm32");
         
         if bus_type == "i2c" {
             let pairs = if is_pico {
@@ -323,6 +324,8 @@ impl Engine {
                 ]
             } else if is_esp32 {
                 vec![("21", "22", "", 0)]
+            } else if is_stm32 {
+                vec![("PB7", "PB6", "", 1), ("PB11", "PB10", "", 2)]
             } else if is_mega {
                 vec![("20", "21", "", 0), ("SDA", "SCL", "", 0)]
             } else {
@@ -343,6 +346,8 @@ impl Engine {
                 ]
             } else if is_esp32 {
                 vec![("18", "23", "19", 0), ("14", "13", "12", 1)]
+            } else if is_stm32 {
+                vec![("PA5", "PA7", "PA6", 1), ("PB13", "PB15", "PB14", 2)]
             } else if is_mega {
                 vec![("52", "51", "50", 0), ("SCK", "MOSI", "MISO", 0)]
             } else {
@@ -368,6 +373,7 @@ impl Engine {
         let board = self.components.get(board_id)?;
         let is_pico = board.kind.contains("pico") || board.kind.contains("rp2040");
         let is_esp32 = board.kind.contains("esp32");
+        let is_stm32 = board.kind.contains("stm32");
 
         let mut preferred_cleaned = preferred.to_string();
         
@@ -401,6 +407,32 @@ impl Engine {
                 }
                 _ => {}
             }
+        } else if is_stm32 {
+            match preferred.to_uppercase().as_str() {
+                "SDA" | "A4" => preferred_cleaned = "PB7".to_string(),
+                "SCL" | "A5" => preferred_cleaned = "PB6".to_string(),
+                "MOSI" => preferred_cleaned = "PA7".to_string(),
+                "MISO" => preferred_cleaned = "PA6".to_string(),
+                "SCK" => preferred_cleaned = "PA5".to_string(),
+                "RX" => preferred_cleaned = "PA10".to_string(),
+                "TX" => preferred_cleaned = "PA9".to_string(),
+                "A0" => preferred_cleaned = "PA0".to_string(),
+                "A1" => preferred_cleaned = "PA1".to_string(),
+                "A2" => preferred_cleaned = "PA2".to_string(),
+                "A3" => preferred_cleaned = "PA3".to_string(),
+                _ if preferred.chars().all(|c| c.is_numeric()) => {
+                    if preferred == "13" {
+                        preferred_cleaned = "PC13".to_string();
+                    } else if preferred == "9" {
+                        preferred_cleaned = "PA3".to_string();
+                    } else if preferred == "10" {
+                        preferred_cleaned = "PA2".to_string();
+                    } else {
+                        preferred_cleaned = format!("PA{}", preferred);
+                    }
+                }
+                _ => {}
+            }
         }
 
         let preferred_exists = board.pins.iter().any(|p| p.id == preferred_cleaned);
@@ -416,6 +448,7 @@ impl Engine {
                 id.chars().all(|c| c.is_numeric()) || 
                 (is_pico && id.starts_with("GP")) || 
                 (is_esp32 && id.starts_with("GPIO")) ||
+                (is_stm32 && (id.starts_with("PA") || id.starts_with("PB") || id.starts_with("PC"))) ||
                 id.starts_with('A') // Allow A0, A1, etc.
             })
             .collect();
@@ -436,6 +469,7 @@ impl Engine {
 
         // Try analog pins (Board Specific)
         let analog_ids = if is_pico { vec!["GP26", "GP27", "GP28"] } 
+                         else if is_stm32 { vec!["PA0","PA1","PA2","PA3","PA4","PA5","PA6","PA7"] }
                          else { vec!["A0","A1","A2","A3","A4","A5"] };
         for ap in &analog_ids {
             if board.pins.iter().any(|p| p.id == *ap) && !is_taken(ap) {
@@ -515,6 +549,7 @@ impl Engine {
         };
         let is_pico = board.kind.contains("pico") || board.kind.contains("rp2040");
         let is_esp32 = board.kind.contains("esp32");
+        let is_stm32 = board.kind.contains("stm32");
 
         let board_has_5v = self.pin_exists(board_id, "5V") || self.pin_exists(board_id, "VBUS");
         let mut fallback_use_external_psu = false;
@@ -556,7 +591,7 @@ impl Engine {
                     x: ps_x, y: ps_y, w: Some(60.0), h: Some(60.0),
                     attrs: Some(serde_json::json!({ "voltage": "5.0" })),
                 });
-                let target_gnd = if is_esp32 { "GND.1" } else { "GND" };
+                let target_gnd = if is_esp32 { "GND.1" } else if is_stm32 { "GND_1" } else { "GND" };
                 plan.added_wires.push(WirePlan {
                     id: format!("w_ps_gnd_{}", comp.id),
                     from: "powersupply:GND".to_string(),
@@ -597,6 +632,12 @@ impl Engine {
                     format!("{}:VBUS", board_id).to_string()
                 } else if is_esp32 {
                     format!("{}:VIN", board_id).to_string()
+                } else if is_stm32 {
+                    if pn == "3v3" {
+                        format!("{}:3V3_1", board_id).to_string()
+                    } else {
+                        format!("{}:5V", board_id).to_string()
+                    }
                 } else {
                     format!("{}:5V", board_id).to_string()
                 };
@@ -614,6 +655,8 @@ impl Engine {
                     format!("{}:GND", fallback_psu_id)
                 } else if is_esp32 {
                     format!("{}:GND.1", board_id).to_string()
+                } else if is_stm32 {
+                    format!("{}:GND_1", board_id).to_string()
                 } else {
                     format!("{}:GND", board_id).to_string()
                 };
@@ -627,7 +670,7 @@ impl Engine {
                     lane: (idx % 7) as i32,
                 });
             } else if pt == "analog" || sig.contains("analog") {
-                let pref = if is_pico { "GP26" } else { "A0" };
+                let pref = if is_pico { "GP26" } else if is_stm32 { "PA0" } else { "A0" };
                 if let Some(ap) = self.resolve_best_pin(board_id, pref) {
                     plan.added_wires.push(WirePlan {
                         id: format!("w_fallback_analog_{}_{}", comp.id, t),
@@ -813,6 +856,7 @@ pub fn generate_autonomous_setup(
     let mut i2c_injected = false;
 
     let is_esp32 = engine.components.get(&board_id).map(|c| c.kind.contains("esp32")).unwrap_or(false);
+    let is_stm32 = engine.components.get(&board_id).map(|c| c.kind.contains("stm32")).unwrap_or(false);
     let board_has_5v = engine.pin_exists(&board_id, "5V") || engine.pin_exists(&board_id, "VBUS");
     let mut use_external_psu = false;
     let mut psu_id = "powersupply".to_string();
@@ -853,7 +897,7 @@ pub fn generate_autonomous_setup(
                     x: ps_x, y: ps_y, w: Some(60.0), h: Some(60.0),
                     attrs: Some(serde_json::json!({ "voltage": "5.0" })),
                 });
-                let target_gnd = if is_esp32 { "GND.1" } else { "GND" };
+                let target_gnd = if is_esp32 { "GND.1" } else if is_stm32 { "GND_1" } else { "GND" };
                 plan.added_wires.push(WirePlan {
                     id: format!("w_ps_gnd_{}", main_id),
                     from: "powersupply:GND".to_string(),
@@ -1062,10 +1106,13 @@ pub fn generate_autonomous_setup(
                 resolved_target_pin = preferred.clone();
                 
                 let is_pico = engine.components.get(&board_id).map(|c| c.kind.contains("pico")).unwrap_or(false);
+                let is_stm32 = engine.components.get(&board_id).map(|c| c.kind.contains("stm32")).unwrap_or(false);
 
                 if preferred.to_lowercase() == "gnd" {
                     if use_external_psu {
                         target = format!("{}:GND", psu_id);
+                    } else if is_stm32 {
+                        target = format!("{}:GND_1", board_id);
                     } else {
                         target = format!("{}:GND", board_id);
                     }
@@ -1078,7 +1125,11 @@ pub fn generate_autonomous_setup(
                         target = format!("{}:5V", board_id);
                     }
                 } else if preferred == "3V3" {
-                    target = format!("{}:3V3", board_id);
+                    if is_stm32 {
+                        target = format!("{}:3V3_1", board_id);
+                    } else {
+                        target = format!("{}:3V3", board_id);
+                    }
                 } else if preferred.contains(':') {
                     // Resolve helper:alias:pin1|pin2 -> physical_id:best_pin
                     let parts: Vec<&str> = preferred.split(':').collect();

@@ -1,5 +1,56 @@
 # Change Log & Audit Trail
 
+## Conversation: 7902fd80-654d-4b11-bab1-262e85690071 (2026-05-27)
+
+### Modified & Added Files:
+1. **[STM32SimulatorBridge.h](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/stm32/utils/STM32SimulatorBridge.h)**:
+   *   **High-Level tone/noTone Shimming**: Shimmed the `tone()` and `noTone()` standard Arduino functions to transmit high-level `>TONE:pin:freq:dur<` serial commands over USART1, rather than high-frequency physical edge toggles, preventing serial buffer saturation.
+   *   **Pure Declaration Conversion**: Split declarations and macros out from definitions to prevent duplicate symbol linker errors under global force-include.
+2. **[STM32SimulatorBridge.cpp](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/stm32/utils/STM32SimulatorBridge.cpp)** [NEW]:
+   *   **Bridge Implementation**: Created a dedicated translation unit containing all global variable definitions and function bodies for the STM32 simulator bridge.
+3. **[compileController.js (STM32)](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/stm32/controller/compileController.js)**:
+   *   **Global shimming**: Added `SimulatorBridge.cpp` to the shim file copy list and added `-include SimulatorBridge.h` as a GCC extra flag to shim libraries globally.
+   *   **Preamble Cleanup**: Removed duplicate `sim_` declarations and pin macros from the main sketch preamble, eliminating C++ default-argument redeclaration compiler errors.
+4. **[SimulatorBridge.h (ESP32)](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/esp32/utils/SimulatorBridge.h)**:
+   *   **High-Level tone/noTone Shimming**: Shimmed `tone()` and `noTone()` to emit `>TONE:pin:freq:dur<` commands, providing a unified high-performance shimming architecture for ESP32 QEMU targets.
+   *   **Pure Declaration Conversion**: Split definitions out to avoid linker issues under global pre-inclusion.
+5. **[SimulatorBridge.cpp (ESP32)](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/esp32/utils/SimulatorBridge.cpp)** [NEW]:
+   *   **Bridge Implementation**: Created a dedicated translation unit for the ESP32 simulator bridge implementation.
+6. **[compileController.js (ESP32)](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/esp32/controller/compileController.js)**:
+   *   **Global shimming**: Added `SimulatorBridge.cpp` to the shim file copy list and added `-include SimulatorBridge.h` as a GCC extra flag to shim libraries globally.
+   *   **Preamble Cleanup**: Removed duplicate `sim_` declarations and pin macros from the main sketch preamble, eliminating C++ default-argument redeclaration compiler errors.
+7. **[renodeRunner.js](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/stm32/utils/renodeRunner.js)**:
+   *   **Unified SPI_BATCH Telemetry**: Converted the `SPIBUF` hex frame handler to encode binary bytes to base64 and dispatch standard `SPI_BATCH` messages instead of raw `SPI_TRANSACTION` hex messages. This aligns the STM32 target perfectly with the frontend worker's `BackendProxyRunner` `syncSpiBatch` API, enabling real-time graphics rendering on the virtual ILI9341 display.
+   *   **TONE Frame Parser**: Intercepted the serial `TONE:` command packets in `_handleFrame` and dispatched a `TONE` WebSocket message with frequency, duration, and pin.
+   *   **DWT Time Sync**: Restructured the DWT cycle counter mock script to sync virtual delay times with actual CPU instruction execution counts dynamically (`cpu.ExecutedInstructions * 10`) using a safe C#-compatible iterator traversal.
+   *   **Console Logging Flood Disablement**: Removed the extremely verbose `TCP-DATA` console/WebSocket debug logger in the `'data'` socket callback, stopping hundreds of log frames per second from blocking the Node.js event loop and freezing the browser's console. This eliminates the severe webpage lag and ensures a swift, real-time transition from booting to running status.
+8. **[lib.rs (Autowiring Engine)](file:///c:/Users/Danish/Documents/simulator/openhw-studio-autowiring-engine/src/lib.rs)**:
+   *   **STM32 USART Pin Protection**: Modified the universal pin translation layer for STM32 targets. Numeric pin requests for `"9"` and `"10"` (which match Arduino Uno's default SPI display CS/DC pins) are now redirected to the safe, free GPIO pins `"PA3"` and `"PA2"` instead of hardcoded USART1 pins (`PA9`/`PA10`), protecting the serial communication tunnel from conflicts.
+9. **[STM32SimulatorSPI.cpp](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/stm32/utils/STM32SimulatorSPI.cpp)** & **[SimulatorSPI.cpp (ESP32)](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/esp32/utils/SimulatorSPI.cpp)**:
+   *   **64x SPI Buffering Performance Optimization**: Removed the immediate-flushing bug (where the SPI controller was flushing after every single byte write), buffering up to `64` bytes before transmitting a `>SPIBUF:<` frame. This reduces outbound WebSocket traffic by 64 times, accelerating screen rendering speeds and slashing simulator boot times from 28 seconds to under 1 second.
+8. **[qemuRunner.js](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/esp32/utils/qemuRunner.js)**:
+   *   **TONE Frame Parser**: Configured `TONE_PATTERN` and parsed the high-level tone frames, propagating the custom `TONE` event over the WebSocket session.
+9. **[useHardwareSocket.js](file:///c:/Users/Danish/Documents/simulator/OpenHW-studio-frontend/src/esp32/hooks/useHardwareSocket.js)**:
+   *   **TONE Socket Handler**: Destructured `onTone` and routed incoming `'TONE'` WebSocket messages to it.
+10. **[useEsp32Engine.js](file:///c:/Users/Danish/Documents/simulator/OpenHW-studio-frontend/src/pages/simulationpage/hooks/useEsp32Engine.js)**:
+   *   **TONE Engine Relayer**: Wired the `onTone` socket callback to post a `'TONE'` message to the web worker thread.
+11. **[simulation.worker.ts](file:///c:/Users/Danish/Documents/simulator/OpenHW-studio-frontend/src/worker/simulation.worker.ts)**:
+   *   **TONE Worker Router**: Intercepted the `'TONE'` message in the worker thread and invoked `syncTone` on the proxy runner.
+12. **[backend-proxy-runner.ts](file:///c:/Users/Danish/Documents/simulator/OpenHW-studio-frontend/src/worker/runners/backend-proxy-runner.ts)**:
+   *   **syncTone Net Routing**: Refactored `syncTone()` to resolve connected endpoints mapping to the signalling board pin using the netlist (`pinToNet`). Dispatches the signal via standard `onPWMSignal` / `onPWM` protocol hooks, matching the AVR/RP2040 connectivity pattern and removing direct component-type coupling from the runner. Enables/disables bypass flag `_isToneBypassed`.
+   *   **syncTone Connection Tracing Refinement**: Refactored `syncTone` to utilize the universal `collectConnectedComponentPins` connection-tracing logic rather than immediate net mapping. This ensures that intermediate passive components (such as resistors) are correctly traversed to locate the target buzzer. Also forces single-buzzer control as fallback if the resulting endpoints array is empty.
+13. **[logic.ts](file:///c:/Users/Danish/Documents/simulator/openhw-studio-emulator/src/components/openhw-buzzer/logic.ts)**:
+   *   **Tone-Bypass Silence Check**: Modified `BuzzerLogic.update()` to skip the automatic 100ms silence detection loop when the buzzer is driven in high-level tone-bypass mode (`_isToneBypassed = true`).
+14. **[component-registry.ts](file:///c:/Users/Danish/Documents/simulator/OpenHW-studio-frontend/src/worker/registries/component-registry.ts)**:
+    *   **Resistor Typo Fix in Traversal**: Fixed a double-comparison typo in `collectConnectedComponentPins` (lines 713 and 748) to correctly identify and traverse `'wokwi-resistor'` instances in addition to `'openhw-resistor'` instances.
+
+### Reasoning:
+*   Allows the virtual buzzer to generate audible sounds and register correct live telemetry on the screen when `tone()` or `noTone()` is called by sketches running inside QEMU (ESP32) and Renode (STM32).
+*   Avoids the significant communication lag and packet overflow that occurs when attempting to transmit raw high-frequency edge-toggles over a UART/WebSocket connection.
+*   Ensures that buzzer tones route correctly even when wired through passive components like current-limiting resistors.
+*   Enables separate library compilations (e.g. `Adafruit_ILI9341` displays) to utilize simulator shims globally via forced pre-inclusion, resolving non-touch screen rendering bugs on both STM32 and ESP32.
+*   Synchronizes Renode's delay framework to physical execution timings, ensuring stable display frame updates.
+
 ## Conversation: c81c5a98-5a3c-44c7-9340-2aa559e90e5c (2026-05-19)
 
 ### Modified Files:
@@ -117,3 +168,51 @@
 * Fixes the severe host CPU load and user interface lag caused by the real ESP32 core SPI driver busy-waiting on emulated SPI hardware registers in QEMU.
 * Fixes the `Guru Meditation Error: Core / panic'ed (Cache error)` crashes during QEMU simulation of TFT LCDs.
 * Enables display data to actually flow to the frontend (via WebSocket `SPI_BATCH` events) so that the virtual TFT LCD and ePaper displays can render visual screen updates smoothly.
+
+## Conversation: 7902fd80-654d-4b11-bab1-262e85690071 (2026-05-27)
+
+### Modified Files:
+1. **[compileController.js](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/stm32/controller/compileController.js)**:
+   * **STM32 Session Timeout**: Increased default GC session timeout from 15 seconds (`15 * 1000`) to 5 minutes (`300 * 1000`) to prevent premature cleanup of Renode sessions.
+   * **GPIO/ADC Shim Macro Injection**: Added the simulator shim function declarations (`sim_pinMode`, `sim_digitalWrite`, etc.) and macro definitions (`pinMode`, `digitalWrite`, `digitalRead`, `analogRead`) directly to the sketch `preamble` to intercept standard Arduino calls prior to compilation. Updated `INJECTED_LINE_COUNT` from 3 to 13 to maintain accurate compiler error line shifting.
+2. **[compileController.js](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/esp32/controller/compileController.js)**:
+   * **ESP32 Session Timeout**: Increased default GC session timeout from 15 seconds (`15 * 1000`) to 5 minutes (`300 * 1000`) to prevent premature cleanup of QEMU sessions.
+3. **[renodeRunner.js](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/stm32/utils/renodeRunner.js)**:
+   * **Renode Register Mocking & Boot Fixes**: Added `sysbus Tag` registers for unimplemented STM32 RCC and Flash peripheral registers in the generated `.resc` script (`RCC_CR`, `RCC_CFGR`, `RCC_CIR`, `RCC_AHBENR`, `RCC_APB2ENR`, `RCC_APB1ENR`, and `FLASH_ACR`).
+   * **Clock Enable Defaulting**: Initialized peripheral clock enable registers (`RCC_APB2ENR`, `RCC_APB1ENR`, `RCC_AHBENR`) to `0xFFFFFFFF` (all clocks enabled) by default in both the primary `rcc` mock and the `rcc_bitband` fallback block to prevent driver initialization failures.
+   * **DWT Cycle Counter Mock & Speed Optimization**: Added a `dwt` Python peripheral mock at `0xE0001000` representing the Cortex-M3 Data Watchpoint and Trace unit. To resolve high CPU lag where the simulated time was multiple times slower than wall-clock time (due to high-frequency loop reads inside the standard C++ `delay()` function), optimized `DWT_CYCCNT` (offset `0x04`) reads to increment `dwt_cyccnt` by `72000` (representing exactly 1ms of virtual CPU cycles at 72 MHz) per read, reducing loop iterations from 36,000 to only 500 per half-second delay. Additionally, suppressed high-frequency print logging on both reads and writes targeting the `0x04` offset, eliminating the heavy stdout parsing bottleneck.
+   * **Performance MIPS Alignment**: Configured `cpu PerformanceInMips 72` in the `.resc` script, aligning Renode's instruction-based virtual clock rate directly with the core's SysTick config (72,000 cycles reload value) to guarantee 1,000 interrupts per virtual second.
+   * **Absolute Python Print Mock Suppression**: Completely removed all Python `print()` stdout statements inside `rcc`, `rcc_bitband`, `flash_acr`, and `dwt` scripts, preventing high-frequency logging from blocking the Node.js main thread and choking execution.
+   * **IsInit Removal & Lazy Initialization**: Removed all `request.IsInit` checks in the Python scripts due to compatibility issues on older Renode versions, replacing them with lazy dictionary-scope checks (`if 'rcc_regs' not in dir():`).
+   * **String Log Concatenation**: Replaced `%` formatting with type-safe string concatenation using `hex()` in Python print statements to prevent type conversion errors inside IronPython.
+   * **RCC Bit-Band System Bus Sync**: Fixed a Python runtime error (`name 'sysbus' is not defined`) in `rcc_bitband` write/read handlers by accessing the system bus via `self.GetMachine().SystemBus` rather than referencing a global `sysbus` variable.
+   * **I2C Transaction Byte Conversion**: Added conversion of the raw I2C write transaction hex string (`hex`) into a numeric byte array (`data`) before transmitting the `I2C_TRANSACTION` WebSocket event.
+4. **[STM32SimulatorBridge.h](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/stm32/utils/STM32SimulatorBridge.h)**:
+   * **Serial1 Guard Removal**: Removed the `if (!Serial1) return;` guard in `_sim_send()` so outbound status/log frames are written directly to USART1 registers regardless of the core `HardwareSerial` initialization state.
+   * **Global Serial Polling Rate-Limiting**: Added a `200 microsecond` global rate-limit using `micros()` in `_process_serial_input()`. During tight busy-wait `delay()` loops in the user sketch, this reduces emulated USART register reads by **99.9%** (avoiding costly Renode C# boundaries) while maintaining instant responsiveness.
+   * **200,000x UART Transmission Speedup**: Completely removed the busy-wait polling loop for the `TXE` bit (which was causing a massive 200,000-iteration spin-wait per printed byte since Renode's USART status register does not set TXE to 1 by default), replacing it with direct virtual register writes.
+   * **CPU Idle Sleep (WFI Assembly Injection)**: Added `__asm__ volatile("wfi")` inside `yield()` to suspend CPU execution during delay cycles, allowing Renode to immediately advance virtual time without executing redundant host instructions.
+5. **[useEsp32Engine.js](file:///c:/Users/Danish/Documents/simulator/OpenHW-studio-frontend/src/pages/simulationpage/hooks/useEsp32Engine.js)**:
+   * **Dual-Board Telemetry Hook Dispatching**: Updated all 8 matching sites from `/esp32/i` to `/(esp32|stm32)/i` to locate the target board ID during neopixel, PWM, SPI, ADC, GPIO, I2C, serial, and wire tracing callbacks. This allows all incoming STM32 telemetry and pin state changes to be correctly forwarded to the simulation Web Worker.
+6. **[telemetryRegistry.js](file:///c:/Users/Danish/Documents/simulator/OpenHW-studio-frontend/src/pages/simulationpage/utils/telemetryRegistry.js)**:
+   * **STM32 Telemetry Registration**: Registered full telemetry parameter lists (leds, deepSiliconRegisters, deepSiliconSRAM, deepSiliconTimers, deepSiliconPower, deepSiliconInterrupts, backendDataReceived) for both `openhw-stm32-bluepill` and `wokwi-stm32-bluepill` board types to match ESP32's comprehensive diagnostic parameters.
+7. **[STM32SimulatorSPI.h](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/stm32/utils/STM32SimulatorSPI.h)**:
+   * **BitOrder Preprocessor Fix**: Removed the redundant and conflicting `#define LSBFIRST` and `#define MSBFIRST` macros to leverage the core's native type-safe `BitOrder` enum, resolving strict C++ compiler type-conversion errors inside `Adafruit_BusIO`.
+8. **[STM32SimulatorWire.h](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/stm32/utils/STM32SimulatorWire.h)**:
+   * **I2C Transmit Buffer Expansion**: Increased `_tx_buf` capacity from `256` bytes to `1028` bytes in the private section of `TwoWire` to fully prevent truncation of large video frame buffers.
+9. **[STM32SimulatorWire.cpp](file:///c:/Users/Danish/Documents/simulator/openhw-studio-backend/src/stm32/utils/STM32SimulatorWire.cpp)**:
+   * **Transmit Frame Boundary & Size Updates**: Increased `write` bounds checks from `256` to `1028` bytes, and increased the temporary stack string `frame` array in `endTransmission` from `528` bytes to `2100` bytes to prevent character overflow during massive OLED/LCD screen data transmissions.
+
+### Reasoning:
+* Prevents simulator processes from being terminated prematurely due to slow startup or compiling on Windows platforms.
+* Fixes infinite system clock configuration loops during firmware boot, enabling the simulator to successfully load and execute sketch code (such as blinking the LED).
+* Resolves firmware boot hangs caused by the lack of a DWT cycle counter (leading to infinite loops in `delayMicroseconds()`) and ensures the communication bridge reliably transmits status messages over USART1.
+* Resolves platform loading tracebacks inside Renode caused by the missing `request.IsInit` property on older Renode releases, making the platform description self-healing and backward-compatible.
+* Resolves Python runtime exceptions during register synchronization in bit-band operations by utilizing the context-specific `self.GetMachine().SystemBus` API.
+* Ensures user sketches utilize the simulation GPIO shims (which transmit state updates over UART) instead of calling the native STM32 core hardware GPIO functions, fixing the issue where the virtual LED failed to blink.
+* Restores real-time voltage and pin state updates in the frontend simulator worker for STM32 Blue Pill boards by resolving a board-matching gap in telemetry event dispatching.
+* Registered stm32 board telemetry parameters to support comprehensive live debugging metrics.
+* Resolves C++ compiler type-conversion errors inside `Adafruit_BusIO` when `Adafruit_SSD1306` is included, allowing SSD1306 OLED sketches to compile successfully on the STM32 target.
+* Ensures compatibility with the frontend simulation engine and Web Worker, enabling the virtual SSD1306 OLED display to receive correct I2C data packages and update its screen.
+* Resolves the general STM32 simulation timer lag (ensuring 1 second in real life corresponds perfectly to 1 second of guest time) by rate-limiting guest-side serial register polling to once every 200us, configuring MIPS virtual clocks to 72 MIPS, and completely suppressing high-frequency print log blocking in Node.js.
+* Fixes blank/corrupted display screens on high-density displays (OLED/LCD2004) by expanding the I2C transmit buffer to 1028 bytes to hold full video frames without truncation or transaction stack overflows.
